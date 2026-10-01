@@ -1,0 +1,8 @@
+population,n,ret_5m_mean_bps,ret_5m_median_bps,ret_5m_hit_rate,ret_5m_n,ret_15m_mean_bps,ret_15m_median_bps,ret_15m_hit_rate,ret_15m_n,ret_30m_mean_bps,ret_30m_median_bps,ret_30m_hit_rate,ret_30m_n,ret_60m_mean_bps,ret_60m_median_bps,ret_60m_hit_rate,ret_60m_n,ret_eod_mean_bps,ret_eod_median_bps,ret_eod_hit_rate,ret_eod_n
+LOW_CONFLUENCE_rejected_bullish_ALL,3871,,,,0,,,,0,,,,0,,,,0,41.54,0.68,0.5027,3871
+LOW_CONFLUENCE_rejected_bullish_REGULAR,2835,,,,0,,,,0,,,,0,,,,0,42.82,18.79,0.5287,2835
+confluence>=2_bullish_ALL,29,,,,0,,,,0,,,,0,,,,0,-0.0,-72.19,0.3793,29
+confluence>=2_bullish_REGULAR,15,,,,0,,,,0,,,,0,,,,0,-20.56,-34.31,0.4,15
+vol_gate_PASS_regular_sample8000,8000,,,,0,,,,0,,,,0,,,,0,30.29,21.64,0.5319,8000
+vol_gate_FAIL_regular_sample8000,8000,,,,0,,,,0,,,,0,,,,0,-1.31,0.13,0.5009,8000
+random_regular_bar_sample8000,8000,,,,0,,,,0,,,,0,,,,0,0.23,-0.51,0.4971,8000

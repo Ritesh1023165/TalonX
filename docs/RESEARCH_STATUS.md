@@ -70,3 +70,61 @@ The **non-price-information lane** was exercised under that clause in Task 107B 
 insider open-market buying) and produced the `INSIDER_BUY_CLUSTER_V2` **paper** candidate.
 That is a paper-validation result, not a real-money edge; it does not reopen the price/volume
 lanes above.
+
+
+## Annotation (append-only) — Raw-adjustment contamination audit (2026-10-01)
+
+These annotations do **not** change any verdict above. They flag data-provenance risk, and the evidence is in
+`docs/research/evidence/2026-10-01_raw_adjustment_audit.md` on branch `research/raw-adjustment-audit`.
+
+### `RAW_CONTAMINATION_POSSIBLE`
+
+These studies used unadjusted (raw) bars with multi-day features and/or holdings. At least one split or spin-off falls
+inside the data window: AAPL, TSLA, NVDA, ISRG, AMZN, GOOGL, PANW, SHOP, LRCX, NFLX, BKNG, KLAC, HON or CMCSA, depending
+on the window.
+
+| Task | Annotation |
+|---|---|
+| 93 | `RAW_CONTAMINATION_POSSIBLE` |
+| 94 | `RAW_CONTAMINATION_POSSIBLE` |
+| 95A | `RAW_CONTAMINATION_POSSIBLE` |
+| 101A-B | `RAW_CONTAMINATION_POSSIBLE` |
+| 121 / 121A / 121B | `RAW_CONTAMINATION_POSSIBLE` (raw, multi-day holding, no EOD flatten) |
+| 125 Track B | `RAW_CONTAMINATION_POSSIBLE` (raw, overnight hold; only a partial ±50% guard) |
+| 56 | `RAW_CONTAMINATION_POSSIBLE` |
+| 7B–59 (V1 lineage) | `RAW_CONTAMINATION_POSSIBLE` |
+
+### Task 93: corporate-action check is `DEMONSTRABLY_INCORRECT`
+
+`results/task93_alpha_foundation/data_quality_report.md` states that none of the 35 symbols split in 2025-01 → 2026-08.
+An ex-date audit of Alpaca corporate actions shows these splits inside that span:
+- NFLX 10:1 on 2025-11-17
+- BKNG 25:1 on 2026-04-06
+- KLAC 10:1 on 2026-06-12
+
+`task93_canonical_v1` is therefore **not** split-clean.
+
+### Task 71 / 72 (B5a)
+
+**Correction to the audit doc's B2 table:** Task72's frozen residual-momentum contract holds 180 minutes with
+`NO_OVERNIGHT_HOLDING = True`. The only multi-day element is a 20-session beta lookback. No position can span a split.
+
+**Validation window** (2024-04-01..05-31, with the lookback from about 2024-03-01):
+- The ex-date audit found no split or spin-off on the 35 names.
+- **Verdict: validation failure not attributable to raw splits.**
+
+**Replication window** (2024-10-21..12-20):
+- It is reserved, was never executed, and was not queried.
+- LRCX 10:1 (2024-10-03) would have fallen inside its beta lookback.
+
+### Task 71 / 74 development slices (raw)
+
+- Task71's development slices contain NFLX 10:1 (2025-11-17), the HON spin-off (2025-10-30) and KLAC 10:1 (2026-06-12).
+- For Task74/75 this was confirmed decisive: Task75 is `RETIRED_AFTER_CORPORATE_ACTION_CORRECTION`.
+
+### Provenance
+
+- The acquisition code for `task93_canonical_v1`, `task95a`, `task95b_daily_v1` and `task95g_sp500_daily_v1` is **not
+  found** in any worktree or remote branch.
+- Their manifests and reports are rescued into `research/provenance/task93_97/`, with a sha256 inventory of the 986 data
+  files left in the live worktree.

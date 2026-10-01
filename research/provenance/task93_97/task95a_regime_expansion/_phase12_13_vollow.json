@@ -1,0 +1,322 @@
+[
+  {
+    "label": "opening_0930_1000 x vol_low",
+    "n": 32415,
+    "e0": 0.526,
+    "e5": 0.2074,
+    "e10": -0.1112,
+    "e20": -0.7483,
+    "pf5": 1.358,
+    "ci_low": 0.1876,
+    "ci_high": 0.2272,
+    "months_pos": 0.709,
+    "symbols_pos": 0.8,
+    "top3_contrib": 0.002,
+    "best_sym_contrib": 0.087,
+    "best_month_contrib": 0.068,
+    "best_year_contrib": 0.306,
+    "cost_burden_0_to_5": 0.3186,
+    "outlier_battery_e5": {
+      "ex_april2025": 0.2067,
+      "rm_best1": 0.2069,
+      "rm_best3": 0.2059,
+      "rm_best5": 0.205,
+      "rm_best_symbol": 0.1912,
+      "rm_best_month": 0.2024,
+      "rm_best_year": 0.2342,
+      "half_2020_2022": 0.1858,
+      "half_2023_2026": 0.2779
+    },
+    "per_year_e5_and_n": {
+      "2020": [
+        0.1535,
+        10761
+      ],
+      "2021": [
+        0.2497,
+        7527
+      ],
+      "2022": [
+        0.1652,
+        6516
+      ],
+      "2023": [
+        0.1735,
+        3693
+      ],
+      "2024": [
+        0.5184,
+        1560
+      ],
+      "2025": [
+        0.1906,
+        1936
+      ],
+      "2026": [
+        0.7035,
+        422
+      ]
+    },
+    "frozen_criteria_failed": [
+      "C8(burden0.32)"
+    ],
+    "survives_outlier_battery": true,
+    "verdict": "DISCOVERY_FAIL"
+  },
+  {
+    "label": "open30_AND_up15m x vol_low",
+    "n": 11817,
+    "e0": 0.6158,
+    "e5": 0.3102,
+    "e10": 0.0046,
+    "e20": -0.6067,
+    "pf5": 1.554,
+    "ci_low": 0.2755,
+    "ci_high": 0.3449,
+    "months_pos": 0.667,
+    "symbols_pos": 0.714,
+    "top3_contrib": 0.004,
+    "best_sym_contrib": 0.092,
+    "best_month_contrib": 0.08,
+    "best_year_contrib": 0.311,
+    "cost_burden_0_to_5": 0.3056,
+    "outlier_battery_e5": {
+      "ex_april2025": 0.3078,
+      "rm_best1": 0.3089,
+      "rm_best3": 0.3067,
+      "rm_best5": 0.3047,
+      "rm_best_symbol": 0.2816,
+      "rm_best_month": 0.3219,
+      "rm_best_year": 0.345,
+      "half_2020_2022": 0.3081,
+      "half_2023_2026": 0.317
+    },
+    "per_year_e5_and_n": {
+      "2020": [
+        0.2415,
+        3976
+      ],
+      "2021": [
+        0.3259,
+        2712
+      ],
+      "2022": [
+        0.3985,
+        2402
+      ],
+      "2023": [
+        0.1242,
+        1373
+      ],
+      "2024": [
+        0.572,
+        518
+      ],
+      "2025": [
+        0.4714,
+        652
+      ],
+      "2026": [
+        0.4909,
+        184
+      ]
+    },
+    "frozen_criteria_failed": [
+      "C8(burden0.31)"
+    ],
+    "survives_outlier_battery": true,
+    "verdict": "DISCOVERY_FAIL"
+  },
+  {
+    "label": "vol_expansion_ge_2x x vol_low",
+    "n": 34830,
+    "e0": 0.5063,
+    "e5": 0.2008,
+    "e10": -0.1046,
+    "e20": -0.7154,
+    "pf5": 1.369,
+    "ci_low": 0.1823,
+    "ci_high": 0.2194,
+    "months_pos": 0.7,
+    "symbols_pos": 0.771,
+    "top3_contrib": 0.003,
+    "best_sym_contrib": 0.078,
+    "best_month_contrib": 0.06,
+    "best_year_contrib": 0.275,
+    "cost_burden_0_to_5": 0.3054,
+    "outlier_battery_e5": {
+      "ex_april2025": 0.2003,
+      "rm_best1": 0.2001,
+      "rm_best3": 0.1987,
+      "rm_best5": 0.1976,
+      "rm_best_symbol": 0.1831,
+      "rm_best_month": 0.2029,
+      "rm_best_year": 0.2209,
+      "half_2020_2022": 0.1923,
+      "half_2023_2026": 0.2261
+    },
+    "per_year_e5_and_n": {
+      "2020": [
+        0.1527,
+        10252
+      ],
+      "2021": [
+        0.2289,
+        8558
+      ],
+      "2022": [
+        0.2051,
+        7195
+      ],
+      "2023": [
+        0.1222,
+        4080
+      ],
+      "2024": [
+        0.4113,
+        1870
+      ],
+      "2025": [
+        0.1853,
+        2408
+      ],
+      "2026": [
+        0.6022,
+        467
+      ]
+    },
+    "frozen_criteria_failed": [
+      "C8(burden0.31)"
+    ],
+    "survives_outlier_battery": true,
+    "verdict": "DISCOVERY_FAIL"
+  },
+  {
+    "label": "current_1m_gate_ge0.25 x vol_low",
+    "n": 3162,
+    "e0": 0.5896,
+    "e5": 0.4029,
+    "e10": 0.2162,
+    "e20": -0.1572,
+    "pf5": 1.792,
+    "ci_low": 0.337,
+    "ci_high": 0.4689,
+    "months_pos": 0.644,
+    "symbols_pos": 0.594,
+    "top3_contrib": 0.011,
+    "best_sym_contrib": 0.226,
+    "best_month_contrib": 0.226,
+    "best_year_contrib": 0.431,
+    "cost_burden_0_to_5": 0.1867,
+    "outlier_battery_e5": {
+      "ex_april2025": 0.4029,
+      "rm_best1": 0.3994,
+      "rm_best3": 0.3932,
+      "rm_best5": 0.3879,
+      "rm_best_symbol": 0.2926,
+      "rm_best_month": 0.445,
+      "rm_best_year": 0.4596,
+      "half_2020_2022": 0.3235,
+      "half_2023_2026": 1.0455
+    },
+    "per_year_e5_and_n": {
+      "2020": [
+        0.3435,
+        1543
+      ],
+      "2021": [
+        0.5743,
+        204
+      ],
+      "2022": [
+        0.2465,
+        1067
+      ],
+      "2023": [
+        1.0255,
+        47
+      ],
+      "2024": [
+        1.1006,
+        56
+      ],
+      "2025": [
+        0.7682,
+        78
+      ],
+      "2026": [
+        1.1622,
+        167
+      ]
+    },
+    "frozen_criteria_failed": [],
+    "survives_outlier_battery": true,
+    "verdict": "DISCOVERY_PASS"
+  },
+  {
+    "label": "close_1530_1600 x vol_low",
+    "n": 326127,
+    "e0": 0.3135,
+    "e5": 0.0638,
+    "e10": -0.1859,
+    "e20": -0.6853,
+    "pf5": 1.146,
+    "ci_low": 0.0591,
+    "ci_high": 0.0685,
+    "months_pos": 0.519,
+    "symbols_pos": 0.486,
+    "top3_contrib": 0.001,
+    "best_sym_contrib": 0.07,
+    "best_month_contrib": 0.048,
+    "best_year_contrib": 0.263,
+    "cost_burden_0_to_5": 0.2497,
+    "outlier_battery_e5": {
+      "ex_april2025": 0.0643,
+      "rm_best1": 0.0637,
+      "rm_best3": 0.0636,
+      "rm_best5": 0.0634,
+      "rm_best_symbol": 0.0477,
+      "rm_best_month": 0.0556,
+      "rm_best_year": 0.0161,
+      "half_2020_2022": 0.1042,
+      "half_2023_2026": -0.0035
+    },
+    "per_year_e5_and_n": {
+      "2020": [
+        0.2379,
+        70208
+      ],
+      "2021": [
+        0.009,
+        74913
+      ],
+      "2022": [
+        0.0657,
+        58769
+      ],
+      "2023": [
+        -0.0255,
+        52397
+      ],
+      "2024": [
+        0.0543,
+        35027
+      ],
+      "2025": [
+        -0.0195,
+        30872
+      ],
+      "2026": [
+        -0.0991,
+        3941
+      ]
+    },
+    "frozen_criteria_failed": [
+      "C2(0.064)",
+      "C3(pf1.15)",
+      "C8(burden0.25)"
+    ],
+    "survives_outlier_battery": false,
+    "verdict": "DISCOVERY_FAIL"
+  }
+]

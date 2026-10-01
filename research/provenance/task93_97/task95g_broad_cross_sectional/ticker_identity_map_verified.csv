@@ -1,0 +1,49 @@
+historical_symbol,current_or_successor_symbol,valid_to,change_type,confidence,source_note
+FB,META,2022-06-09,RENAME,PRIMARY,Facebook -> Meta Platforms rebrand
+WLTW,WTW,2022-01-07,RENAME,PRIMARY,Willis Towers Watson ticker change
+ANTM,ELV,2022-06-28,RENAME,PRIMARY,Anthem -> Elevance Health rebrand
+FISV,FI,2023-07-10,RENAME,PRIMARY,Fiserv ticker change
+COG,CTRA,2021-10-01,RENAME,PRIMARY,Cabot Oil & Gas COG -> Coterra CTRA
+XEC,CTRA,2021-10-01,MERGER_SUCCESSOR,PRIMARY,Cimarex merged into Cabot to form Coterra
+INFO,SPGI,2022-02-28,MERGER_SUCCESSOR,PRIMARY,IHS Markit acquired by S&P Global
+XLNX,AMD,2022-02-14,MERGER_SUCCESSOR,PRIMARY,Xilinx acquired by AMD
+MXIM,ADI,2021-08-26,MERGER_SUCCESSOR,PRIMARY,Maxim Integrated acquired by Analog Devices
+ALXN,,2021-07-21,ACQUIRED_FOREIGN_PARENT,PRIMARY,Alexion acquired by AstraZeneca (ADR)
+CERN,ORCL,2022-06-08,MERGER_SUCCESSOR,PRIMARY,Cerner acquired by Oracle
+ATVI,MSFT,2023-10-13,MERGER_SUCCESSOR,PRIMARY,Activision Blizzard acquired by Microsoft
+PXD,XOM,2024-05-03,MERGER_SUCCESSOR,PRIMARY,Pioneer Natural Resources acquired by ExxonMobil
+ABMD,JNJ,2022-12-22,MERGER_SUCCESSOR,PRIMARY,Abiomed acquired by Johnson & Johnson
+RE,EG,2023-05-01,RENAME,PRIMARY,Everest Re -> Everest Group ticker change
+DISCA,WBD,2022-04-11,MERGER_SUCCESSOR,PRIMARY,Discovery + WarnerMedia -> Warner Bros. Discovery
+DISCK,WBD,2022-04-11,MERGER_SUCCESSOR,PRIMARY,Discovery class C -> WBD
+VIAC,PARA,2022-02-16,RENAME,PRIMARY,ViacomCBS -> Paramount Global
+TWTR,,2022-10-28,ACQUIRED_PRIVATE,PRIMARY,Twitter taken private by Musk
+CTXS,,2022-09-30,ACQUIRED_PRIVATE,PRIMARY,Citrix taken private (Vista/Elliott)
+PKI,RVTY,2023-05-16,RENAME,PRIMARY,PerkinElmer -> Revvity
+FRC,,2023-05-01,FAILED,PRIMARY,"First Republic Bank seized by FDIC, sold to JPMorgan"
+SIVB,,2023-03-10,FAILED,PRIMARY,SVB Financial collapse
+SBNY,,2023-03-12,FAILED,PRIMARY,Signature Bank seized
+CELG,BMY,2019-11-20,MERGER_SUCCESSOR,PRIMARY,Celgene acquired by Bristol-Myers Squibb
+AGN,ABBV,2020-05-08,MERGER_SUCCESSOR,PRIMARY,Allergan acquired by AbbVie
+RTN,RTX,2020-04-03,MERGER_SUCCESSOR,PRIMARY,Raytheon + United Technologies -> Raytheon Technologies (UTX->RTX)
+UTX,RTX,2020-04-03,RENAME,PRIMARY,United Technologies -> Raytheon Technologies
+ETFC,MS,2020-10-02,MERGER_SUCCESSOR,PRIMARY,E*Trade acquired by Morgan Stanley
+TIF,,2021-01-07,ACQUIRED_PRIVATE,PRIMARY,Tiffany acquired by LVMH (foreign parent)
+NBL,CVX,2020-10-05,MERGER_SUCCESSOR,PRIMARY,Noble Energy acquired by Chevron
+CXO,COP,2021-01-15,MERGER_SUCCESSOR,PRIMARY,Concho Resources acquired by ConocoPhillips
+KSU,,2021-12-14,ACQUIRED_FOREIGN_PARENT,PRIMARY,Kansas City Southern acquired by Canadian Pacific
+MYL,VTRS,2020-11-16,MERGER_SUCCESSOR,PRIMARY,Mylan + Upjohn -> Viatris
+DWDP,,2019-06-03,SPLIT,PRIMARY,"DowDuPont split into DOW, DD, CTVA"
+WCG,CNC,2020-01-23,MERGER_SUCCESSOR,PRIMARY,WellCare acquired by Centene
+NLSN,,2022-10-11,ACQUIRED_PRIVATE,PRIMARY,Nielsen taken private
+PBCT,MTB,2022-04-04,MERGER_SUCCESSOR,PRIMARY,People's United acquired by M&T Bank
+VAR,,2021-04-15,ACQUIRED_FOREIGN_PARENT,PRIMARY,Varian acquired by Siemens Healthineers (foreign)
+FLIR,TDY,2021-05-14,MERGER_SUCCESSOR,PRIMARY,FLIR Systems acquired by Teledyne
+CDAY,DAY,2023-01-01,RENAME,PRIMARY,Ceridian -> Dayforce ticker change
+DRE,PLD,2022-10-04,MERGER_SUCCESSOR,PRIMARY,Duke Realty acquired by Prologis
+SGEN,PFE,2023-12-14,MERGER_SUCCESSOR,PRIMARY,Seagen acquired by Pfizer
+SPLK,CSCO,2024-03-18,MERGER_SUCCESSOR,PRIMARY,Splunk acquired by Cisco
+PEAK,DOC,2024-03-01,RENAME,PRIMARY,"Healthpeak -> merged w/ Physicians Realty, ticker DOC"
+WRK,SW,2024-07-08,MERGER_SUCCESSOR,PRIMARY,WestRock + Smurfit Kappa -> Smurfit WestRock
+JNPR,HPE,2025-07-02,MERGER_SUCCESSOR,PRIMARY,Juniper Networks acquired by HPE
+ANSS,SNPS,2025-07-17,MERGER_SUCCESSOR,PRIMARY,Ansys acquired by Synopsys

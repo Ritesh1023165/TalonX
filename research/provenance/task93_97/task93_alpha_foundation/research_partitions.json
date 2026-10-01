@@ -1,0 +1,284 @@
+{
+ "dataset_id": "task93_canonical_v1",
+ "dataset_fingerprint": "796893860a2733b3ffd689c81f2ce68adf96a6096cfcbbc942d7924a34e37474",
+ "frozen_at": "2026-09-02 (Task 93 Phase 4)",
+ "frozen_commit": "4b0e5dfa2415afe1dbf423c63c9cc479264106fa",
+ "rule": "Chronological, non-overlapping. Task 94 hypothesis DISCOVERY may use only the discovery partition. VALIDATION confirms. HOLDOUT is touched at most once, after a hypothesis has passed discovery+validation, and never re-used. Partitions are FROZEN \u2014 poor Task 94 results must not move these boundaries.",
+ "partitions": {
+  "discovery": {
+   "start": "2025-01-24",
+   "end": "2025-08-14",
+   "segment": "A (broad)",
+   "n_symbols": 35,
+   "symbols": [
+    "AAPL",
+    "ADBE",
+    "ADI",
+    "AMAT",
+    "AMD",
+    "AMZN",
+    "AVGO",
+    "BKNG",
+    "CMCSA",
+    "COST",
+    "CSCO",
+    "GILD",
+    "GOOGL",
+    "HON",
+    "INTC",
+    "INTU",
+    "ISRG",
+    "KLAC",
+    "LRCX",
+    "MDLZ",
+    "META",
+    "MSFT",
+    "MU",
+    "NFLX",
+    "NVDA",
+    "PANW",
+    "PEP",
+    "PYPL",
+    "QCOM",
+    "REGN",
+    "SBUX",
+    "STX",
+    "TSLA",
+    "TXN",
+    "VRTX"
+   ],
+   "bars": 2565682,
+   "actual_start": "2025-01-24 00:00:00+00:00",
+   "actual_end": "2025-08-14 23:59:00+00:00"
+  },
+  "validation": {
+   "start": "2025-08-15",
+   "end": "2026-02-28",
+   "segment": "B (deep-10)",
+   "n_symbols": 10,
+   "symbols": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "MSFT",
+    "NVDA",
+    "PYPL",
+    "STX",
+    "TSLA"
+   ],
+   "bars": 988278,
+   "actual_start": "2025-08-15 08:00:00+00:00",
+   "actual_end": "2026-02-28 00:59:00+00:00"
+  },
+  "holdout": {
+   "start": "2026-03-01",
+   "end": "2026-08-14",
+   "segment": "B (deep-10)",
+   "n_symbols": 10,
+   "symbols": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "MSFT",
+    "NVDA",
+    "PYPL",
+    "STX",
+    "TSLA"
+   ],
+   "bars": 914766,
+   "actual_start": "2026-03-02 09:00:00+00:00",
+   "actual_end": "2026-08-14 23:59:00+00:00",
+   "status": "UNTOUCHED_BY_TASK94_DISCOVERY"
+  }
+ },
+ "secondary_untouched_holdout": {
+  "note": "Additional reserved data, DIFFERENT symbols (the 25 non-deep names) and scattered 2025-09..2026-07 windows. Never used in Task 94 discovery; available as an independent replication set.",
+  "packages": [
+   "data/historical_1m/task54_extended_windows (W1 2025-09-15..10-24, W2 2025-11-12..12-24, W3 2026-04-07..05-18)",
+   "data/historical_1m/task56_holdout (H1 2025-12-11..01-26, H2 2026-02-06..03-20, H3 2026-05-27..07-09)",
+   "data/historical_1m/task46_validation_windows",
+   "data/historical_1m/task37_universe_windows (A 2025-08-29..09-12, B 2026-02-06..02-20, C 2026-07-20..07-31)"
+  ]
+ },
+ "per_symbol_bar_counts": {
+  "AAPL": {
+   "discovery": 110137,
+   "validation": 96556,
+   "holdout": 93007
+  },
+  "ADBE": {
+   "discovery": 59101,
+   "validation": 0,
+   "holdout": 0
+  },
+  "ADI": {
+   "discovery": 56114,
+   "validation": 0,
+   "holdout": 0
+  },
+  "AMAT": {
+   "discovery": 63195,
+   "validation": 0,
+   "holdout": 0
+  },
+  "AMD": {
+   "discovery": 117113,
+   "validation": 109981,
+   "holdout": 94733
+  },
+  "AMZN": {
+   "discovery": 109326,
+   "validation": 103911,
+   "holdout": 91077
+  },
+  "AVGO": {
+   "discovery": 93521,
+   "validation": 0,
+   "holdout": 0
+  },
+  "BKNG": {
+   "discovery": 19738,
+   "validation": 0,
+   "holdout": 0
+  },
+  "CMCSA": {
+   "discovery": 61949,
+   "validation": 0,
+   "holdout": 0
+  },
+  "COST": {
+   "discovery": 55513,
+   "validation": 0,
+   "holdout": 0
+  },
+  "CSCO": {
+   "discovery": 66709,
+   "validation": 0,
+   "holdout": 0
+  },
+  "GILD": {
+   "discovery": 58445,
+   "validation": 0,
+   "holdout": 0
+  },
+  "GOOGL": {
+   "discovery": 104734,
+   "validation": 96883,
+   "holdout": 94511
+  },
+  "HON": {
+   "discovery": 56470,
+   "validation": 0,
+   "holdout": 0
+  },
+  "INTC": {
+   "discovery": 120249,
+   "validation": 0,
+   "holdout": 0
+  },
+  "INTU": {
+   "discovery": 51619,
+   "validation": 0,
+   "holdout": 0
+  },
+  "ISRG": {
+   "discovery": 53337,
+   "validation": 0,
+   "holdout": 0
+  },
+  "KLAC": {
+   "discovery": 45754,
+   "validation": 0,
+   "holdout": 0
+  },
+  "LRCX": {
+   "discovery": 64691,
+   "validation": 0,
+   "holdout": 0
+  },
+  "MDLZ": {
+   "discovery": 57299,
+   "validation": 0,
+   "holdout": 0
+  },
+  "META": {
+   "discovery": 87612,
+   "validation": 92534,
+   "holdout": 91667
+  },
+  "MSFT": {
+   "discovery": 85398,
+   "validation": 95183,
+   "holdout": 103973
+  },
+  "MU": {
+   "discovery": 95869,
+   "validation": 0,
+   "holdout": 0
+  },
+  "NFLX": {
+   "discovery": 63670,
+   "validation": 0,
+   "holdout": 0
+  },
+  "NVDA": {
+   "discovery": 133873,
+   "validation": 128028,
+   "holdout": 109847
+  },
+  "PANW": {
+   "discovery": 63355,
+   "validation": 0,
+   "holdout": 0
+  },
+  "PEP": {
+   "discovery": 62389,
+   "validation": 0,
+   "holdout": 0
+  },
+  "PYPL": {
+   "discovery": 73037,
+   "validation": 79769,
+   "holdout": 62326
+  },
+  "QCOM": {
+   "discovery": 66159,
+   "validation": 0,
+   "holdout": 0
+  },
+  "REGN": {
+   "discovery": 45374,
+   "validation": 0,
+   "holdout": 0
+  },
+  "SBUX": {
+   "discovery": 64455,
+   "validation": 0,
+   "holdout": 0
+  },
+  "STX": {
+   "discovery": 56275,
+   "validation": 59715,
+   "holdout": 64691
+  },
+  "TSLA": {
+   "discovery": 132366,
+   "validation": 125718,
+   "holdout": 108934
+  },
+  "TXN": {
+   "discovery": 59867,
+   "validation": 0,
+   "holdout": 0
+  },
+  "VRTX": {
+   "discovery": 50969,
+   "validation": 0,
+   "holdout": 0
+  }
+ }
+}

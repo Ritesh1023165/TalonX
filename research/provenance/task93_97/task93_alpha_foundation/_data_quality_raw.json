@@ -1,0 +1,376 @@
+{
+ "per_symbol": {
+  "AAPL": {
+   "bars": 299700,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 15585,
+   "max_1min_abs_return": 0.0656,
+   "n_moves_gt25pct": 0
+  },
+  "ADBE": {
+   "bars": 59101,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2792,
+   "max_1min_abs_return": 0.0577,
+   "n_moves_gt25pct": 0
+  },
+  "ADI": {
+   "bars": 56114,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1329,
+   "max_1min_abs_return": 0.0474,
+   "n_moves_gt25pct": 0
+  },
+  "AMAT": {
+   "bars": 63195,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4482,
+   "max_1min_abs_return": 0.0787,
+   "n_moves_gt25pct": 0
+  },
+  "AMD": {
+   "bars": 321827,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 11114,
+   "max_1min_abs_return": 0.301,
+   "n_moves_gt25pct": 1
+  },
+  "AMZN": {
+   "bars": 304314,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 14848,
+   "max_1min_abs_return": 0.0796,
+   "n_moves_gt25pct": 0
+  },
+  "AVGO": {
+   "bars": 93521,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 7467,
+   "max_1min_abs_return": 0.0782,
+   "n_moves_gt25pct": 0
+  },
+  "BKNG": {
+   "bars": 19738,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 6648,
+   "max_1min_abs_return": 0.0506,
+   "n_moves_gt25pct": 0
+  },
+  "CMCSA": {
+   "bars": 61949,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 3821,
+   "max_1min_abs_return": 0.0439,
+   "n_moves_gt25pct": 0
+  },
+  "COST": {
+   "bars": 55513,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2550,
+   "max_1min_abs_return": 0.0355,
+   "n_moves_gt25pct": 0
+  },
+  "CSCO": {
+   "bars": 66709,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 5403,
+   "max_1min_abs_return": 0.0476,
+   "n_moves_gt25pct": 0
+  },
+  "GILD": {
+   "bars": 58445,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2438,
+   "max_1min_abs_return": 0.0352,
+   "n_moves_gt25pct": 0
+  },
+  "GOOGL": {
+   "bars": 296128,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 16390,
+   "max_1min_abs_return": 0.081,
+   "n_moves_gt25pct": 0
+  },
+  "HON": {
+   "bars": 56470,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1464,
+   "max_1min_abs_return": 0.0642,
+   "n_moves_gt25pct": 0
+  },
+  "INTC": {
+   "bars": 120249,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2993,
+   "max_1min_abs_return": 0.0665,
+   "n_moves_gt25pct": 0
+  },
+  "INTU": {
+   "bars": 51619,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1279,
+   "max_1min_abs_return": 0.0367,
+   "n_moves_gt25pct": 0
+  },
+  "ISRG": {
+   "bars": 53337,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1633,
+   "max_1min_abs_return": 0.1079,
+   "n_moves_gt25pct": 0
+  },
+  "KLAC": {
+   "bars": 45754,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2743,
+   "max_1min_abs_return": 0.0794,
+   "n_moves_gt25pct": 0
+  },
+  "LRCX": {
+   "bars": 64691,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4993,
+   "max_1min_abs_return": 0.0629,
+   "n_moves_gt25pct": 0
+  },
+  "MDLZ": {
+   "bars": 57299,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1705,
+   "max_1min_abs_return": 0.0356,
+   "n_moves_gt25pct": 0
+  },
+  "META": {
+   "bars": 271813,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 17943,
+   "max_1min_abs_return": 0.0563,
+   "n_moves_gt25pct": 0
+  },
+  "MSFT": {
+   "bars": 284554,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 15263,
+   "max_1min_abs_return": 0.0488,
+   "n_moves_gt25pct": 0
+  },
+  "MU": {
+   "bars": 95869,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 7361,
+   "max_1min_abs_return": 0.078,
+   "n_moves_gt25pct": 0
+  },
+  "NFLX": {
+   "bars": 63670,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4692,
+   "max_1min_abs_return": 0.0437,
+   "n_moves_gt25pct": 0
+  },
+  "NVDA": {
+   "bars": 371748,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 261,
+   "max_1min_abs_return": 0.0782,
+   "n_moves_gt25pct": 0
+  },
+  "PANW": {
+   "bars": 63355,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4508,
+   "max_1min_abs_return": 0.0889,
+   "n_moves_gt25pct": 0
+  },
+  "PEP": {
+   "bars": 62389,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4587,
+   "max_1min_abs_return": 0.0241,
+   "n_moves_gt25pct": 0
+  },
+  "PYPL": {
+   "bars": 215132,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 22361,
+   "max_1min_abs_return": 0.2343,
+   "n_moves_gt25pct": 0
+  },
+  "QCOM": {
+   "bars": 66159,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 5692,
+   "max_1min_abs_return": 0.0475,
+   "n_moves_gt25pct": 0
+  },
+  "REGN": {
+   "bars": 45374,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2494,
+   "max_1min_abs_return": 0.0844,
+   "n_moves_gt25pct": 0
+  },
+  "SBUX": {
+   "bars": 64455,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 4811,
+   "max_1min_abs_return": 0.0521,
+   "n_moves_gt25pct": 0
+  },
+  "STX": {
+   "bars": 180681,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 11441,
+   "max_1min_abs_return": 0.0974,
+   "n_moves_gt25pct": 0
+  },
+  "TSLA": {
+   "bars": 367018,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1103,
+   "max_1min_abs_return": 0.084,
+   "n_moves_gt25pct": 0
+  },
+  "TXN": {
+   "bars": 59867,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 2557,
+   "max_1min_abs_return": 0.0718,
+   "n_moves_gt25pct": 0
+  },
+  "VRTX": {
+   "bars": 50969,
+   "engine_quality": {
+    "error": "operation 'sub' not supported for dtype 'str' with dtype 'str'"
+   },
+   "zero_volume_bars": 0,
+   "intraday_gaps_gt2min": 1366,
+   "max_1min_abs_return": 0.0519,
+   "n_moves_gt25pct": 0
+  }
+ },
+ "aggregate": {
+  "bars": 4468726,
+  "dup": 0,
+  "out_of_order": 0,
+  "nan": 0,
+  "inf": 0,
+  "neg_vol": 0,
+  "bad_ohlc": 0,
+  "zero_vol_bars": 0,
+  "big_jumps": 1,
+  "intraday_gaps_gt2min": 218117,
+  "overnight_ok": 0
+ },
+ "split_or_ca_suspects": [
+  [
+   "AMD",
+   "2025-10-06 12:08:00+00:00",
+   165.3,
+   215.06,
+   0.301
+  ]
+ ]
+}

@@ -1,0 +1,396 @@
+{
+  "dataset_id": "task95b_daily_v1",
+  "source": "task95a_expanded_v1 (Alpaca SIP 1-min, results/task95a_regime_expansion/_expanded_data/)",
+  "source_fingerprint": "8333c1001e28ee18...",
+  "aggregation": "regular-session only (09:30<=et_min<16:00 ET, Mon-Fri), >=60 1-min bars/day",
+  "price_adjustment": "SPLIT-ADJUSTED adj_* columns (raw OHLCV also retained). Volume NOT adjusted.",
+  "timezone": "labels in America/New_York; source bars UTC tz-aware",
+  "forward_returns": "close-to-close on adj_close; fwd_{1,2,3,5,10}d + fwd_overnight; returns spanning a split ex-date are nulled",
+  "n_symbols": 35,
+  "total_trading_day_rows": 51922,
+  "common_universe_10": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "MSFT",
+    "NVDA",
+    "PYPL",
+    "STX",
+    "TSLA"
+  ],
+  "splits_detected": {
+    "AAPL": {
+      "2020-08-31": {
+        "raw_ratio": 3.871,
+        "applied": 4
+      }
+    },
+    "AMZN": {
+      "2022-06-06": {
+        "raw_ratio": 19.6,
+        "applied": 20
+      }
+    },
+    "AVGO": {
+      "2024-07-15": {
+        "raw_ratio": 9.918,
+        "applied": 10
+      }
+    },
+    "GOOGL": {
+      "2022-07-18": {
+        "raw_ratio": 20.514,
+        "applied": 20
+      }
+    },
+    "ISRG": {
+      "2021-10-05": {
+        "raw_ratio": 2.939,
+        "applied": 3
+      }
+    },
+    "LRCX": {
+      "2024-10-03": {
+        "raw_ratio": 10.039,
+        "applied": 10
+      }
+    },
+    "NVDA": {
+      "2021-07-20": {
+        "raw_ratio": 4.037,
+        "applied": 4
+      },
+      "2024-06-10": {
+        "raw_ratio": 9.935,
+        "applied": 10
+      }
+    },
+    "PANW": {
+      "2022-09-14": {
+        "raw_ratio": 3.015,
+        "applied": 3
+      },
+      "2024-12-16": {
+        "raw_ratio": 1.941,
+        "applied": 2
+      }
+    },
+    "TSLA": {
+      "2020-08-31": {
+        "raw_ratio": 4.44,
+        "applied": 4
+      },
+      "2022-08-25": {
+        "raw_ratio": 3.011,
+        "applied": 3
+      }
+    }
+  },
+  "per_symbol": {
+    "AAPL": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {
+        "2020-08-31": {
+          "raw_ratio": 3.871,
+          "applied": 4
+        }
+      },
+      "median_daily_abs_ret_pct": 0.944
+    },
+    "ADBE": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.18
+    },
+    "ADI": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.18
+    },
+    "AMAT": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.609
+    },
+    "AMD": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.905
+    },
+    "AMZN": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {
+        "2022-06-06": {
+          "raw_ratio": 19.6,
+          "applied": 20
+        }
+      },
+      "median_daily_abs_ret_pct": 1.216
+    },
+    "AVGO": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {
+        "2024-07-15": {
+          "raw_ratio": 9.918,
+          "applied": 10
+        }
+      },
+      "median_daily_abs_ret_pct": 1.359
+    },
+    "BKNG": {
+      "trading_days": 1406,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.197
+    },
+    "CMCSA": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.915
+    },
+    "COST": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.781
+    },
+    "CSCO": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.771
+    },
+    "GILD": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.845
+    },
+    "GOOGL": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {
+        "2022-07-18": {
+          "raw_ratio": 20.514,
+          "applied": 20
+        }
+      },
+      "median_daily_abs_ret_pct": 1.079
+    },
+    "HON": {
+      "trading_days": 1411,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.806
+    },
+    "INTC": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.354
+    },
+    "INTU": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.207
+    },
+    "ISRG": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {
+        "2021-10-05": {
+          "raw_ratio": 2.939,
+          "applied": 3
+        }
+      },
+      "median_daily_abs_ret_pct": 1.08
+    },
+    "KLAC": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.536
+    },
+    "LRCX": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {
+        "2024-10-03": {
+          "raw_ratio": 10.039,
+          "applied": 10
+        }
+      },
+      "median_daily_abs_ret_pct": 1.608
+    },
+    "MDLZ": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.712
+    },
+    "META": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.291
+    },
+    "MSFT": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.979
+    },
+    "MU": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.675
+    },
+    "NFLX": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.296
+    },
+    "NVDA": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {
+        "2021-07-20": {
+          "raw_ratio": 4.037,
+          "applied": 4
+        },
+        "2024-06-10": {
+          "raw_ratio": 9.935,
+          "applied": 10
+        }
+      },
+      "median_daily_abs_ret_pct": 1.85
+    },
+    "PANW": {
+      "trading_days": 1411,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {
+        "2022-09-14": {
+          "raw_ratio": 3.015,
+          "applied": 3
+        },
+        "2024-12-16": {
+          "raw_ratio": 1.941,
+          "applied": 2
+        }
+      },
+      "median_daily_abs_ret_pct": 1.282
+    },
+    "PEP": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.634
+    },
+    "PYPL": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.401
+    },
+    "QCOM": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.373
+    },
+    "REGN": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.017
+    },
+    "SBUX": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.962
+    },
+    "STX": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.533
+    },
+    "TSLA": {
+      "trading_days": 1663,
+      "start": "2020-01-02",
+      "end": "2026-08-14",
+      "splits": {
+        "2020-08-31": {
+          "raw_ratio": 4.44,
+          "applied": 4
+        },
+        "2022-08-25": {
+          "raw_ratio": 3.011,
+          "applied": 3
+        }
+      },
+      "median_daily_abs_ret_pct": 2.12
+    },
+    "TXN": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 1.146
+    },
+    "VRTX": {
+      "trading_days": 1412,
+      "start": "2020-01-02",
+      "end": "2025-08-14",
+      "splits": {},
+      "median_daily_abs_ret_pct": 0.956
+    }
+  },
+  "build_seconds": 81.4
+}

@@ -1,0 +1,12 @@
+stage,input,accepted,rejected,acceptance_rate
+post_warmup_bar_evaluations,2561517,2561517,0,1.0
+volatility_gate (ATR%>=0.25 on 1m),2561517,184842,2376675,0.072161
+candidate_generation (trigger on vol-passing bar),184842,7647,177195,0.04137
+  of which bullish (long-only relevant),7647,3900,3747,0.510004
+confluence_gate (score>=2) [all directions],7647,35,7612,0.004577
+  confluence>=2 AND bullish,35,29,6,0.828571
+  + regular session,29,15,14,0.517241
+  + HTF trend_component=True,15,2,13,0.133333
+  + risk_reward_ratio>=1.5,2,1,1,0.5
+published_signals,1,1,0,1.0
+trades_executed,1,1,0,1.0

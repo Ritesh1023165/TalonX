@@ -1,0 +1,67 @@
+{
+  "AAPL": {
+    "canon_bars": 5155,
+    "fresh_bars": 5155,
+    "overlap_matched": 5155,
+    "max_abs_diff": {
+      "open": 0.0,
+      "high": 0.0,
+      "low": 0.0,
+      "close": 0.0,
+      "volume": 0.0
+    },
+    "identical": true
+  },
+  "NVDA": {
+    "canon_bars": 5754,
+    "fresh_bars": 5754,
+    "overlap_matched": 5754,
+    "max_abs_diff": {
+      "open": 0.0,
+      "high": 0.0,
+      "low": 0.0,
+      "close": 0.0,
+      "volume": 0.0
+    },
+    "identical": true
+  },
+  "STX": {
+    "canon_bars": 2405,
+    "fresh_bars": 2405,
+    "overlap_matched": 2405,
+    "max_abs_diff": {
+      "open": 0.0,
+      "high": 0.0,
+      "low": 0.0,
+      "close": 0.0,
+      "volume": 0.0
+    },
+    "identical": true
+  },
+  "TSLA": {
+    "canon_bars": 5598,
+    "fresh_bars": 5598,
+    "overlap_matched": 5598,
+    "max_abs_diff": {
+      "open": 0.0,
+      "high": 0.0,
+      "low": 0.0,
+      "close": 0.0,
+      "volume": 0.0
+    },
+    "identical": true
+  },
+  "PYPL": {
+    "canon_bars": 2917,
+    "fresh_bars": 2917,
+    "overlap_matched": 2917,
+    "max_abs_diff": {
+      "open": 0.0,
+      "high": 0.0,
+      "low": 0.0,
+      "close": 0.0,
+      "volume": 0.0
+    },
+    "identical": true
+  }
+}

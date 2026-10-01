@@ -1,0 +1,20 @@
+{
+  "dataset": "task95g_sp500_panel_v1",
+  "paid_data_spend": "\u00a30",
+  "price_fingerprint": "08aa253ad4df1121",
+  "discovery_ranking_dates": 819,
+  "avg_eligible": 497.6227106227106,
+  "min_eligible": 495,
+  "max_eligible": 500,
+  "membership_source": "fja05680/sp500 point-in-time (independent); tickers normalized",
+  "eligibility": "member on date t AND >=200 prior trading days AND close>0",
+  "bucket": "top 10% / mid 80% / bottom 10% of eligible members per date",
+  "metric": "top_decile_excess = mean(top-decile fwd_kd) - equal-weight eligible-member fwd_kd",
+  "horizons": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "partitions_from": "task95b research_partitions.json (discovery 2020-01-02..2023-06-15)"
+}

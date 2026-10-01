@@ -1,0 +1,6 @@
+rank,experiment_id,family,horizon_days,regime,event_count,excess_net_5bps,excess_net_10bps,nonoverlap_ci_low_vs_correct_comparator,best_year_share,common10_excess_net5,automated_verdict,adjudicated_verdict,reject_reason
+1,E-gapdn_p10__vol_high,E,3,vol_high,1177,+35.0 (vs regime-matched; +63.7 vs global),+25.0,-22.3 (spans zero),0.45,-20.7,DISCOVERY_PASS,DISCOVERY_FAIL,"wrong comparator (global not regime-matched); ~77 of ~100bps is same-dates market move; NEGATIVE in 2022 (half the events); remove-best-year -> negative (Phase 13 fail); negative on COMMON10; 1 of 35 grid cells"
+2,D-dd20_rsi35,D,5,none,1574,+35.3,+25.3,-91.2 (spans zero),0.64,n/a,DISCOVERY_FAIL,DISCOVERY_FAIL,"S4 (non-overlap CI spans zero); S7 (best-year 64%); crash-recovery concentrated"
+3,D-deepdd_fresh3ddrop,D,3,none,2151,+25.2,+15.2,+1.7 (marginal),0.52,n/a,DISCOVERY_FAIL,DISCOVERY_FAIL,"S7 (best-year 52% = 2020 crash recovery); vs DD15-matched comparator net5 drops to +17.3 (< S2); 2022 excess negative"
+4,A-mom_60d_q1,A,3,none,5658,+20.8,+10.8,+6.5,0.42,n/a,DISCOVERY_FAIL,DISCOVERY_FAIL,"S2 (+20.8 < +25); S7 (concentration)"
+5,D-5d_drawdown_q1__vol_high,D,3,vol_high,1887,+45.6,+35.6,-10.2 (spans zero),0.46,n/a,DISCOVERY_FAIL,DISCOVERY_FAIL,"S4; S7; same V-bottom artifact as #1"

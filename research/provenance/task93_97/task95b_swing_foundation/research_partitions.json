@@ -1,0 +1,71 @@
+{
+  "dataset": "task95b_daily_v1",
+  "frozen_at": "2026-09-03 (Task 95B Phase 4)",
+  "frozen_commit": "4b0e5dfa2415afe1dbf423c63c9cc479264106fa",
+  "rule": "Chronological, non-overlapping, PURGED by 10 trading days (= max forward horizon) so no discovery forward-return window reaches into validation, and none of validation reaches into holdout. DISCOVERY only for hypothesis generation/selection. VALIDATION confirms a frozen candidate. HOLDOUT untouched during discovery, used at most once. Boundaries are FROZEN regardless of results.",
+  "partitions": {
+    "discovery": {
+      "start": "2020-01-02",
+      "end": "2023-06-30",
+      "entry_eligible_end": "2023-06-15",
+      "purge_trading_days_after": 10,
+      "rows": 30798,
+      "entry_eligible_rows": 30448,
+      "symbols": 35,
+      "years": [
+        2020,
+        2021,
+        2022,
+        2023
+      ],
+      "distinct_trading_days": 880,
+      "regimes_present": {
+        "trend_bear_rows": 13291,
+        "trend_bull_rows": 17472,
+        "drawdown_gt20_rows": 10282,
+        "high_rv60_rows": 6839
+      }
+    },
+    "validation": {
+      "start": "2023-07-17",
+      "end": "2025-02-14",
+      "entry_eligible_end": "2025-01-31",
+      "purge_trading_days_after": 10,
+      "rows": 13961,
+      "entry_eligible_rows": 13611,
+      "symbols": 35,
+      "years": [
+        2023,
+        2024,
+        2025
+      ],
+      "distinct_trading_days": 399,
+      "regimes_present": {
+        "trend_bear_rows": 5555,
+        "trend_bull_rows": 8406,
+        "drawdown_gt20_rows": 4636,
+        "high_rv60_rows": 1465
+      }
+    },
+    "holdout": {
+      "start": "2025-03-03",
+      "end": "2026-08-14",
+      "entry_eligible_end": "2026-07-31",
+      "purge_trading_days_after": 10,
+      "rows": 6533,
+      "entry_eligible_rows": 6433,
+      "symbols": 35,
+      "years": [
+        2025,
+        2026
+      ],
+      "distinct_trading_days": 366,
+      "regimes_present": {
+        "trend_bear_rows": 2975,
+        "trend_bull_rows": 3558,
+        "drawdown_gt20_rows": 2516,
+        "high_rv60_rows": 1797
+      }
+    }
+  }
+}

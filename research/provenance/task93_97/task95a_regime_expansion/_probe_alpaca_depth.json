@@ -1,0 +1,1313 @@
+{
+  "task": "95A",
+  "phase": 3,
+  "purpose": "probe Alpaca 1-min historical depth + feed entitlement (read-only, no secrets)",
+  "key_id_last4": "BCQO",
+  "earliest_available": {
+    "AAPL": {
+      "omitted": {
+        "feed": "omitted",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-01T00:00:00Z"
+      },
+      "iex": {
+        "feed": "iex",
+        "http_status": 200,
+        "earliest_bar_ts": "2020-07-27T13:30:00Z"
+      },
+      "sip": {
+        "feed": "sip",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-01T00:00:00Z"
+      }
+    },
+    "STX": {
+      "omitted": {
+        "feed": "omitted",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-04T13:00:00Z"
+      },
+      "iex": {
+        "feed": "iex",
+        "http_status": 200,
+        "earliest_bar_ts": "2020-07-27T13:30:00Z"
+      },
+      "sip": {
+        "feed": "sip",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-04T13:00:00Z"
+      }
+    },
+    "NVDA": {
+      "omitted": {
+        "feed": "omitted",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-04T11:37:00Z"
+      },
+      "iex": {
+        "feed": "iex",
+        "http_status": 200,
+        "earliest_bar_ts": "2020-07-27T13:30:00Z"
+      },
+      "sip": {
+        "feed": "sip",
+        "http_status": 200,
+        "earliest_bar_ts": "2016-01-04T11:37:00Z"
+      }
+    }
+  },
+  "session_probes": {
+    "2016-06-15 (earliest-era)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 569,
+          "first_ts": "2016-06-15T08:25:00Z",
+          "last_ts": "2016-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:52:00Z",
+            "o": 97.88,
+            "h": 97.93,
+            "l": 97.87,
+            "c": 97.8938,
+            "v": 57691
+          },
+          "total_volume": 31741628,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 569,
+          "first_ts": "2016-06-15T08:25:00Z",
+          "last_ts": "2016-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:52:00Z",
+            "o": 97.88,
+            "h": 97.93,
+            "l": 97.87,
+            "c": 97.8938,
+            "v": 57691
+          },
+          "total_volume": 31741628,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 393,
+          "first_ts": "2016-06-15T13:30:00Z",
+          "last_ts": "2016-06-15T20:37:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:47:00Z",
+            "o": 23.07,
+            "h": 23.08,
+            "l": 23.04,
+            "c": 23.045,
+            "v": 12264
+          },
+          "total_volume": 4579702,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 393,
+          "first_ts": "2016-06-15T13:30:00Z",
+          "last_ts": "2016-06-15T20:37:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:47:00Z",
+            "o": 23.07,
+            "h": 23.08,
+            "l": 23.04,
+            "c": 23.045,
+            "v": 12264
+          },
+          "total_volume": 4579702,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 409,
+          "first_ts": "2016-06-15T10:15:00Z",
+          "last_ts": "2016-06-15T22:45:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:47:00Z",
+            "o": 47.349,
+            "h": 47.37,
+            "l": 47.3438,
+            "c": 47.37,
+            "v": 5379
+          },
+          "total_volume": 8441613,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 409,
+          "first_ts": "2016-06-15T10:15:00Z",
+          "last_ts": "2016-06-15T22:45:00Z",
+          "sample_bar": {
+            "t": "2016-06-15T16:47:00Z",
+            "o": 47.349,
+            "h": 47.37,
+            "l": 47.3438,
+            "c": 47.37,
+            "v": 5379
+          },
+          "total_volume": 8441613,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2018-06-13 (pre-2019)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 553,
+          "first_ts": "2018-06-13T08:00:00Z",
+          "last_ts": "2018-06-13T23:58:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:40:00Z",
+            "o": 192.33,
+            "h": 192.34,
+            "l": 192.31,
+            "c": 192.33,
+            "v": 15361
+          },
+          "total_volume": 24349565,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 553,
+          "first_ts": "2018-06-13T08:00:00Z",
+          "last_ts": "2018-06-13T23:58:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:40:00Z",
+            "o": 192.33,
+            "h": 192.34,
+            "l": 192.31,
+            "c": 192.33,
+            "v": 15361
+          },
+          "total_volume": 24349565,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 397,
+          "first_ts": "2018-06-13T12:59:00Z",
+          "last_ts": "2018-06-13T23:25:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:46:00Z",
+            "o": 57.26,
+            "h": 57.3104,
+            "l": 57.26,
+            "c": 57.3096,
+            "v": 4321
+          },
+          "total_volume": 2903846,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 397,
+          "first_ts": "2018-06-13T12:59:00Z",
+          "last_ts": "2018-06-13T23:25:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:46:00Z",
+            "o": 57.26,
+            "h": 57.3104,
+            "l": 57.26,
+            "c": 57.3096,
+            "v": 4321
+          },
+          "total_volume": 2903846,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 496,
+          "first_ts": "2018-06-13T08:01:00Z",
+          "last_ts": "2018-06-13T23:59:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:44:00Z",
+            "o": 264.4,
+            "h": 264.42,
+            "l": 264.33,
+            "c": 264.36,
+            "v": 9583
+          },
+          "total_volume": 8853122,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 496,
+          "first_ts": "2018-06-13T08:01:00Z",
+          "last_ts": "2018-06-13T23:59:00Z",
+          "sample_bar": {
+            "t": "2018-06-13T16:44:00Z",
+            "o": 264.4,
+            "h": 264.42,
+            "l": 264.33,
+            "c": 264.36,
+            "v": 9583
+          },
+          "total_volume": 8853122,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2020-03-16 (covid-crash)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 906,
+          "first_ts": "2020-03-16T08:00:00Z",
+          "last_ts": "2020-03-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:16:00Z",
+            "o": 255.845,
+            "h": 256.105,
+            "l": 255,
+            "c": 255,
+            "v": 154568
+          },
+          "total_volume": 86571842,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 906,
+          "first_ts": "2020-03-16T08:00:00Z",
+          "last_ts": "2020-03-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:16:00Z",
+            "o": 255.845,
+            "h": 256.105,
+            "l": 255,
+            "c": 255,
+            "v": 154568
+          },
+          "total_volume": 86571842,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 394,
+          "first_ts": "2020-03-16T11:00:00Z",
+          "last_ts": "2020-03-16T23:49:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:51:00Z",
+            "o": 41.495,
+            "h": 41.495,
+            "l": 41.385,
+            "c": 41.385,
+            "v": 11586
+          },
+          "total_volume": 5185616,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 394,
+          "first_ts": "2020-03-16T11:00:00Z",
+          "last_ts": "2020-03-16T23:49:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:51:00Z",
+            "o": 41.495,
+            "h": 41.495,
+            "l": 41.385,
+            "c": 41.385,
+            "v": 11586
+          },
+          "total_volume": 5185616,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 702,
+          "first_ts": "2020-03-16T08:00:00Z",
+          "last_ts": "2020-03-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:52:00Z",
+            "o": 219.38,
+            "h": 219.65,
+            "l": 219.1907,
+            "c": 219.31,
+            "v": 14736
+          },
+          "total_volume": 19606390,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 702,
+          "first_ts": "2020-03-16T08:00:00Z",
+          "last_ts": "2020-03-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2020-03-16T16:52:00Z",
+            "o": 219.38,
+            "h": 219.65,
+            "l": 219.1907,
+            "c": 219.31,
+            "v": 14736
+          },
+          "total_volume": 19606390,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2021-06-16 (bull-2021)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 758,
+          "first_ts": "2021-06-16T08:00:00Z",
+          "last_ts": "2021-06-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:49:00Z",
+            "o": 130.3089,
+            "h": 130.365,
+            "l": 130.3026,
+            "c": 130.33,
+            "v": 94002
+          },
+          "total_volume": 100273482,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 394,
+          "first_ts": "2021-06-16T13:30:00Z",
+          "last_ts": "2021-06-16T20:38:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:47:00Z",
+            "o": 130.21,
+            "h": 130.25,
+            "l": 130.21,
+            "c": 130.24,
+            "v": 3850
+          },
+          "total_volume": 1422169,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 758,
+          "first_ts": "2021-06-16T08:00:00Z",
+          "last_ts": "2021-06-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:49:00Z",
+            "o": 130.3089,
+            "h": 130.365,
+            "l": 130.3026,
+            "c": 130.33,
+            "v": 94002
+          },
+          "total_volume": 100273482,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 400,
+          "first_ts": "2021-06-16T11:03:00Z",
+          "last_ts": "2021-06-16T20:34:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:47:00Z",
+            "o": 93.265,
+            "h": 93.32,
+            "l": 93.265,
+            "c": 93.32,
+            "v": 833
+          },
+          "total_volume": 2093138,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 256,
+          "first_ts": "2021-06-16T13:30:00Z",
+          "last_ts": "2021-06-16T19:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:59:00Z",
+            "o": 93.33,
+            "h": 93.39,
+            "l": 93.33,
+            "c": 93.39,
+            "v": 725
+          },
+          "total_volume": 99038,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 400,
+          "first_ts": "2021-06-16T11:03:00Z",
+          "last_ts": "2021-06-16T20:34:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:47:00Z",
+            "o": 93.265,
+            "h": 93.32,
+            "l": 93.265,
+            "c": 93.32,
+            "v": 833
+          },
+          "total_volume": 2093138,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 500,
+          "first_ts": "2021-06-16T10:56:00Z",
+          "last_ts": "2021-06-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:47:00Z",
+            "o": 711.075,
+            "h": 711.31,
+            "l": 711.075,
+            "c": 711.22,
+            "v": 2737
+          },
+          "total_volume": 8006689,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 314,
+          "first_ts": "2021-06-16T13:30:00Z",
+          "last_ts": "2021-06-16T19:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T17:02:00Z",
+            "o": 711.96,
+            "h": 711.96,
+            "l": 711.73,
+            "c": 711.73,
+            "v": 345
+          },
+          "total_volume": 214661,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 500,
+          "first_ts": "2021-06-16T10:56:00Z",
+          "last_ts": "2021-06-16T23:59:00Z",
+          "sample_bar": {
+            "t": "2021-06-16T16:47:00Z",
+            "o": 711.075,
+            "h": 711.31,
+            "l": 711.075,
+            "c": 711.22,
+            "v": 2737
+          },
+          "total_volume": 8006689,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2022-06-15 (bear-2022)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 822,
+          "first_ts": "2022-06-15T08:00:00Z",
+          "last_ts": "2022-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:43:00Z",
+            "o": 134.1254,
+            "h": 134.16,
+            "l": 134.0737,
+            "c": 134.095,
+            "v": 79753
+          },
+          "total_volume": 101289588,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 393,
+          "first_ts": "2022-06-15T12:20:00Z",
+          "last_ts": "2022-06-15T19:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:43:00Z",
+            "o": 134.15,
+            "h": 134.15,
+            "l": 134.08,
+            "c": 134.09,
+            "v": 3110
+          },
+          "total_volume": 2035640,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 822,
+          "first_ts": "2022-06-15T08:00:00Z",
+          "last_ts": "2022-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:43:00Z",
+            "o": 134.1254,
+            "h": 134.16,
+            "l": 134.0737,
+            "c": 134.095,
+            "v": 79753
+          },
+          "total_volume": 101289588,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 387,
+          "first_ts": "2022-06-15T13:30:00Z",
+          "last_ts": "2022-06-15T20:05:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:48:00Z",
+            "o": 75.83,
+            "h": 75.83,
+            "l": 75.83,
+            "c": 75.83,
+            "v": 390
+          },
+          "total_volume": 1984574,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 253,
+          "first_ts": "2022-06-15T13:31:00Z",
+          "last_ts": "2022-06-15T19:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T17:07:00Z",
+            "o": 75.585,
+            "h": 75.585,
+            "l": 75.53,
+            "c": 75.53,
+            "v": 320
+          },
+          "total_volume": 104574,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 387,
+          "first_ts": "2022-06-15T13:30:00Z",
+          "last_ts": "2022-06-15T20:05:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:48:00Z",
+            "o": 75.83,
+            "h": 75.83,
+            "l": 75.83,
+            "c": 75.83,
+            "v": 390
+          },
+          "total_volume": 1984574,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 777,
+          "first_ts": "2022-06-15T08:00:00Z",
+          "last_ts": "2022-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:52:00Z",
+            "o": 162.4699,
+            "h": 162.5474,
+            "l": 162.31,
+            "c": 162.3799,
+            "v": 84106
+          },
+          "total_volume": 58433943,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 389,
+          "first_ts": "2022-06-15T13:30:00Z",
+          "last_ts": "2022-06-15T19:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:45:00Z",
+            "o": 162.67,
+            "h": 162.71,
+            "l": 162.56,
+            "c": 162.71,
+            "v": 1799
+          },
+          "total_volume": 1167701,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 777,
+          "first_ts": "2022-06-15T08:00:00Z",
+          "last_ts": "2022-06-15T23:59:00Z",
+          "sample_bar": {
+            "t": "2022-06-15T16:52:00Z",
+            "o": 162.4699,
+            "h": 162.5474,
+            "l": 162.31,
+            "c": 162.3799,
+            "v": 84106
+          },
+          "total_volume": 58433943,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2023-06-14 (recovery-2023)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 719,
+          "first_ts": "2023-06-14T08:00:00Z",
+          "last_ts": "2023-06-14T23:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:32:00Z",
+            "o": 184.135,
+            "h": 184.15,
+            "l": 184.08,
+            "c": 184.135,
+            "v": 49361
+          },
+          "total_volume": 57421637,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 382,
+          "first_ts": "2023-06-14T13:30:00Z",
+          "last_ts": "2023-06-14T19:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:47:00Z",
+            "o": 183.985,
+            "h": 184,
+            "l": 183.985,
+            "c": 184,
+            "v": 484
+          },
+          "total_volume": 774890,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 719,
+          "first_ts": "2023-06-14T08:00:00Z",
+          "last_ts": "2023-06-14T23:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:32:00Z",
+            "o": 184.135,
+            "h": 184.15,
+            "l": 184.08,
+            "c": 184.135,
+            "v": 49361
+          },
+          "total_volume": 57421637,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 387,
+          "first_ts": "2023-06-14T13:03:00Z",
+          "last_ts": "2023-06-14T23:24:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:45:00Z",
+            "o": 65.15,
+            "h": 65.15,
+            "l": 65.15,
+            "c": 65.15,
+            "v": 778
+          },
+          "total_volume": 1744036,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 157,
+          "first_ts": "2023-06-14T13:30:00Z",
+          "last_ts": "2023-06-14T19:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T17:46:00Z",
+            "o": 65.1,
+            "h": 65.1,
+            "l": 65.1,
+            "c": 65.1,
+            "v": 134
+          },
+          "total_volume": 50544,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 387,
+          "first_ts": "2023-06-14T13:03:00Z",
+          "last_ts": "2023-06-14T23:24:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:45:00Z",
+            "o": 65.15,
+            "h": 65.15,
+            "l": 65.15,
+            "c": 65.15,
+            "v": 778
+          },
+          "total_volume": 1744036,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 858,
+          "first_ts": "2023-06-14T08:00:00Z",
+          "last_ts": "2023-06-14T23:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:48:00Z",
+            "o": 418.86,
+            "h": 419.0799,
+            "l": 418.66,
+            "c": 418.6701,
+            "v": 44612
+          },
+          "total_volume": 74019099,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 382,
+          "first_ts": "2023-06-14T13:30:00Z",
+          "last_ts": "2023-06-14T19:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:44:00Z",
+            "o": 419.07,
+            "h": 419.38,
+            "l": 419.07,
+            "c": 419.38,
+            "v": 1759
+          },
+          "total_volume": 1165927,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 858,
+          "first_ts": "2023-06-14T08:00:00Z",
+          "last_ts": "2023-06-14T23:59:00Z",
+          "sample_bar": {
+            "t": "2023-06-14T16:48:00Z",
+            "o": 418.86,
+            "h": 419.0799,
+            "l": 418.66,
+            "c": 418.6701,
+            "v": 44612
+          },
+          "total_volume": 74019099,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2024-06-12 (bull-2024)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 910,
+          "first_ts": "2024-06-12T08:00:00Z",
+          "last_ts": "2024-06-12T23:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:24:00Z",
+            "o": 215.65,
+            "h": 215.76,
+            "l": 215.5,
+            "c": 215.635,
+            "v": 325526
+          },
+          "total_volume": 198121079,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 390,
+          "first_ts": "2024-06-12T13:30:00Z",
+          "last_ts": "2024-06-12T19:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:45:00Z",
+            "o": 215.915,
+            "h": 216.15,
+            "l": 215.915,
+            "c": 216.095,
+            "v": 1039
+          },
+          "total_volume": 3328339,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 910,
+          "first_ts": "2024-06-12T08:00:00Z",
+          "last_ts": "2024-06-12T23:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:24:00Z",
+            "o": 215.65,
+            "h": 215.76,
+            "l": 215.5,
+            "c": 215.635,
+            "v": 325526
+          },
+          "total_volume": 198121079,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 406,
+          "first_ts": "2024-06-12T12:33:00Z",
+          "last_ts": "2024-06-12T22:34:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:44:00Z",
+            "o": 104.445,
+            "h": 104.47,
+            "l": 104.445,
+            "c": 104.47,
+            "v": 655
+          },
+          "total_volume": 3094360,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 234,
+          "first_ts": "2024-06-12T13:30:00Z",
+          "last_ts": "2024-06-12T19:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T17:16:00Z",
+            "o": 104.85,
+            "h": 104.85,
+            "l": 104.84,
+            "c": 104.85,
+            "v": 596
+          },
+          "total_volume": 90602,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 406,
+          "first_ts": "2024-06-12T12:33:00Z",
+          "last_ts": "2024-06-12T22:34:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:44:00Z",
+            "o": 104.445,
+            "h": 104.47,
+            "l": 104.445,
+            "c": 104.47,
+            "v": 655
+          },
+          "total_volume": 3094360,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 940,
+          "first_ts": "2024-06-12T08:00:00Z",
+          "last_ts": "2024-06-12T23:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:10:00Z",
+            "o": 125.82,
+            "h": 125.86,
+            "l": 125.63,
+            "c": 125.7192,
+            "v": 440362
+          },
+          "total_volume": 299588884,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 427,
+          "first_ts": "2024-06-12T12:34:00Z",
+          "last_ts": "2024-06-12T20:19:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:29:00Z",
+            "o": 125.475,
+            "h": 125.6,
+            "l": 125.475,
+            "c": 125.585,
+            "v": 2141
+          },
+          "total_volume": 1838232,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 940,
+          "first_ts": "2024-06-12T08:00:00Z",
+          "last_ts": "2024-06-12T23:59:00Z",
+          "sample_bar": {
+            "t": "2024-06-12T16:10:00Z",
+            "o": 125.82,
+            "h": 125.86,
+            "l": 125.63,
+            "c": 125.7192,
+            "v": 440362
+          },
+          "total_volume": 299588884,
+          "zero_vol_bars": 0
+        }
+      }
+    },
+    "2025-03-19 (known-good-2025)": {
+      "AAPL": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 656,
+          "first_ts": "2025-03-19T08:00:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:47:00Z",
+            "o": 214.83,
+            "h": 214.89,
+            "l": 214.7815,
+            "c": 214.785,
+            "v": 49135
+          },
+          "total_volume": 54363342,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 386,
+          "first_ts": "2025-03-19T13:30:00Z",
+          "last_ts": "2025-03-19T19:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:44:00Z",
+            "o": 214.72,
+            "h": 214.76,
+            "l": 214.72,
+            "c": 214.74,
+            "v": 741
+          },
+          "total_volume": 1227992,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 656,
+          "first_ts": "2025-03-19T08:00:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:47:00Z",
+            "o": 214.83,
+            "h": 214.89,
+            "l": 214.7815,
+            "c": 214.785,
+            "v": 49135
+          },
+          "total_volume": 54363342,
+          "zero_vol_bars": 0
+        }
+      },
+      "STX": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 391,
+          "first_ts": "2025-03-19T13:09:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:48:00Z",
+            "o": 88.905,
+            "h": 88.905,
+            "l": 88.905,
+            "c": 88.905,
+            "v": 387
+          },
+          "total_volume": 2164810,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 225,
+          "first_ts": "2025-03-19T13:33:00Z",
+          "last_ts": "2025-03-19T19:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T17:19:00Z",
+            "o": 88.6,
+            "h": 88.6,
+            "l": 88.6,
+            "c": 88.6,
+            "v": 316
+          },
+          "total_volume": 89945,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 391,
+          "first_ts": "2025-03-19T13:09:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:48:00Z",
+            "o": 88.905,
+            "h": 88.905,
+            "l": 88.905,
+            "c": 88.905,
+            "v": 387
+          },
+          "total_volume": 2164810,
+          "zero_vol_bars": 0
+        }
+      },
+      "NVDA": {
+        "omitted": {
+          "feed": "omitted",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 959,
+          "first_ts": "2025-03-19T08:00:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:00:00Z",
+            "o": 117.55,
+            "h": 117.67,
+            "l": 117.52,
+            "c": 117.53,
+            "v": 338742
+          },
+          "total_volume": 273425563,
+          "zero_vol_bars": 0
+        },
+        "iex": {
+          "feed": "iex",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 397,
+          "first_ts": "2025-03-19T12:30:00Z",
+          "last_ts": "2025-03-19T19:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:41:00Z",
+            "o": 117.745,
+            "h": 117.845,
+            "l": 117.74,
+            "c": 117.805,
+            "v": 2054
+          },
+          "total_volume": 4431305,
+          "zero_vol_bars": 0
+        },
+        "sip": {
+          "feed": "sip",
+          "http_status": 200,
+          "x_ratelimit_remaining": "199",
+          "bar_count": 959,
+          "first_ts": "2025-03-19T08:00:00Z",
+          "last_ts": "2025-03-19T23:59:00Z",
+          "sample_bar": {
+            "t": "2025-03-19T16:00:00Z",
+            "o": 117.55,
+            "h": 117.67,
+            "l": 117.52,
+            "c": 117.53,
+            "v": 338742
+          },
+          "total_volume": 273425563,
+          "zero_vol_bars": 0
+        }
+      }
+    }
+  }
+}

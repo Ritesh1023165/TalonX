@@ -1,0 +1,16 @@
+{
+  "elapsed_sec": 641.4,
+  "written": 191,
+  "skipped_existing": 19,
+  "failed": 0,
+  "total_new_bars": 19124490,
+  "windows": [
+    "2020",
+    "2021",
+    "2022",
+    "2023",
+    "2024",
+    "2025pre"
+  ],
+  "universe_n": 35
+}

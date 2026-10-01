@@ -1,0 +1,84 @@
+{
+  "expanded_regular_bars": 19585109,
+  "task94_regular_bars": 1834898,
+  "expansion_factor": 10.7,
+  "distinct_calendar_months": 80,
+  "month_span": "2020-01 .. 2026-08",
+  "years_covered": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "regime_counts_expanded": {
+    "trend_bull (sym > 50d SMA)": 11234721,
+    "trend_bear (sym < 50d SMA)": 8337097,
+    "realized_vol_high (rv z >= +0.85)": 3647906,
+    "realized_vol_mid (-0.85..+0.85)": 13645097,
+    "realized_vol_low (rv z <= -0.85)": 2230672,
+    "symbol_drawdown > 10%": 11334718,
+    "symbol_drawdown > 20%": 6797577,
+    "symbol_near_highs (>= -3%)": 3610873,
+    "market_bull_day": 13664814,
+    "market_bear_day": 5907004,
+    "market_drawdown > 10%": 5466081,
+    "market_drawdown > 20%": 2892659
+  },
+  "regime_counts_task94_window": {
+    "trend_bull (sym > 50d SMA)": 989514,
+    "trend_bear (sym < 50d SMA)": 845384,
+    "realized_vol_high (rv z >= +0.85)": 334832,
+    "realized_vol_mid (-0.85..+0.85)": 1344221,
+    "realized_vol_low (rv z <= -0.85)": 155845,
+    "symbol_drawdown > 10%": 1289215,
+    "symbol_drawdown > 20%": 833190,
+    "symbol_near_highs (>= -3%)": 230442,
+    "market_bull_day": 1200541,
+    "market_bear_day": 634357,
+    "market_drawdown > 10%": 371147,
+    "market_drawdown > 20%": 40308
+  },
+  "bars_by_year": {
+    "2020": 3373424,
+    "2021": 3325705,
+    "2022": 3345493,
+    "2023": 3285264,
+    "2024": 3258813,
+    "2025": 2392062,
+    "2026": 604348
+  },
+  "bars_by_year_x_trend": {
+    "False": {
+      "2020": 1297804,
+      "2021": 1128834,
+      "2022": 2105137,
+      "2023": 1155211,
+      "2024": 1250628,
+      "2025": 1085554,
+      "2026": 313929
+    },
+    "True": {
+      "2020": 2062329,
+      "2021": 2196871,
+      "2022": 1240356,
+      "2023": 2130053,
+      "2024": 2008185,
+      "2025": 1306508,
+      "2026": 290419
+    }
+  },
+  "materiality": {
+    "task94_had_trend_bear": 845384,
+    "expanded_trend_bear": 8337097,
+    "task94_had_market_bear_day": 634357,
+    "expanded_market_bear_day": 5907004,
+    "task94_had_market_dd_gt10": 371147,
+    "expanded_market_dd_gt10": 5466081,
+    "task94_had_vol_high": 334832,
+    "expanded_vol_high": 3647906
+  },
+  "elapsed_sec": 19.6
+}

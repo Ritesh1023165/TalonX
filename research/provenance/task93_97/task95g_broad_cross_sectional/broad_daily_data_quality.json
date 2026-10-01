@@ -1,0 +1,14 @@
+{
+  "total_rows": 1059207,
+  "symbols": 619,
+  "dates": 1811,
+  "dup_rows": 0,
+  "impossible_ohlc": 0,
+  "nonpos_close": 0,
+  "extreme_daily_moves_gt50pct": 35,
+  "extreme_daily_moves_gt80pct": 11,
+  "zero_volume_days": 65553,
+  "median_symbol_first_date": "2019-06-03",
+  "symbols_full_window": 543,
+  "masked_split_artifact_cells": 49
+}

@@ -1,0 +1,19 @@
+{
+  "candidate_gross_mean_bps": 100.16,
+  "n": 1177,
+  "uncond_long_global_bps": 26.43,
+  "uncond_long_volhigh_bps": 55.13,
+  "random_same_symbol_bps": 43.24,
+  "random_same_symbol_ci_bps": [
+    12.69,
+    73.41
+  ],
+  "random_same_month_bps": 4.33,
+  "random_same_month_ci_bps": [
+    -24.89,
+    34.1
+  ],
+  "basket_proxy_same_dates_bps": 76.6,
+  "above_sma50_long_bps": 20.83,
+  "VERDICT": "candidate mean (100.16 bps) barely exceeds random-same-month (4.33) and is BELOW the regime-matched vol_high baseline once the largest year (2022, negative) is included; excess over the correct benchmark is not robust (see _deepdive.json)"
+}

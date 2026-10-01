@@ -1,0 +1,11 @@
+experiment_id,n,e5_base,e5_ex_april2025,e5_ex_2025,e5_rm_best1,e5_rm_best5,e5_rm_best_symbol,e5_rm_best_month,slice,e10,e5_rm_best3,e5_rm_best_year,e5_half_2020_2022,e5_half_2023_2026,cost_burden_0_5,pf5,best_sym_contrib,best_month_contrib,best_year_contrib,frozen_criteria_failed,verdict
+A5-tod_0930_1000,1528471,0.0065,0.0055,0.0011,0.0065,0.0065,-0.0011,0.0013,full_history,,,,,,,,,,,,
+A1-vol_expansion_ge_2x,905173,0.0384,0.0365,0.0322,0.0384,0.0383,0.028,0.0374,full_history,,,,,,,,,,,,
+A5-tod_1530_1600,1534290,0.0337,0.0319,0.0354,0.0336,0.0336,0.0242,0.0283,full_history,,,,,,,,,,,,
+A5-open30_AND_up15m,1042577,-0.0385,-0.0385,-0.0393,-0.0385,-0.0385,-0.0452,-0.0389,full_history,,,,,,,,,,,,
+A1-current_1m_gate_ge0.25,1259532,0.0217,0.0224,0.0242,0.0217,0.0217,0.0203,0.021,full_history,,,,,,,,,,,,
+opening_0930_1000 x vol_low,32415,0.2074,0.2067,,0.2069,0.205,0.1912,0.2024,regime=vol_low,-0.1112,0.2059,0.2342,0.1858,0.2779,0.3186,1.358,0.087,0.068,0.306,C8(burden0.32),DISCOVERY_FAIL
+open30_AND_up15m x vol_low,11817,0.3102,0.3078,,0.3089,0.3047,0.2816,0.3219,regime=vol_low,0.0046,0.3067,0.345,0.3081,0.317,0.3056,1.554,0.092,0.08,0.311,C8(burden0.31),DISCOVERY_FAIL
+vol_expansion_ge_2x x vol_low,34830,0.2008,0.2003,,0.2001,0.1976,0.1831,0.2029,regime=vol_low,-0.1046,0.1987,0.2209,0.1923,0.2261,0.3054,1.369,0.078,0.06,0.275,C8(burden0.31),DISCOVERY_FAIL
+current_1m_gate_ge0.25 x vol_low,3162,0.4029,0.4029,,0.3994,0.3879,0.2926,0.445,regime=vol_low,0.2162,0.3932,0.4596,0.3235,1.0455,0.1867,1.792,0.226,0.226,0.431,none,DISCOVERY_PASS
+close_1530_1600 x vol_low,326127,0.0638,0.0643,,0.0637,0.0634,0.0477,0.0556,regime=vol_low,-0.1859,0.0636,0.0161,0.1042,-0.0035,0.2497,1.146,0.07,0.048,0.263,C2(0.064);C3(pf1.15);C8(burden0.25),DISCOVERY_FAIL

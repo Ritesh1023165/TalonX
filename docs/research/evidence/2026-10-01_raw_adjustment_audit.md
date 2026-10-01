@@ -160,3 +160,22 @@ Positive multi-day verdicts come first. **Nothing here was re-run**; you choose.
 | — | Task 72/73, 61R | no split in their windows | NONE |
 | — | Task 67A/68/70 (F6) | same-session only | NONE |
 | — | LARGE_GAP_REVERSION_V1 | explicit SPLIT_DAY exclusion | NONE |
+
+## B5 addendum (2026-10-01)
+
+**B5a, Task71/72:**
+- **Correction to the B2 table, rows 2 and 3:** Task72 holds 180 minutes with `NO_OVERNIGHT_HOLDING=True`. It is a
+  MULTI_DAY_FEATURE (20-session beta) and intraday holding, not overnight holding.
+- **Validation window 2024-04-01..05-31** (with the lookback from about 2024-03-01): no split or spin-off on the 35
+  names. → **Validation failure not attributable to raw splits.**
+- **Replication** (2024-10-21..12-20): reserved, never executed, not queried. LRCX 10:1 (2024-10-03) lies inside its
+  beta lookback.
+
+**B5b:** append-only annotations were added to `docs/research/TALONX_RESEARCH_LEDGER.md` and `docs/RESEARCH_STATUS.md`:
+`RAW_CONTAMINATION_POSSIBLE` for 93, 94, 95A, 101A-B, 121, 125B, 56 and 7B–59, plus Task93's corporate-action check as
+`DEMONSTRABLY_INCORRECT`. No verdict was changed.
+
+**B5c:** `research/provenance/task93_97/`
+- 113 files copied: manifests, reports, logs and small top-level tables, plus the Task97 builder.
+- `INVENTORY.json` holds the sha256 of the 986 data files (6.13 GB) left behind.
+- The acquisition code for 93, 95A, 95B and 95G was **not found** anywhere.

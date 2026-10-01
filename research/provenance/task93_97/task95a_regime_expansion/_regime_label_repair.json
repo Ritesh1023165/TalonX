@@ -1,0 +1,295 @@
+{
+  "splits_detected": {
+    "AAPL": {
+      "2020-08-31": {
+        "raw_ratio": 3.871,
+        "applied": 4,
+        "direction": "down"
+      }
+    },
+    "AMZN": {
+      "2022-06-06": {
+        "raw_ratio": 19.6,
+        "applied": 20,
+        "direction": "down"
+      }
+    },
+    "AVGO": {
+      "2024-07-15": {
+        "raw_ratio": 9.918,
+        "applied": 10,
+        "direction": "down"
+      }
+    },
+    "GOOGL": {
+      "2022-07-18": {
+        "raw_ratio": 20.514,
+        "applied": 20,
+        "direction": "down"
+      }
+    },
+    "ISRG": {
+      "2021-10-05": {
+        "raw_ratio": 2.939,
+        "applied": 3,
+        "direction": "down"
+      }
+    },
+    "LRCX": {
+      "2024-10-03": {
+        "raw_ratio": 10.039,
+        "applied": 10,
+        "direction": "down"
+      }
+    },
+    "NVDA": {
+      "2021-07-20": {
+        "raw_ratio": 4.037,
+        "applied": 4,
+        "direction": "down"
+      },
+      "2024-06-10": {
+        "raw_ratio": 9.935,
+        "applied": 10,
+        "direction": "down"
+      }
+    },
+    "PANW": {
+      "2022-09-14": {
+        "raw_ratio": 3.015,
+        "applied": 3,
+        "direction": "down"
+      },
+      "2024-12-16": {
+        "raw_ratio": 1.941,
+        "applied": 2,
+        "direction": "down"
+      }
+    },
+    "TSLA": {
+      "2020-08-31": {
+        "raw_ratio": 4.44,
+        "applied": 4,
+        "direction": "down"
+      },
+      "2022-08-25": {
+        "raw_ratio": 3.011,
+        "applied": 3,
+        "direction": "down"
+      }
+    }
+  },
+  "basket_min_dd": -0.354,
+  "per_symbol": {
+    "AAPL": {
+      "dd_min": -0.333,
+      "dd_mean": -0.092,
+      "bull_frac": 0.596,
+      "mkt_dd_min": -0.354
+    },
+    "ADBE": {
+      "dd_min": -0.6,
+      "dd_mean": -0.247,
+      "bull_frac": 0.521,
+      "mkt_dd_min": -0.354
+    },
+    "ADI": {
+      "dd_min": -0.331,
+      "dd_mean": -0.086,
+      "bull_frac": 0.565,
+      "mkt_dd_min": -0.354
+    },
+    "AMAT": {
+      "dd_min": -0.554,
+      "dd_mean": -0.188,
+      "bull_frac": 0.586,
+      "mkt_dd_min": -0.354
+    },
+    "AMD": {
+      "dd_min": -0.654,
+      "dd_mean": -0.245,
+      "bull_frac": 0.545,
+      "mkt_dd_min": -0.354
+    },
+    "AMZN": {
+      "dd_min": -0.561,
+      "dd_mean": -0.168,
+      "bull_frac": 0.592,
+      "mkt_dd_min": -0.354
+    },
+    "AVGO": {
+      "dd_min": -0.474,
+      "dd_mean": -0.094,
+      "bull_frac": 0.687,
+      "mkt_dd_min": -0.354
+    },
+    "BKNG": {
+      "dd_min": -0.448,
+      "dd_mean": -0.13,
+      "bull_frac": 0.577,
+      "mkt_dd_min": -0.354
+    },
+    "CMCSA": {
+      "dd_min": -0.535,
+      "dd_mean": -0.259,
+      "bull_frac": 0.485,
+      "mkt_dd_min": -0.354
+    },
+    "COST": {
+      "dd_min": -0.315,
+      "dd_mean": -0.076,
+      "bull_frac": 0.661,
+      "mkt_dd_min": -0.354
+    },
+    "CSCO": {
+      "dd_min": -0.386,
+      "dd_mean": -0.152,
+      "bull_frac": 0.584,
+      "mkt_dd_min": -0.354
+    },
+    "GILD": {
+      "dd_min": -0.325,
+      "dd_mean": -0.149,
+      "bull_frac": 0.56,
+      "mkt_dd_min": -0.354
+    },
+    "GOOGL": {
+      "dd_min": -0.443,
+      "dd_mean": -0.121,
+      "bull_frac": 0.65,
+      "mkt_dd_min": -0.354
+    },
+    "HON": {
+      "dd_min": -0.433,
+      "dd_mean": -0.121,
+      "bull_frac": 0.524,
+      "mkt_dd_min": -0.354
+    },
+    "INTC": {
+      "dd_min": -0.735,
+      "dd_mean": -0.432,
+      "bull_frac": 0.42,
+      "mkt_dd_min": -0.354
+    },
+    "INTU": {
+      "dd_min": -0.491,
+      "dd_mean": -0.167,
+      "bull_frac": 0.63,
+      "mkt_dd_min": -0.354
+    },
+    "ISRG": {
+      "dd_min": -0.499,
+      "dd_mean": -0.142,
+      "bull_frac": 0.584,
+      "mkt_dd_min": -0.354
+    },
+    "KLAC": {
+      "dd_min": -0.409,
+      "dd_mean": -0.113,
+      "bull_frac": 0.603,
+      "mkt_dd_min": -0.354
+    },
+    "LRCX": {
+      "dd_min": -0.569,
+      "dd_mean": -0.189,
+      "bull_frac": 0.582,
+      "mkt_dd_min": -0.354
+    },
+    "MDLZ": {
+      "dd_min": -0.298,
+      "dd_mean": -0.085,
+      "bull_frac": 0.525,
+      "mkt_dd_min": -0.354
+    },
+    "META": {
+      "dd_min": -0.767,
+      "dd_mean": -0.205,
+      "bull_frac": 0.555,
+      "mkt_dd_min": -0.354
+    },
+    "MSFT": {
+      "dd_min": -0.375,
+      "dd_mean": -0.111,
+      "bull_frac": 0.582,
+      "mkt_dd_min": -0.354
+    },
+    "MU": {
+      "dd_min": -0.578,
+      "dd_mean": -0.24,
+      "bull_frac": 0.54,
+      "mkt_dd_min": -0.354
+    },
+    "NFLX": {
+      "dd_min": -0.759,
+      "dd_mean": -0.241,
+      "bull_frac": 0.661,
+      "mkt_dd_min": -0.354
+    },
+    "NVDA": {
+      "dd_min": -0.664,
+      "dd_mean": -0.142,
+      "bull_frac": 0.667,
+      "mkt_dd_min": -0.354
+    },
+    "PANW": {
+      "dd_min": -0.468,
+      "dd_mean": -0.107,
+      "bull_frac": 0.636,
+      "mkt_dd_min": -0.354
+    },
+    "PEP": {
+      "dd_min": -0.347,
+      "dd_mean": -0.096,
+      "bull_frac": 0.539,
+      "mkt_dd_min": -0.354
+    },
+    "PYPL": {
+      "dd_min": -0.873,
+      "dd_mean": -0.582,
+      "bull_frac": 0.43,
+      "mkt_dd_min": -0.354
+    },
+    "QCOM": {
+      "dd_min": -0.456,
+      "dd_mean": -0.218,
+      "bull_frac": 0.525,
+      "mkt_dd_min": -0.354
+    },
+    "REGN": {
+      "dd_min": -0.598,
+      "dd_mean": -0.145,
+      "bull_frac": 0.549,
+      "mkt_dd_min": -0.354
+    },
+    "SBUX": {
+      "dd_min": -0.446,
+      "dd_mean": -0.205,
+      "bull_frac": 0.497,
+      "mkt_dd_min": -0.354
+    },
+    "STX": {
+      "dd_min": -0.582,
+      "dd_mean": -0.203,
+      "bull_frac": 0.615,
+      "mkt_dd_min": -0.354
+    },
+    "TSLA": {
+      "dd_min": -0.736,
+      "dd_mean": -0.306,
+      "bull_frac": 0.547,
+      "mkt_dd_min": -0.354
+    },
+    "TXN": {
+      "dd_min": -0.339,
+      "dd_mean": -0.111,
+      "bull_frac": 0.571,
+      "mkt_dd_min": -0.354
+    },
+    "VRTX": {
+      "dd_min": -0.416,
+      "dd_mean": -0.128,
+      "bull_frac": 0.551,
+      "mkt_dd_min": -0.354
+    }
+  }
+}

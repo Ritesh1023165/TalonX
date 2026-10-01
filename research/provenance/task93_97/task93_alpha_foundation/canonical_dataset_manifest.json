@@ -1,0 +1,597 @@
+{
+ "dataset_id": "task93_canonical_v1",
+ "purpose": "Authoritative historical research dataset for Task 93 baseline of the frozen TalonX long-only strategy (4b0e5df).",
+ "built_from_directory": "results/task93_alpha_foundation/_canonical_data",
+ "provider": "alpaca",
+ "granularity": "1min OHLCV",
+ "price_adjustment": "UNADJUSTED (Alpaca 1-min bars as delivered; no split/dividend back-adjustment applied). Corporate-action discontinuities audited in data_quality_report.md.",
+ "timestamp_tz": "UTC, tz-aware (+00:00). Session classification done in America/New_York by the engine.",
+ "timestamp_coverage": "Extended hours included: ~08:00 UTC (04:00 ET pre-market) to ~23:59 UTC (19:59 ET after-hours).",
+ "n_symbols": 35,
+ "symbols": [
+  "AAPL",
+  "ADBE",
+  "ADI",
+  "AMAT",
+  "AMD",
+  "AMZN",
+  "AVGO",
+  "BKNG",
+  "CMCSA",
+  "COST",
+  "CSCO",
+  "GILD",
+  "GOOGL",
+  "HON",
+  "INTC",
+  "INTU",
+  "ISRG",
+  "KLAC",
+  "LRCX",
+  "MDLZ",
+  "META",
+  "MSFT",
+  "MU",
+  "NFLX",
+  "NVDA",
+  "PANW",
+  "PEP",
+  "PYPL",
+  "QCOM",
+  "REGN",
+  "SBUX",
+  "STX",
+  "TSLA",
+  "TXN",
+  "VRTX"
+ ],
+ "universe_source": "PIV DEFAULT_UNIVERSE / FPRC-ORPB validation universe (identical 35-symbol set across task63 and task61r). NOT profitability-selected.",
+ "deep_symbols_10": [
+  "AAPL",
+  "AMD",
+  "AMZN",
+  "GOOGL",
+  "META",
+  "MSFT",
+  "NVDA",
+  "PYPL",
+  "STX",
+  "TSLA"
+ ],
+ "deep_symbols_note": "The 10 symbols with data extending past 2025-08-14 (the long-standing task7b canonical-baseline universe).",
+ "segments": {
+  "A_broad": {
+   "symbols": 35,
+   "start": "2025-01-24",
+   "end": "2025-08-14",
+   "bars": 4468726,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "note": "Contiguous 35-symbol series; task63 ends 2025-05-05, task61r begins 2025-05-06, no gap."
+  },
+  "B_deep": {
+   "symbols": 10,
+   "start": "2025-08-15",
+   "end": "2026-08-14",
+   "bars": 1903044,
+   "sources": [
+    "task7b_alpaca_long_history"
+   ],
+   "note": "10-symbol continuation. Byte-identical strategy semantics to Task 74S which already replayed exactly this (dataset_hash 5e5412a960bf)."
+  }
+ },
+ "total_bars": 4468726,
+ "combined_fingerprint_sha256": "796893860a2733b3ffd689c81f2ce68adf96a6096cfcbbc942d7924a34e37474",
+ "per_symbol": {
+  "AAPL": {
+   "bars": 299700,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152269,
+   "premarket_bars": 83592,
+   "afterhours_bars": 63839,
+   "intraday_gaps_gt2min": 15585,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "ac37189b52e0b0da0136761e24bcb010eaa347c333e8c789c3d8f7473858a086"
+  },
+  "ADBE": {
+   "bars": 59101,
+   "start": "2025-01-24 12:52:00+00:00",
+   "end": "2025-08-14 23:32:00+00:00",
+   "reg_session_bars": 54289,
+   "premarket_bars": 2426,
+   "afterhours_bars": 2386,
+   "intraday_gaps_gt2min": 2792,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "c82892e78b2b270dac66141059817881622c828fd5fc19dc7073c09db6619290"
+  },
+  "ADI": {
+   "bars": 56114,
+   "start": "2025-01-24 00:02:00+00:00",
+   "end": "2025-08-14 22:00:00+00:00",
+   "reg_session_bars": 54046,
+   "premarket_bars": 1020,
+   "afterhours_bars": 1048,
+   "intraday_gaps_gt2min": 1329,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "69ea9e52f4c1bc819792896ba67e7a535d272a975aa18e0ebbcd0001c49e6972"
+  },
+  "AMAT": {
+   "bars": 63195,
+   "start": "2025-01-24 00:34:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54420,
+   "premarket_bars": 4942,
+   "afterhours_bars": 3833,
+   "intraday_gaps_gt2min": 4482,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "c10758d4c02d88429154a2d490448e7780e35c79f0e7063d251099a2debdc850"
+  },
+  "AMD": {
+   "bars": 321827,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152305,
+   "premarket_bars": 95601,
+   "afterhours_bars": 73921,
+   "intraday_gaps_gt2min": 11114,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "56d2c583fbd054ef82995403c636f016e8968e27b57fa6b4eac1924b93b464f9"
+  },
+  "AMZN": {
+   "bars": 304314,
+   "start": "2025-01-24 00:03:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152326,
+   "premarket_bars": 83783,
+   "afterhours_bars": 68205,
+   "intraday_gaps_gt2min": 14848,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "5c0f5998c6100a0ccfb0fa11a314c94b8416f14a11271c9c64fd977c5830deaf"
+  },
+  "AVGO": {
+   "bars": 93521,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54515,
+   "premarket_bars": 22311,
+   "afterhours_bars": 16695,
+   "intraday_gaps_gt2min": 7467,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "871d61eb146f94f84fe9c158d9d5eb6842137a796fee4f4f78f9ebe80aeb89b4"
+  },
+  "BKNG": {
+   "bars": 19738,
+   "start": "2025-01-24 14:30:00+00:00",
+   "end": "2025-08-14 20:42:00+00:00",
+   "reg_session_bars": 19354,
+   "premarket_bars": 38,
+   "afterhours_bars": 346,
+   "intraday_gaps_gt2min": 6648,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "3ef1374f331c1b8228dce86f36df7f1de544d5e5d70517f1cfe346889f256ad5"
+  },
+  "CMCSA": {
+   "bars": 61949,
+   "start": "2025-01-24 09:21:00+00:00",
+   "end": "2025-08-14 23:55:00+00:00",
+   "reg_session_bars": 54429,
+   "premarket_bars": 4244,
+   "afterhours_bars": 3276,
+   "intraday_gaps_gt2min": 3821,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "1667988e8202feb9c205baeb991d6e4fca8b19ca1f547327ab503df98c0e8c80"
+  },
+  "COST": {
+   "bars": 55513,
+   "start": "2025-01-24 12:27:00+00:00",
+   "end": "2025-08-14 23:42:00+00:00",
+   "reg_session_bars": 51930,
+   "premarket_bars": 1697,
+   "afterhours_bars": 1886,
+   "intraday_gaps_gt2min": 2550,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "0822b60b53c8a264eca4e7962cca8a0b9703280099b77c95c19c2eb47da5899a"
+  },
+  "CSCO": {
+   "bars": 66709,
+   "start": "2025-01-24 00:44:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54466,
+   "premarket_bars": 7029,
+   "afterhours_bars": 5214,
+   "intraday_gaps_gt2min": 5403,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "25fc2d9e43b8700cd757f9a1033aaf7edd5318a37c2656e7247556e3b79033d5"
+  },
+  "GILD": {
+   "bars": 58445,
+   "start": "2025-01-24 00:37:00+00:00",
+   "end": "2025-08-14 23:46:00+00:00",
+   "reg_session_bars": 54417,
+   "premarket_bars": 2147,
+   "afterhours_bars": 1881,
+   "intraday_gaps_gt2min": 2438,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "e363d0c6f0fca213c186f78d4d6e1cb491927cce4cb63e2e7b19949e5bcc3154"
+  },
+  "GOOGL": {
+   "bars": 296128,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152256,
+   "premarket_bars": 85200,
+   "afterhours_bars": 58672,
+   "intraday_gaps_gt2min": 16390,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "12f306b2aeb574da635fd8894e9e08d3d5bd1b2a43d2e5ea8807333d87dc18d7"
+  },
+  "HON": {
+   "bars": 56470,
+   "start": "2025-01-24 14:27:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54055,
+   "premarket_bars": 1201,
+   "afterhours_bars": 1214,
+   "intraday_gaps_gt2min": 1464,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "7a1bf9d3b19a188b596556b7759f290919d67cb1fa33afe63c3f48627fdb612f"
+  },
+  "INTC": {
+   "bars": 120249,
+   "start": "2025-01-24 00:00:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54560,
+   "premarket_bars": 37537,
+   "afterhours_bars": 28152,
+   "intraday_gaps_gt2min": 2993,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "246b8ff1cfe5fe7b095d929f9eab51630ab585822ed1eb79fd479cb86f21c95f"
+  },
+  "INTU": {
+   "bars": 51619,
+   "start": "2025-01-24 13:36:00+00:00",
+   "end": "2025-08-14 20:02:00+00:00",
+   "reg_session_bars": 50332,
+   "premarket_bars": 557,
+   "afterhours_bars": 730,
+   "intraday_gaps_gt2min": 1279,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "5eb9572ecde74bf170a52f4dd8ac3f1919020bdd0cd8c916513db036f91151f1"
+  },
+  "ISRG": {
+   "bars": 53337,
+   "start": "2025-01-24 00:00:00+00:00",
+   "end": "2025-08-14 23:58:00+00:00",
+   "reg_session_bars": 51283,
+   "premarket_bars": 916,
+   "afterhours_bars": 1138,
+   "intraday_gaps_gt2min": 1633,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "ae2ccadf1de1c63144da24388cd2dc551de4de1e591e4eb87310527f6a0b1f7d"
+  },
+  "KLAC": {
+   "bars": 45754,
+   "start": "2025-01-24 13:18:00+00:00",
+   "end": "2025-08-14 23:43:00+00:00",
+   "reg_session_bars": 44503,
+   "premarket_bars": 517,
+   "afterhours_bars": 734,
+   "intraday_gaps_gt2min": 2743,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "9997c501ee60d1488c538d0d293b9b0cf643cdbecfa602ab34ec45842b5b8b59"
+  },
+  "LRCX": {
+   "bars": 64691,
+   "start": "2025-01-24 00:03:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54442,
+   "premarket_bars": 5863,
+   "afterhours_bars": 4386,
+   "intraday_gaps_gt2min": 4993,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "20e58474f26a8b4cee772d066b3b938cec6d24350cc51078daf922c6f335f415"
+  },
+  "MDLZ": {
+   "bars": 57299,
+   "start": "2025-01-24 13:00:00+00:00",
+   "end": "2025-08-14 22:49:00+00:00",
+   "reg_session_bars": 54417,
+   "premarket_bars": 1407,
+   "afterhours_bars": 1475,
+   "intraday_gaps_gt2min": 1705,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "8d9d421eca84d0083be76eaaaeab4291faac8731e30787abacd3aa6abbf34c0e"
+  },
+  "META": {
+   "bars": 271813,
+   "start": "2025-01-24 00:02:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152256,
+   "premarket_bars": 67071,
+   "afterhours_bars": 52486,
+   "intraday_gaps_gt2min": 17943,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "f8c9bd88211704e079e0c7562b2f9a313304ba9f3515b3348a7012080702ff5f"
+  },
+  "MSFT": {
+   "bars": 284554,
+   "start": "2025-01-24 00:03:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152199,
+   "premarket_bars": 76280,
+   "afterhours_bars": 56075,
+   "intraday_gaps_gt2min": 15263,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "5422e0696739742fe1b22b53794da35bf14088b261fcb7af1a11cc4301496030"
+  },
+  "MU": {
+   "bars": 95869,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 54525,
+   "premarket_bars": 24318,
+   "afterhours_bars": 17026,
+   "intraday_gaps_gt2min": 7361,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "96314d217e113a58b7f34be3f8ea0162b1b055927a6e588815902f3ac36e4736"
+  },
+  "NFLX": {
+   "bars": 63670,
+   "start": "2025-01-24 00:02:00+00:00",
+   "end": "2025-08-14 23:59:00+00:00",
+   "reg_session_bars": 53968,
+   "premarket_bars": 5393,
+   "afterhours_bars": 4309,
+   "intraday_gaps_gt2min": 4692,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "27bbe6718072a582153640dd0e7d6584e347c7e1183c8267b15f9205145c038c"
+  },
+  "NVDA": {
+   "bars": 371748,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152478,
+   "premarket_bars": 126862,
+   "afterhours_bars": 92408,
+   "intraday_gaps_gt2min": 261,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "2ff097961081104db2c70d9059cf4ca2a90ff0ad06a732b25e98ec004a298e5a"
+  },
+  "PANW": {
+   "bars": 63355,
+   "start": "2025-01-24 00:58:00+00:00",
+   "end": "2025-08-14 23:58:00+00:00",
+   "reg_session_bars": 54394,
+   "premarket_bars": 4515,
+   "afterhours_bars": 4446,
+   "intraday_gaps_gt2min": 4508,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "903586aca9a777fb6240a7b7fc546585154fa6d4b7e8292cb50f8b704f56d447"
+  },
+  "PEP": {
+   "bars": 62389,
+   "start": "2025-01-24 00:31:00+00:00",
+   "end": "2025-08-14 23:50:00+00:00",
+   "reg_session_bars": 54451,
+   "premarket_bars": 4708,
+   "afterhours_bars": 3230,
+   "intraday_gaps_gt2min": 4587,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "ddc56198d736ab1e07b1ae629763df6949eec75679b1329e88e278c99e9b1f54"
+  },
+  "PYPL": {
+   "bars": 215132,
+   "start": "2025-01-24 00:56:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152095,
+   "premarket_bars": 36631,
+   "afterhours_bars": 26406,
+   "intraday_gaps_gt2min": 22361,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "d0cd7f19ace9ea7c927e4e5d2cca7aa8cc1b7490583b5330718315124c570f77"
+  },
+  "QCOM": {
+   "bars": 66159,
+   "start": "2025-01-24 00:12:00+00:00",
+   "end": "2025-08-14 23:55:00+00:00",
+   "reg_session_bars": 54440,
+   "premarket_bars": 6886,
+   "afterhours_bars": 4833,
+   "intraday_gaps_gt2min": 5692,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "ec431b680496a0cd983441e7043a8c592158cceb0f191d8c7b072231feb38654"
+  },
+  "REGN": {
+   "bars": 45374,
+   "start": "2025-01-24 09:11:00+00:00",
+   "end": "2025-08-14 22:25:00+00:00",
+   "reg_session_bars": 44431,
+   "premarket_bars": 488,
+   "afterhours_bars": 455,
+   "intraday_gaps_gt2min": 2494,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "956f1b911d390386b44e3c1a1b655313beb8c1d29ea87224d1215d9cdb1f5436"
+  },
+  "SBUX": {
+   "bars": 64455,
+   "start": "2025-01-24 00:05:00+00:00",
+   "end": "2025-08-14 23:54:00+00:00",
+   "reg_session_bars": 54450,
+   "premarket_bars": 5343,
+   "afterhours_bars": 4662,
+   "intraday_gaps_gt2min": 4811,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "c7321d310cc96818d4d77a29bfb7881e2719ccfed98f2800fd8f65f70399ffa2"
+  },
+  "STX": {
+   "bars": 180681,
+   "start": "2025-01-24 12:17:00+00:00",
+   "end": "2026-08-14 23:58:00+00:00",
+   "reg_session_bars": 150884,
+   "premarket_bars": 18582,
+   "afterhours_bars": 11215,
+   "intraday_gaps_gt2min": 11441,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "d257d64f199f26ea0c7092721c93d55cce04e08edba39d43e87ed361afc6def1"
+  },
+  "TSLA": {
+   "bars": 367018,
+   "start": "2025-01-24 00:00:00+00:00",
+   "end": "2026-08-14 23:59:00+00:00",
+   "reg_session_bars": 152484,
+   "premarket_bars": 123107,
+   "afterhours_bars": 91427,
+   "intraday_gaps_gt2min": 1103,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation",
+    "task7b_alpaca_long_history"
+   ],
+   "sha256": "01612f657d4fa3aaee5e467535f69fa6f04ac6c0ed2acb627ef68fc5598176cf"
+  },
+  "TXN": {
+   "bars": 59867,
+   "start": "2025-01-24 00:01:00+00:00",
+   "end": "2025-08-14 23:35:00+00:00",
+   "reg_session_bars": 54400,
+   "premarket_bars": 2958,
+   "afterhours_bars": 2509,
+   "intraday_gaps_gt2min": 2557,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "a0c967a46797c3069dc88b1f7acd1408205e167813db064412239848873db7ee"
+  },
+  "VRTX": {
+   "bars": 50969,
+   "start": "2025-01-24 14:30:00+00:00",
+   "end": "2025-08-14 20:32:00+00:00",
+   "reg_session_bars": 49584,
+   "premarket_bars": 529,
+   "afterhours_bars": 856,
+   "intraday_gaps_gt2min": 1366,
+   "sources": [
+    "task63_orpb_v1_validation",
+    "task61r_fprc_v1_validation"
+   ],
+   "sha256": "b9a9c6bbe662cac2d295d05a0ba6dd1b51f7483e4ff90414306646b864619a3b"
+  }
+ },
+ "known_limitations": [
+  "No pre-2025 history exists anywhere locally. Earliest bar 2025-01-24. Cannot cover a 2020/2022-style crash or bear regime.",
+  "Segment A broad universe is ~6.7 months (2025 H1) -> effectively one macro regime.",
+  "10 symbols cover the full 18.7-month span; the other 25 stop at 2025-08-14.",
+  "UNADJUSTED prices -> a split during the window shows as a ~50% single-bar jump; audited in Phase 3.",
+  "Individual-security backtest, not point-in-time universe -> mild survivorship bias (all 35 are prominent/liquid names as of 2026).",
+  "Alpaca 1-min bars omit ticks with zero volume in some pre/post sessions -> 'unexpected' intra-session gaps (documented, benign, same pattern as Task 26)."
+ ]
+}

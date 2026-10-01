@@ -1,0 +1,6 @@
+cost_bps,trades,wins,losses,total_R,expectancy_R,profit_factor,cost_R_burden
+0,1,1,0,5.9907,5.9907,inf,0.0
+2,1,1,0,5.8918,5.8918,inf,0.0989
+5,1,1,0,5.7435,5.7435,inf,0.2472
+10,1,1,0,5.4963,5.4963,inf,0.4944
+20,1,1,0,5.0019,5.0019,inf,0.9888

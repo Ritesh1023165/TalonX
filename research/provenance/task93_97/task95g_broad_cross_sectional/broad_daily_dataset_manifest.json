@@ -1,0 +1,26 @@
+{
+  "dataset": "task95g_sp500_daily_v1",
+  "paid_data_spend": "\u00a30",
+  "frozen_commit": "4b0e5dfa2415afe1dbf423c63c9cc479264106fa",
+  "membership_source": "fja05680/sp500 point-in-time daily list (independent, free); tickers normalized to current tradable symbol",
+  "price_source": "Alpaca SIP /v2/stocks/bars 1Day adjustment=all (entitled, GET only)",
+  "window": "2019-06-03..2026-08-14",
+  "membership_window": "2020-01-01..2026-08-14",
+  "fja_covers_to": "2026-06-30",
+  "held_flat_after": "2026-06-30..2026-08-14 (no post-2026-06-30 membership events applied)",
+  "unique_symbols": 620,
+  "symbols_with_data": 619,
+  "symbols_zero_data": 1,
+  "total_daily_rows": 1059207,
+  "rows_by_year": {
+    "2019": 87527,
+    "2020": 149762,
+    "2021": 149049,
+    "2022": 147545,
+    "2023": 145710,
+    "2024": 146601,
+    "2025": 144509,
+    "2026": 88504
+  },
+  "fingerprint": "08aa253ad4df1121"
+}

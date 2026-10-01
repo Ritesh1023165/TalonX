@@ -1,0 +1,8 @@
+2026-09-03 07:06:04,309 [INFO] scripts.download_historical_1m: AAPL: downloaded 199631 bar(s) via alpaca (2020-01-01 00:00:00+00:00 -> 2020-12-31 23:59:00+00:00) -- FULL
+[2020] AAPL   FULL      199,631 bars (2020-01-01 00:00:00+00:00 -> 2020-12-31 23:59:00+00:00)
+2026-09-03 07:06:17,849 [INFO] scripts.download_historical_1m: ADBE: downloaded 105674 bar(s) via alpaca (2020-01-01 00:08:00+00:00 -> 2020-12-31 22:45:00+00:00) -- FULL
+[2020] ADBE   FULL      105,674 bars (2020-01-01 00:08:00+00:00 -> 2020-12-31 22:45:00+00:00)
+2026-09-03 07:06:30,322 [INFO] scripts.download_historical_1m: ADI: downloaded 100173 bar(s) via alpaca (2020-01-02 14:29:00+00:00 -> 2020-12-31 21:52:00+00:00) -- PARTIAL
+[2020] ADI    PARTIAL   100,173 bars (2020-01-02 14:29:00+00:00 -> 2020-12-31 21:52:00+00:00)
+2026-09-03 07:06:43,619 [INFO] scripts.download_historical_1m: AMAT: downloaded 110812 bar(s) via alpaca (2020-01-01 00:14:00+00:00 -> 2020-12-31 23:07:00+00:00) -- FULL
+[2020] AMAT   FULL      110,812 bars (2020-01-01 00:14:00+00:00 -> 2020-12-31 23:07:00+00:00)

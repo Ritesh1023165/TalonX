@@ -1,0 +1,6 @@
+scenario,trades,total_R,expectancy_R,profit_factor,max_dd_R
+full_sample,1,5.9907,5.9907,inf,0.0
+remove_best_trade,0,0.0,,,0.0
+remove_best_3,0,0.0,,,0.0
+remove_best_symbol(PYPL),0,0.0,,,0.0
+remove_best_month(2025-04),0,0.0,,,0.0

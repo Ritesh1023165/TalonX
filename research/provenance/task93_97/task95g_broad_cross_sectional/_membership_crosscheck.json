@@ -1,0 +1,164 @@
+{
+  "sample_dates": [
+    "2020-01-02",
+    "2020-06-15",
+    "2021-03-15",
+    "2021-09-15",
+    "2022-01-14",
+    "2022-06-15",
+    "2023-01-13",
+    "2023-06-15",
+    "2024-01-12",
+    "2024-06-14",
+    "2025-01-15",
+    "2025-06-16",
+    "2026-06-15"
+  ],
+  "mean_jaccard": 0.955176923076923,
+  "mean_symdiff_per_date": 23.23076923076923,
+  "rows": [
+    {
+      "date": "2020-01-02",
+      "mine_n": 506,
+      "fja_n": 505,
+      "agree": 485,
+      "jaccard": 0.9221,
+      "only_mine": "BALL;BBWI;BNY;COR;CTRA;DOC;ECHO;EG;ELV;GEN;LUMN;META;MRSH;PSKY;RDDT;RTX;RVTY;SW;TT;VMRK",
+      "n_only_mine": 21,
+      "only_fja": "ABC;ANTM;AVB;BK;BLL;COG;CTL;EQR;FB;IR;LB;MMC;MYL;NLOK;PEAK;PKI;RE;UTX;VIAC;WRK",
+      "n_only_fja": 20
+    },
+    {
+      "date": "2020-06-15",
+      "mine_n": 506,
+      "fja_n": 505,
+      "agree": 487,
+      "jaccard": 0.9294,
+      "only_mine": "BALL;BBWI;BNY;COR;CTRA;DOC;ECHO;EG;ELV;GEN;LUMN;META;MRSH;PSKY;RDDT;RVTY;SW;VMRK;VTRS",
+      "n_only_mine": 19,
+      "only_fja": "ABC;ANTM;AVB;BK;BLL;COG;CTL;EQR;FB;LB;MMC;MYL;NLOK;PEAK;PKI;RE;VIAC;WRK",
+      "n_only_fja": 18
+    },
+    {
+      "date": "2021-03-15",
+      "mine_n": 506,
+      "fja_n": 505,
+      "agree": 489,
+      "jaccard": 0.9368,
+      "only_mine": "BALL;BBWI;BNY;COR;CTRA;DOC;ECHO;EG;ELV;GEN;META;MRSH;PSKY;RDDT;RVTY;SW;VMRK",
+      "n_only_mine": 17,
+      "only_fja": "ABC;ANTM;AVB;BK;BLL;COG;EQR;FB;LB;MMC;NLOK;PEAK;PKI;RE;VIAC;WRK",
+      "n_only_fja": 16
+    },
+    {
+      "date": "2021-09-15",
+      "mine_n": 506,
+      "fja_n": 505,
+      "agree": 490,
+      "jaccard": 0.9405,
+      "only_mine": "BALL;BNY;COR;CTRA;DOC;ECHO;EG;ELV;GEN;META;MRSH;PSKY;RDDT;RVTY;SW;VMRK",
+      "n_only_mine": 16,
+      "only_fja": "ABC;ANTM;AVB;BK;BLL;COG;EQR;FB;MMC;NLOK;PEAK;PKI;RE;VIAC;WRK",
+      "n_only_fja": 15
+    },
+    {
+      "date": "2022-01-14",
+      "mine_n": 506,
+      "fja_n": 505,
+      "agree": 491,
+      "jaccard": 0.9442,
+      "only_mine": "BALL;BNY;COR;DOC;ECHO;EG;ELV;GEN;META;MRSH;PSKY;RDDT;RVTY;SW;VMRK",
+      "n_only_mine": 15,
+      "only_fja": "ABC;ANTM;AVB;BK;BLL;EQR;FB;MMC;NLOK;PEAK;PKI;RE;VIAC;WRK",
+      "n_only_fja": 14
+    },
+    {
+      "date": "2022-06-15",
+      "mine_n": 505,
+      "fja_n": 504,
+      "agree": 492,
+      "jaccard": 0.9516,
+      "only_mine": "BNY;COR;DOC;ECHO;EG;ELV;GEN;MRSH;PSKY;RDDT;RVTY;SW;VMRK",
+      "n_only_mine": 13,
+      "only_fja": "ABC;ANTM;AVB;BK;EQR;MMC;NLOK;PARA;PEAK;PKI;RE;WRK",
+      "n_only_fja": 12
+    },
+    {
+      "date": "2023-01-13",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 493,
+      "jaccard": 0.9591,
+      "only_mine": "BNY;COR;DOC;ECHO;EG;MRSH;PSKY;RDDT;RVTY;SW;VMRK",
+      "n_only_mine": 11,
+      "only_fja": "ABC;AVB;BK;EQR;MMC;PARA;PEAK;PKI;RE;WRK",
+      "n_only_fja": 10
+    },
+    {
+      "date": "2023-06-15",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 493,
+      "jaccard": 0.9591,
+      "only_mine": "BNY;COR;DOC;ECHO;EG;FISV;MRSH;PSKY;RDDT;SW;VMRK",
+      "n_only_mine": 11,
+      "only_fja": "ABC;AVB;BK;EQR;FI;MMC;PARA;PEAK;RE;WRK",
+      "n_only_fja": 10
+    },
+    {
+      "date": "2024-01-12",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 495,
+      "jaccard": 0.9668,
+      "only_mine": "BNY;DOC;ECHO;FISV;MRSH;PSKY;RDDT;SW;VMRK",
+      "n_only_mine": 9,
+      "only_fja": "AVB;BK;EQR;FI;MMC;PARA;PEAK;WRK",
+      "n_only_fja": 8
+    },
+    {
+      "date": "2024-06-14",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 496,
+      "jaccard": 0.9706,
+      "only_mine": "BNY;ECHO;FISV;MRSH;PSKY;RDDT;SW;VMRK",
+      "n_only_mine": 8,
+      "only_fja": "AVB;BK;EQR;FI;MMC;PARA;WRK",
+      "n_only_fja": 7
+    },
+    {
+      "date": "2025-01-15",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 497,
+      "jaccard": 0.9745,
+      "only_mine": "BNY;ECHO;FISV;MRSH;PSKY;RDDT;VMRK",
+      "n_only_mine": 7,
+      "only_fja": "AVB;BK;EQR;FI;MMC;PARA",
+      "n_only_fja": 6
+    },
+    {
+      "date": "2025-06-16",
+      "mine_n": 504,
+      "fja_n": 503,
+      "agree": 497,
+      "jaccard": 0.9745,
+      "only_mine": "BNY;ECHO;FISV;MRSH;PSKY;RDDT;VMRK",
+      "n_only_mine": 7,
+      "only_fja": "AVB;BK;EQR;FI;MMC;PARA",
+      "n_only_fja": 6
+    },
+    {
+      "date": "2026-06-15",
+      "mine_n": 503,
+      "fja_n": 503,
+      "agree": 500,
+      "jaccard": 0.9881,
+      "only_mine": "ECHO;RDDT;VMRK",
+      "n_only_mine": 3,
+      "only_fja": "AVB;EQR;SATS",
+      "n_only_fja": 3
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+experiment_id,family,horizon,gross_excess_bps,net_excess_5bps,net_excess_10bps,top_minus_bottom_bps,year_breadth,monotonicity,verdict,failure_reason
+B-pull_20_5,B_pullback,3,3.8,-8.3,-20.5,17.0,2/4,non-monotone/flat,DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G7_monotonicity;G_sign
+B-pull_20_3,B_pullback,3,2.0,-12.0,-26.1,16.6,1/4,non-monotone/flat,DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+A-rel_20d,A_momentum,3,-17.9,-24.3,-30.7,-36.3,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+A-rel_60d,A_momentum,3,-20.5,-24.4,-28.2,-46.5,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+C-voladj_60,C_vol_adj,3,-21.5,-25.4,-29.4,-38.2,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+C-voladj_20,C_vol_adj,3,-18.8,-25.5,-32.3,-29.0,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+D-relvol_20,D_rel_volume,3,-4.9,-25.6,-46.2,3.2,1/4,non-monotone/flat,DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G7_monotonicity;G_sign
+A-rel_10d,A_momentum,3,-18.8,-27.7,-36.5,-35.9,1/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+D-vol_accel,D_rel_volume,3,-3.3,-32.2,-61.0,8.1,1/4,non-monotone/flat,DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+A-rel_5d,A_momentum,3,-25.6,-38.0,-50.4,-48.3,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+D-strength_x_vol,D_rel_volume,3,-21.7,-38.9,-56.2,-31.1,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+A-rel_1d,A_momentum,3,-16.1,-41.8,-67.6,-36.0,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign
+A-rel_3d,A_momentum,3,-26.3,-42.1,-58.0,-53.0,0/4,reversal-monotone (D1 worst),DISCOVERY_FAIL,G2;G2b_other_horizon;G3;G4;G5;G6_year;G6_rmbest10;G7_monotonicity;G_sign

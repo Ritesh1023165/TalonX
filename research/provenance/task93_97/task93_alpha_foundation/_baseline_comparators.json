@@ -1,0 +1,232 @@
+{
+ "buy_and_hold_segmentA": {
+  "per_symbol": [
+   {
+    "symbol": "PYPL",
+    "first": 89.8,
+    "last": 69.32,
+    "buyhold_pct": -22.806236080178177
+   },
+   {
+    "symbol": "ADBE",
+    "first": 438.4,
+    "last": 349.0,
+    "buyhold_pct": -20.392335766423354
+   },
+   {
+    "symbol": "ISRG",
+    "first": 597.0001,
+    "last": 476.0,
+    "buyhold_pct": -20.268020055608027
+   },
+   {
+    "symbol": "TSLA",
+    "first": 412.18,
+    "last": 334.724,
+    "buyhold_pct": -18.791789994662533
+   },
+   {
+    "symbol": "REGN",
+    "first": 691.99,
+    "last": 570.0,
+    "buyhold_pct": -17.628867469183085
+   },
+   {
+    "symbol": "AMAT",
+    "first": 190.91,
+    "last": 161.86,
+    "buyhold_pct": -15.216594206694245
+   },
+   {
+    "symbol": "CMCSA",
+    "first": 37.51,
+    "last": 33.0,
+    "buyhold_pct": -12.023460410557185
+   },
+   {
+    "symbol": "VRTX",
+    "first": 441.79,
+    "last": 390.3,
+    "buyhold_pct": -11.65485864324679
+   },
+   {
+    "symbol": "QCOM",
+    "first": 174.35,
+    "last": 158.5345,
+    "buyhold_pct": -9.071121307714359
+   },
+   {
+    "symbol": "PANW",
+    "first": 187.1237,
+    "last": 173.399,
+    "buyhold_pct": -7.334559972894938
+   },
+   {
+    "symbol": "SBUX",
+    "first": 97.86,
+    "last": 93.2,
+    "buyhold_pct": -4.761904761904756
+   },
+   {
+    "symbol": "HON",
+    "first": 224.04,
+    "last": 217.5,
+    "buyhold_pct": -2.9191215854311725
+   },
+   {
+    "symbol": "AMZN",
+    "first": 235.2,
+    "last": 230.6,
+    "buyhold_pct": -1.9557823129251695
+   },
+   {
+    "symbol": "PEP",
+    "first": 149.0,
+    "last": 149.17,
+    "buyhold_pct": 0.11409395973154268
+   },
+   {
+    "symbol": "TXN",
+    "first": 191.5,
+    "last": 193.48,
+    "buyhold_pct": 1.0339425587467366
+   },
+   {
+    "symbol": "GOOGL",
+    "first": 198.0,
+    "last": 202.89,
+    "buyhold_pct": 2.469696969696966
+   },
+   {
+    "symbol": "COST",
+    "first": 940.94,
+    "last": 976.4,
+    "buyhold_pct": 3.7685718536782264
+   },
+   {
+    "symbol": "AAPL",
+    "first": 223.2622,
+    "last": 232.3999,
+    "buyhold_pct": 4.0928110535504825
+   },
+   {
+    "symbol": "ADI",
+    "first": 225.55,
+    "last": 236.85,
+    "buyhold_pct": 5.0099756151629204
+   },
+   {
+    "symbol": "MDLZ",
+    "first": 56.9,
+    "last": 61.3335,
+    "buyhold_pct": 7.791739894551841
+   },
+   {
+    "symbol": "CSCO",
+    "first": 62.1703,
+    "last": 69.1787,
+    "buyhold_pct": 11.272906838152629
+   },
+   {
+    "symbol": "BKNG",
+    "first": 4802.0,
+    "last": 5484.77,
+    "buyhold_pct": 14.218450645564351
+   },
+   {
+    "symbol": "INTC",
+    "first": 21.53,
+    "last": 24.93,
+    "buyhold_pct": 15.791918253599624
+   },
+   {
+    "symbol": "MSFT",
+    "first": 446.6319,
+    "last": 523.26,
+    "buyhold_pct": 17.15688019597348
+   },
+   {
+    "symbol": "KLAC",
+    "first": 758.1,
+    "last": 888.52,
+    "buyhold_pct": 17.203535153673656
+   },
+   {
+    "symbol": "INTU",
+    "first": 597.8,
+    "last": 710.64,
+    "buyhold_pct": 18.875878220140518
+   },
+   {
+    "symbol": "MU",
+    "first": 104.599,
+    "last": 125.5,
+    "buyhold_pct": 19.982026596812585
+   },
+   {
+    "symbol": "META",
+    "first": 637.0,
+    "last": 781.2,
+    "buyhold_pct": 22.637362637362646
+   },
+   {
+    "symbol": "LRCX",
+    "first": 81.6,
+    "last": 100.24,
+    "buyhold_pct": 22.84313725490197
+   },
+   {
+    "symbol": "NVDA",
+    "first": 146.61,
+    "last": 181.87,
+    "buyhold_pct": 24.05020121410544
+   },
+   {
+    "symbol": "NFLX",
+    "first": 982.35,
+    "last": 1230.5,
+    "buyhold_pct": 25.260854074413388
+   },
+   {
+    "symbol": "GILD",
+    "first": 92.2201,
+    "last": 118.7288,
+    "buyhold_pct": 28.745034976106076
+   },
+   {
+    "symbol": "AVGO",
+    "first": 240.0,
+    "last": 312.0,
+    "buyhold_pct": 30.000000000000004
+   },
+   {
+    "symbol": "STX",
+    "first": 108.31,
+    "last": 155.73,
+    "buyhold_pct": 43.7817376050226
+   },
+   {
+    "symbol": "AMD",
+    "first": 122.85,
+    "last": 180.6996,
+    "buyhold_pct": 47.0896214896215
+   }
+  ],
+  "equal_weight_basket_pct": 6.24,
+  "median_pct": 4.09,
+  "positive_symbols": "22/35"
+ },
+ "random_eligible_long_349min_0bps": {
+  "n": 16016,
+  "mean_bps": 4.06,
+  "median_bps": 0.52,
+  "hit_rate": 0.5017,
+  "std_bps": 202.9
+ },
+ "actual_single_trade": {
+  "raw_return_bps": 245.3,
+  "R": 5.99,
+  "hold_min": 349,
+  "exit": "END_OF_SESSION"
+ }
+}

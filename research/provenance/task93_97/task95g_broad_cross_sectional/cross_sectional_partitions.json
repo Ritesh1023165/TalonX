@@ -1,0 +1,29 @@
+{
+  "dataset": "task95g_sp500_panel_v1",
+  "frozen_commit": "4b0e5dfa2415afe1dbf423c63c9cc479264106fa",
+  "price_fingerprint": "08aa253ad4df1121",
+  "rule": "Task 95B chronology verbatim. Discovery ONLY. Validation + holdout UNTOUCHED. 10-day purge.",
+  "discovery": {
+    "start": "2020-01-02",
+    "entry_eligible_end": "2023-06-15",
+    "ranking_dates": 819,
+    "avg_eligible": 497.6,
+    "years": [
+      2020,
+      2021,
+      2022,
+      2023
+    ]
+  },
+  "validation": {
+    "start": "2023-07-17",
+    "end": "2025-02-14",
+    "status": "UNTOUCHED"
+  },
+  "holdout": {
+    "start": "2025-03-03",
+    "end": "2026-08-14",
+    "status": "UNTOUCHED"
+  },
+  "purge_trading_days": 10
+}
