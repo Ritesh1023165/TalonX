@@ -1,10 +1,10 @@
 {
  "program": "EVENT_RESPONSE_MAP_V1",
  "status": "DESIGN_LOCKED_GATE_C (no price data exists)",
- "locked_at_utc": "2026-10-01T00:16:42+00:00",
+ "locked_at_utc": "2026-10-01T00:18:20+00:00",
  "branch": "research/event_response_map_v1",
- "base_sha": "86f7375ea5e718a00d63884da84d67ad1be6d15e",
- "fingerprint": "b5c2f4797b6f897541ca6c6c5b6b193d476f0a7b9083c89cb47c06b362a8ea48",
+ "base_sha": "7e2d29ee1454bb4c901f5df2823e12b265603618",
+ "fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
  "file_sha256": {
   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
@@ -13,8 +13,8 @@
   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
   "research/event_response_map_v1/events.py": "c043c547bd3cc8b8a4315d95fc050c80f009540c2cc31b8bd13a32be986d38d4",
   "research/event_response_map_v1/metrics.py": "545bf95867efe09b85c269244590563f09901983afd1bd44abb30508d5184b47",
-  "research/event_response_map_v1/phase_d.py": "f683b1ecde17e8a63430a35e81cc563b2280e6c299ba29c72ea2b5c79c9589ac",
-  "research/event_response_map_v1/fingerprint.py": "ebbe988749ddcac8f8e6cda4394970dbcdee5714fd6722a1439d0eaaf6e3bb74",
+  "research/event_response_map_v1/phase_d.py": "f33ebadd95d1fbf73ad6f8e5e29d28eabc3b7cb1b7afb8996105fe398c914f5a",
+  "research/event_response_map_v1/fingerprint.py": "9fba15460af58af07a63d8949e0f2b27c6c361f557784aa3d2ba7324c15ccf84",
   "docs/research/preregistration/rs_sector_mapping_v1.json": "7ac052e08e35059acf92b26c28f892aabf10f8aee25b996b8f0a4381a66bd21b",
   "talonx_v2/cluster_engine.py": "874300546772ecc9b7ef43db15ce92dca1bfc82acc8834a44be92f2401eb4d8b",
   "talonx_v2/config.py": "fdc361612e57102ed55daa472d8f02cf59e65a9baeb572350c75c3a4704efa56",
@@ -24,7 +24,8 @@
   "talonx_premarket/universe.py": "4cfd45f527b4c4d27e0dbfd59266c6befa3465c01af471ce92163794c6c5d105",
   "research/event_response_map_v1/universe_source.py": "7d064a1590f71f291eca3072d2f698ea3f68114fd54f51e2d7cf615759c5a686"
  },
- "candidates_sha256": "c41297936d7585b27aed4854402e907371310da79218c5c3fefba2e705bb4a17",
+ "candidates_sha256": "a865fce26673a4fbf5df3819c1456fb100d2bfb53432af632bc8ef69e1e1f61c",
+ "candidates_sha256_note": "sha256 of LF-normalized bytes",
  "candidates": {
   "total": 10772,
   "source_counts": {

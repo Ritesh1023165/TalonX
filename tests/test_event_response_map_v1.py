@@ -293,7 +293,6 @@ def test_design_lock_matches_code_when_present():
         pytest.skip("design lock not yet written")
     lock = json.loads(p.read_text())
     assert F.verify() == lock["fingerprint"]
-    cand = (F.ROOT / "results/event_response_map_v1/candidates.json").read_bytes()
-    assert hashlib.sha256(cand).hexdigest() == lock["candidates_sha256"]
+    assert F.lf_sha256(F.ROOT / "results/event_response_map_v1/candidates.json") == lock["candidates_sha256"]
 
 

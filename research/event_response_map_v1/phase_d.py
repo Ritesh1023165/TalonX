@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from research.common.locked_range_guard import EVENT_RESPONSE_MAP_V1, LockedRangeGuard  # noqa: E402
 from research.event_response_map_v1 import data as D, events as E, metrics as M, universe as U  # noqa: E402
-from research.event_response_map_v1.fingerprint import verify  # noqa: E402
+from research.event_response_map_v1.fingerprint import lf_sha256, verify  # noqa: E402
 
 OUT = ROOT / "results" / "event_response_map_v1"
 ARCH = OUT / "_archive"
@@ -42,7 +42,7 @@ def preflight(args) -> dict:
     fp = verify(ROOT)
     lock = json.loads((OUT / "design_lock.json").read_text())
     cand_bytes = (OUT / "candidates.json").read_bytes()
-    if hashlib.sha256(cand_bytes).hexdigest() != lock["candidates_sha256"]:
+    if lf_sha256(OUT / "candidates.json") != lock["candidates_sha256"]:
         raise SystemExit("candidates.json differs from the locked candidate list")
     LockedRangeGuard(EVENT_RESPONSE_MAP_V1).record({"event": "phase_d_preflight", "fingerprint": fp})
     return json.loads(cand_bytes)

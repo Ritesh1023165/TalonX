@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from research.event_response_map_v1 import data as D, metrics as M  # noqa: E402
-from research.event_response_map_v1.fingerprint import file_hashes, fingerprint  # noqa: E402
+from research.event_response_map_v1.fingerprint import file_hashes, fingerprint, lf_sha256  # noqa: E402
 from research.event_response_map_v1.spec import SPEC  # noqa: E402
 
 OUT = ROOT / "results" / "event_response_map_v1"
@@ -60,7 +60,8 @@ def main() -> dict:
         "locked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "branch": "research/event_response_map_v1", "base_sha": base,
         "fingerprint": fingerprint(ROOT), "file_sha256": file_hashes(ROOT),
-        "candidates_sha256": hashlib.sha256((OUT / "candidates.json").read_bytes()).hexdigest(),
+        "candidates_sha256": lf_sha256(OUT / "candidates.json"),
+        "candidates_sha256_note": "sha256 of LF-normalized bytes",
         "candidates": {"total": len(cand["symbols"]), "source_counts": cand["source_counts"],
                        "only_from": cand["only_from"], "named": len(cand["names"])},
         "universe_coverage_vs_pit_sp500_metadata": {y: {k: v[k] for k in ("sp500_members_any_day", "coverage_pct", "missing")}

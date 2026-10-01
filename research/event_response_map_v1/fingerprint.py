@@ -33,6 +33,11 @@ def file_hashes(root: Path = ROOT) -> dict:
     return {f: hashlib.sha256((root / f).read_bytes().replace(b"\r\n", b"\n")).hexdigest() for f in LOCKED_FILES}
 
 
+def lf_sha256(path: Path) -> str:
+    """sha256 of newline-normalized bytes (identical on every checkout regardless of core.autocrlf)."""
+    return hashlib.sha256(Path(path).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def fingerprint(root: Path = ROOT) -> str:
     from research.event_response_map_v1.spec import SPEC
     doc = {"spec": SPEC, "files": file_hashes(root)}
