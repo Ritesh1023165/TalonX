@@ -1,6 +1,6 @@
 # EVENT_RESPONSE_MAP_V1: design lock (Gate C)
 
-**Status:** DESIGN_LOCKED. **No price data exists** for this program at lock time.
+**Status:** DESIGN_LOCKED, fingerprint `0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546` (locked 2026-10-01T00:18:20Z). **No price data exists** for this program at lock time.
 
 | Item | Value |
 |---|---|
@@ -37,7 +37,7 @@ The Task75 guard state is a different file on a different branch. This program h
 | B | Alpaca name changes 2019–2023: the **pre-rename** ticker | 1,454 |
 | C | Alpaca cash/stock mergers 2019–2023: the **acquiree** ticker | 3,242 |
 | D | Point-in-time S&P 500 (Task95F, fja05680/Wikipedia): any-day members 2019–2023 | 614 (37 found only here) |
-| **Total (frozen)** | `candidates.json`, sha256 `c4129793…4bb17` | **10,772** |
+| **Total (frozen)** | `candidates.json`, sha256 `a865fce2…e1f61c` (LF-normalized) | **10,772** |
 
 **How delisted and renamed names enter:**
 - **Delisted names** enter through A (inactive) when Alpaca still lists them. Otherwise they enter through C (acquirees) or D (former index members).
