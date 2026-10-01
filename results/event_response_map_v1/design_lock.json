@@ -1,26 +1,189 @@
 {
  "program": "EVENT_RESPONSE_MAP_V1",
- "status": "DESIGN_LOCKED_GATE_C_REV2 (no price data exists)",
- "lock_revision": 2,
+ "status": "DESIGN_LOCKED_GATE_C_REV3 (no price data exists)",
+ "lock_revision": 3,
  "supersedes": {
   "rev1_commit": "067ed29",
-  "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546"
+  "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
+  "rev2_commit": "8a57c33",
+  "rev2_fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22"
  },
- "locked_at_utc": "2026-10-01T08:03:17+00:00",
+ "candidates_r3_sha256": "a7095779e32ad0aa3530410f5a5d238dd8a1005a873ca09bd7d9350f488502ad",
+ "rev3_counts": {
+  "R1a_stage_plus_identity_resolution_FINAL": {
+   "by_reason": {
+    "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 141,
+    "R1A_UNNAMED_NO_CIK": 2628
+   },
+   "by_source": {
+    "B": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 78,
+     "R1A_UNNAMED_NO_CIK": 416
+    },
+    "C": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 68,
+     "R1A_UNNAMED_NO_CIK": 2222
+    }
+   },
+   "total": 2769
+  },
+  "R1a_stage_plus_sp500_exemption": {
+   "by_reason": {
+    "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 52,
+    "R1A_UNNAMED_NO_CIK": 3368
+   },
+   "by_source": {
+    "B": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 45,
+     "R1A_UNNAMED_NO_CIK": 788
+    },
+    "C": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 7,
+     "R1A_UNNAMED_NO_CIK": 2644
+    }
+   },
+   "total": 3420
+  },
+  "R1a_stage_rev2_no_exemption": {
+   "by_reason": {
+    "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 52,
+    "R1A_UNNAMED_NO_CIK": 3415
+   },
+   "by_source": {
+    "B": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 45,
+     "R1A_UNNAMED_NO_CIK": 790
+    },
+    "C": {
+     "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023": 7,
+     "R1A_UNNAMED_NO_CIK": 2652
+    },
+    "D": {
+     "R1A_UNNAMED_NO_CIK": 47
+    }
+   },
+   "total": 3467
+  },
+  "R1b_sic6770_partial_symbols_day_masked": 46,
+  "R1b_sic6770_whole_period_removed": 390,
+  "candidates_in": 10772,
+  "ciks_with_dev_filings": 6249,
+  "eight_k_by_item": {
+   "1.01": {
+    "AMBIGUOUS": 823,
+    "ASSIGNED": 29224,
+    "ASSIGNED_TO_REMOVED_SYMBOL": 379,
+    "NO_VALID_TICKER": 3082
+   },
+   "2.02": {
+    "AMBIGUOUS": 1442,
+    "ASSIGNED": 67458,
+    "ASSIGNED_TO_REMOVED_SYMBOL": 22,
+    "NO_VALID_TICKER": 3693
+   },
+   "5.02": {
+    "AMBIGUOUS": 890,
+    "ASSIGNED": 39640,
+    "ASSIGNED_TO_REMOVED_SYMBOL": 156,
+    "NO_VALID_TICKER": 3110
+   },
+   "7.01": {
+    "AMBIGUOUS": 1703,
+    "ASSIGNED": 53479,
+    "ASSIGNED_TO_REMOVED_SYMBOL": 319,
+    "NO_VALID_TICKER": 3902
+   },
+   "8.01": {
+    "AMBIGUOUS": 1934,
+    "ASSIGNED": 51179,
+    "ASSIGNED_TO_REMOVED_SYMBOL": 692,
+    "NO_VALID_TICKER": 4122
+   }
+  },
+  "eight_k_target_items_attribution": {
+   "AMBIGUOUS": 5530,
+   "ASSIGNED": 195210,
+   "ASSIGNED_TO_REMOVED_SYMBOL": 1212,
+   "NO_VALID_TICKER": 14099
+  },
+  "form345_dated_symbol_audit": {
+   "AMBIGUOUS": 16813,
+   "CIK_NOT_IN_UNIVERSE": 165027,
+   "DISAGREE": 12396,
+   "MATCH": 777164,
+   "NO_VALID_TICKER": 36510
+  },
+  "form345_ticker_observations": 1007910,
+  "identity_methods": {
+   "FORM345_AMBIGUOUS": 29,
+   "FORM345_TICKER": 1303,
+   "RENAME_CHAIN_BWD": 14,
+   "RENAME_CHAIN_FWD": 731,
+   "SEC_TICKERS": 5628,
+   "UNIQUE_NAME_MATCH": 52,
+   "UNMAPPED": 3015
+  },
+  "kept": 7613,
+  "pit_sp500_coverage": {
+   "2019": {
+    "coverage_pct": 100.0,
+    "kept": 533,
+    "members": 533
+   },
+   "2020": {
+    "coverage_pct": 100.0,
+    "kept": 524,
+    "members": 524
+   },
+   "2021": {
+    "coverage_pct": 100.0,
+    "kept": 525,
+    "members": 525
+   },
+   "2022": {
+    "coverage_pct": 100.0,
+    "kept": 526,
+    "members": 526
+   },
+   "2023": {
+    "coverage_pct": 100.0,
+    "kept": 521,
+    "members": 521
+   }
+  },
+  "post2023_rename_records": 1542,
+  "r7_sic_sources": {
+   "CURRENT_SUBMISSIONS_SIC_FALLBACK": 1209,
+   "DESPAC_5_06_SPLIT": 299,
+   "HEADER_LAST_DEV_FILING": 5689
+  },
+  "removed_total": 3159,
+  "rename_edges_total": 2667,
+  "residual_limitation": "Alpaca renames processed inside the Task75 reserved windows (2024-06-01..09-02, 2024-10-21..12-20) were not queried; their identities rely on EDGAR sources only",
+  "rev2_identity_methods": {
+   "RENAME_CHAIN": 592,
+   "SEC_TICKERS": 5638,
+   "UNIQUE_NAME_MATCH": 197,
+   "UNMAPPED": 4345
+  }
+ },
+ "locked_at_utc": "2026-10-01T09:24:31+00:00",
  "branch": "research/event_response_map_v1",
- "base_sha": "525d1c5c8929ccb0f9f0c8868e87bfdf91f10dc9",
- "fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22",
+ "base_sha": "8a57c3345e8a2e927ce66f01a22cc387988dce05",
+ "fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7",
  "file_sha256": {
   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
-  "research/event_response_map_v1/spec.py": "af9efaeff99d9f495b38c25ad5fe19b5a64dfc01457b723793d280c2424b62f4",
+  "research/event_response_map_v1/spec.py": "a861852cdd23cce540a42277e18e3a226e0047bdc68fa97931cb35915be59cd6",
   "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
-  "research/event_response_map_v1/events.py": "cc41bef5b5569e5485d4b4bc7bb526d162e2d38828bfc690a88b6be1aca43f8f",
+  "research/event_response_map_v1/events.py": "b6abfd0571cd3d704946ef5fcc4710b2627e5d26401c4bcb56561f827b715950",
   "research/event_response_map_v1/metrics.py": "9172acfca4662f7d70012a61b19b1fb2ea5352300c9522b3aacaac527aeca07d",
-  "research/event_response_map_v1/phase_d.py": "ff9d608b4959ddc3e405156724dcf4a96a096bedcba4ea24a1101c9dd5c3126d",
+  "research/event_response_map_v1/phase_d.py": "cd6ae6a2d261fa104656a2727fe6e8320b3e2ff1b71392e931bb91b5996e2723",
   "research/event_response_map_v1/instrument_filter.py": "622df0bd9bdb34ff945583db1bf8851241dd68f31ef1f6e5acaea48d8db408d3",
-  "research/event_response_map_v1/fingerprint.py": "070efd762efec52f9265e307646a0b3a84146e33ba31df8686bf31b4befb8fe6",
+  "research/event_response_map_v1/identity.py": "194e9ee41ecfc6223b96f6b19682cb7dc1ea65789a99caed52a8adbc9a92574e",
+  "research/event_response_map_v1/r3_metadata.py": "0f58f05e9be2638efbcb4941b6f5efdf13940f5c36dac203ea6c8b47f57eab53",
+  "research/event_response_map_v1/fingerprint.py": "f3dd7c7f1e095f0792ed38ce5a5dcba2be14f38ca7730e4f1f442d2f283d5dfe",
   "docs/research/preregistration/rs_sector_mapping_v1.json": "7ac052e08e35059acf92b26c28f892aabf10f8aee25b996b8f0a4381a66bd21b",
   "talonx_v2/cluster_engine.py": "874300546772ecc9b7ef43db15ce92dca1bfc82acc8834a44be92f2401eb4d8b",
   "talonx_v2/config.py": "fdc361612e57102ed55daa472d8f02cf59e65a9baeb572350c75c3a4704efa56",
@@ -128,7 +291,16 @@
  "spec": {
   "program": "EVENT_RESPONSE_MAP_V1",
   "status": "DISCOVERY_ONLY -- nothing produced by this program is validated; at most ONE hypothesis may later be nominated, frozen and pre-registered in a separate task",
-  "lock_revision": 2,
+  "lock_revision": 3,
+  "revision_3_changes (owner, 2026-10-01; no data existed)": {
+   "R1_FIX_a_sp500_exemption": "point-in-time S&P 500 members (any day 2019-2023) are exempt from R1a (index membership = operating common stock); R1b still applies where a CIK exists",
+   "R1_FIX_b_identity_resolution": "before R1a, candidate tickers are resolved to CIKs (research/event_response_map_v1/identity.py): forward dated Alpaca rename chain (2019-2023 + post-2023 renames, identity only, Task75 reserved windows NOT queried) to a current SEC ticker; SEC company_tickers / submissions 'tickers' (never for a ticker that was renamed away); backward rename chain; issuer trading symbol on Form 3/4/5 2019-2023 when it names exactly one issuer CIK; unique normalized name across cik-lookup-data + submissions name/formerNames. Metadata only, R5 guard. R1a counts reported by source (B, C, D) and reason at: rev2 | +S&P exemption | +identity resolution",
+   "R1_FIX_c_survivorship_diagnostic": "NON-GATING: Phase D also downloads development bars (ALL + raw eligibility) for every symbol still removed by R1a (separate archive alpaca_diag); reports how many pass $5/$20M by bucket x year; for SCREEN_PASS cells only, re-computes the cell with those symbols' events added (NO_EVENT not re-drawn) and flags EXCLUSION_DEPENDENT if the cell no longer passes",
+   "R6_dated_attribution": "each 8-K is assigned to the ONE ticker valid for its CIK on the FILING DATE via the dated rename chain (validity: from the processing date of the rename into the ticker until the rename out of it); bar presence on the entry date is a consistency check only; AMBIGUOUS (several valid, e.g. dual share classes), NO_VALID_TICKER and DISAGREE (assigned ticker lacks the entry bar while another ticker of the CIK has it) are excluded and counted. Audit of every one-ticker-per-CIK use: (1) 8-K attribution -> dated rule; (2) sector benchmark -> dated symbol->CIK on the entry date, else SPY; (3) Form 4 symbol -> dated ticker of the issuer CIK on the filing date, reported symbol must agree, else excluded and counted; (4) the rev-1 UNMAPPED_INACTIVE_CIK map is retired (a CIK without development filings simply yields no 8-K/Form-4 events)",
+   "R7_point_in_time_sic": "CHOSEN: dated SIC. sic_end = SIC in the EDGAR filing header (-index-headers.html) of the CIK's last company filing (10-K/10-Q/8-K/20-F/40-F/6-K/S-1/S-4/DEF 14A and /A) dated <= 2023-12-29; if the CIK filed an 8-K item 5.06 (change in shell company status) in the period, the header SIC of its last company filing before that 8-K applies before it and sic_end from it on. Fallback when no company filing exists in the period: current submissions SIC (counted). R1b: a symbol is removed if its CIK's SIC is 6770 for the whole period; otherwise symbol-days inside a 6770 window are masked from eligibility. Cost ~1 header per CIK + 1 per 5.06 CIK (~6-7k SEC requests, ~40 min at <= 2.9/s, off-hours). Residual limitation: an SIC reclassification without an item 5.06 inside the period is not dated (sic_end applies)",
+   "R3_result": "10,772 in -> 7,613 kept; R1a 2,769 after identity resolution (rev2 3,467 -> +S&P exemption 3,420 -> final 2,769; final by reason: no CIK 2,628, CIK without 10-K/10-Q 141); R1b dated SIC 6770 whole period 390 removed, 46 symbols day-masked; PIT S&P 500 metadata coverage 100 % every year 2019-2023; 8-K (filing x target item) at metadata stage: 195,210 assigned, 14,099 NO_VALID_TICKER + 5,530 AMBIGUOUS excluded, 1,212 assigned to R1-removed symbols; DISAGREE measured in Phase D",
+   "frozen_list": "results/event_response_map_v1/candidates_r3.json (sha256 pinned in design_lock.json) supersedes candidates_r1.json for Phase D"
+  },
   "revision_2_changes (owner, Gate C; no data existed)": {
    "approved_decisions": "1 raw as-traded D-1 data for ELIGIBILITY ONLY (returns stay adjustment=all); 2 gap entry D+1 open; 3 8-K conservative dual acceptance reading; 4 directional cost test",
    "R1_instrument_filter": "a candidate WITHOUT a known name is kept only if it maps to a CIK with a 10-K/10-K/A/10-Q/10-Q/A filed 2019-01-01..2023-12-31 (EDGAR full-index master.idx 2019Q1-2023Q4); ANY candidate whose mapped CIK has SIC 6770 (blank checks; current EDGAR SIC) is excluded; applied before any price download; frozen as candidates_r1.json (sha256 pinned); counts per rule reported",
@@ -281,8 +453,8 @@
  },
  "data_plan": {
   "alpaca": {
-   "symbols": 7034,
-   "equity_candidates_after_R1": 7027,
+   "symbols": 7620,
+   "equity_candidates_after_R1_rev3": 7613,
    "benchmarks": [
     "SPY",
     "XLE",
@@ -299,25 +471,32 @@
    "timeframe": "1Day",
    "feed": "sip",
    "batch": 100,
-   "batches_per_pass": 71,
+   "batches_per_pass": 77,
    "passes": {
     "RETURNS (adjustment=all, equities+benchmarks)": [
-     497,
-     923
+     539,
+     1001
     ],
     "ELIGIBILITY_ONLY (adjustment=raw, equities only; needs owner approval)": [
-     497,
-     923
+     539,
+     1001
+    ]
+   },
+   "survivorship_diagnostic_passes (R1-FIX c; RETURNS + ELIGIBILITY_ONLY, archive alpaca_diag)": {
+    "symbols": 2769,
+    "requests_per_pass": [
+     196,
+     364
     ]
    },
    "requests_total_range": [
-    994,
-    1846
+    1470,
+    2730
    ],
    "rate_per_min": 37.5,
    "minutes_range": [
-    27,
-    49
+    39,
+    73
    ]
   },
   "sec": {
@@ -328,7 +507,7 @@
    "submissions_json": "main file per mapped CIK already archived at lock rev 2 (R1 SIC); Phase D adds only older pages overlapping 2019-2023",
    "rate_per_s": 2.94
   },
-  "schedule": "OWNER: weekend Sat 2026-10-03 or Sun 2026-10-04 (live engine CLOSED phase), --go --eligibility-raw-approved. Code-enforced R5 guard: weekday 09:00-16:30 America/New_York refused for Alpaca and SEC. stage=run reads the archive only.",
+  "schedule": "OWNER: Sat 2026-10-03 from 14:00Z (live engine CLOSED phase), --go --eligibility-raw-approved. Code-enforced R5 guard: weekday 09:00-16:30 America/New_York refused for Alpaca and SEC. stage=run reads the archive only.",
   "after_download": "D0 integrity report: per-year bar coverage of candidates and of the PIT S&P 500 reference, missing/duplicate sessions, CIK-method counts, unnamed-symbol count"
  }
 }

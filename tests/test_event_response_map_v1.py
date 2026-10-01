@@ -428,7 +428,146 @@ def test_r4_coverage_breaks_out_by_bucket_and_year():
     assert cov["L3|2020"]["all_bar_present_rate"] == 1.0 and set(cov) == {"L1|2019", "L3|2020"}
 
 
-def test_lock_revision_2_recorded_in_spec():
+def test_lock_revisions_recorded_in_spec():
     from research.event_response_map_v1.spec import SPEC
-    assert SPEC["lock_revision"] == 2
-    assert any(k.startswith("revision_2_changes") for k in SPEC)
+    assert SPEC["lock_revision"] == 3
+    assert any(k.startswith("revision_2_changes") for k in SPEC) and any(k.startswith("revision_3_changes") for k in SPEC)
+
+
+# ------------------------------------------------------------------------------------------------ LOCK REV 3
+from research.event_response_map_v1 import identity as I  # noqa: E402
+
+EDGES = I.rename_edges([{"old_symbol": "BK", "new_symbol": "BNY", "process_date": "2026-05-21"},
+                        {"old_symbol": "FB", "new_symbol": "META", "process_date": "2022-06-09"},
+                        {"old_symbol": "OLDX", "new_symbol": "MIDX", "process_date": "2020-03-02"},
+                        {"old_symbol": "MIDX", "new_symbol": "GONE", "process_date": "2021-07-01"},
+                        {"old_symbol": "ACQ", "new_symbol": "NEWAQ", "process_date": "2022-02-01"}])
+
+
+def test_r1fix_post2023_rename_ranges_skip_task75_reserved_windows():
+    for s_, e_ in I.POST2023_RENAME_RANGES:
+        I.assert_outside_reserved(s_, e_)
+    with pytest.raises(RuntimeError):
+        I.assert_outside_reserved("2024-05-01", "2024-06-01")
+    with pytest.raises(RuntimeError):
+        I.assert_outside_reserved("2024-12-20", "2024-12-31")
+
+
+def test_r1fix_identity_resolution_methods_and_recycling_guard():
+    cand = {"symbols": {"BK": ["D"], "FB": ["B"], "META": ["A"], "OLDX": ["B"], "MIDX": ["B"], "GONE": ["C"],
+                        "ACQ": ["C"], "TWIN": ["C"], "NAMED": ["A"], "NEWAQ": ["C"]},
+            "names": {"NAMED": "Named Holdings Inc", "META": "Meta Platforms"}}
+    sec = {"BNY": "0000001390", "META": "0001326801", "FB": "0009999999", "OLDX": "0000000777"}   # FB/OLDX recycled
+    f345 = [("ACQ", "0000000555", date(2020, 1, 2)), ("TWIN", "0000000001", date(2020, 1, 2)),
+            ("TWIN", "0000000002", date(2021, 1, 2)), ("GONE", "0000000888", date(2022, 1, 3))]
+    idn = I.build_identity(cand, sec, EDGES, f345, {I.norm_name("Named Holdings"): {"0000000444"}}, {"BK"})
+    assert idn["BK"] == {"cik": "0000001390", "method": "RENAME_CHAIN_FWD"}          # BK -> BNY (2026)
+    assert idn["FB"] == {"cik": "0001326801", "method": "RENAME_CHAIN_FWD"}          # not the recycled 'FB'
+    assert idn["META"]["method"] == "SEC_TICKERS"
+    assert idn["ACQ"] == {"cik": "0000000555", "method": "FORM345_TICKER"}
+    assert idn["TWIN"] == {"cik": None, "method": "FORM345_AMBIGUOUS"}
+    assert idn["NAMED"] == {"cik": "0000000444", "method": "UNIQUE_NAME_MATCH"}
+    assert idn["GONE"]["cik"] == "0000000888"
+    assert idn["MIDX"] == {"cik": "0000000888", "method": "RENAME_CHAIN_FWD"}         # MIDX -> GONE (resolved)
+    assert idn["OLDX"] == {"cik": "0000000888", "method": "RENAME_CHAIN_FWD"}         # recycled OLDX ticker not used
+    assert idn["NEWAQ"] == {"cik": "0000000555", "method": "RENAME_CHAIN_BWD"}       # ACQ (resolved) -> NEWAQ
+
+
+def test_r1fix_r1a_sp500_exemption():
+    from research.event_response_map_v1.r3_metadata import r1a_reason
+    assert r1a_reason("K", {}, None, set(), {"K"}, exempt=True) is None
+    assert r1a_reason("K", {}, None, set(), {"K"}, exempt=False) == "R1A_UNNAMED_NO_CIK"
+    assert r1a_reason("Z", {}, "0000000001", set(), set(), exempt=True) == "R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023"
+    assert r1a_reason("Z", {}, "0000000001", {"0000000001"}, set(), exempt=True) is None
+    assert r1a_reason("N", {"N": "x"}, None, set(), set(), exempt=True) is None
+
+
+def _intervals():
+    idn = {"FB": {"cik": "0001326801"}, "META": {"cik": "0001326801"},
+           "GOOG": {"cik": "0001652044"}, "GOOGL": {"cik": "0001652044"}}
+    return I.dated_intervals(idn, EDGES)
+
+
+def test_r6_dated_assignment_rename_and_dual_class():
+    iv = _intervals()
+    assert I.assign("1326801", date(2021, 5, 3), iv) == ("FB", "ASSIGNED")
+    assert I.assign("1326801", date(2022, 6, 8), iv) == ("FB", "ASSIGNED")
+    assert I.assign("1326801", date(2022, 6, 9), iv) == ("META", "ASSIGNED")
+    assert I.assign("1652044", date(2021, 5, 3), iv) == (None, "AMBIGUOUS")
+    assert I.assign("0000000042", date(2021, 5, 3), iv) == (None, "NO_VALID_TICKER")
+    bs = I.by_symbol(iv)
+    assert I.symbol_cik_on("META", date(2021, 1, 4), bs) is None                       # not META's company yet
+    assert I.symbol_cik_on("META", date(2023, 1, 4), bs) == "0001326801"
+
+
+def test_r6_eight_k_dated_attribution_and_consistency_check():
+    iv = _intervals()
+    ss = sessions(1000, date(2020, 1, 2))
+    f = pd.DataFrame([
+        {"cik": "1326801", "form": "8-K", "filingDate": "2021-05-03", "acceptanceDateTime": "2021-05-03T20:05:00.000Z", "items": "2.02"},
+        {"cik": "1326801", "form": "8-K", "filingDate": "2022-07-01", "acceptanceDateTime": "2022-07-01T21:00:00.000Z", "items": "8.01,7.01"},
+        {"cik": "1652044", "form": "8-K", "filingDate": "2021-05-03", "acceptanceDateTime": "2021-05-03T20:05:00.000Z", "items": "2.02"},
+        {"cik": "1326801", "form": "8-K", "filingDate": "2021-06-01", "acceptanceDateTime": "2021-06-01T21:00:00.000Z", "items": "5.02"},
+    ])
+    bars = {("FB", date(2021, 5, 4)), ("META", date(2022, 7, 4)), ("META", date(2021, 6, 2))}   # fixture calendar has no holidays
+    ev, c = E.eight_k_events_dated(f, iv, ss, lambda s_, d: (s_, d) in bars)
+    assert sorted(zip(ev["event_type"], ev["symbol"])) == [("8K_2.02", "FB"), ("8K_7.01", "META"), ("8K_8.01", "META")]
+    assert c["AMBIGUOUS"] == 1 and c["DISAGREE"] == 1 and c["ASSIGNED_CONSISTENT"] == 3
+
+
+def test_r6_form4_dated_symbol_mapping():
+    iv = _intervals()
+    rows = [{"issuer_cik": "1326801", "issuer_sym": "fb", "filing_date": date(2021, 3, 1)},
+            {"issuer_cik": "1326801", "issuer_sym": "FB", "filing_date": date(2022, 8, 1)},
+            {"issuer_cik": "1652044", "issuer_sym": "GOOGL", "filing_date": date(2021, 3, 1)},
+            {"issuer_cik": "0000000042", "issuer_sym": "XYZ", "filing_date": date(2021, 3, 1)}]
+    out, c = E.form4_rows_dated(rows, iv)
+    assert [r["issuer_sym"] for r in out] == ["FB"]
+    assert c == {"MATCH": 1, "DISAGREE": 1, "AMBIGUOUS": 1, "NO_VALID_TICKER": 0, "CIK_NOT_IN_UNIVERSE": 1}
+
+
+def test_r6_outcomes_use_dated_benchmark_callable():
+    ss = sessions(30)
+    px = pd.DataFrame({"symbol": "AAA", "date": ss, "open": 10.0, "close": 11.0})
+    spy = pd.DataFrame({"symbol": "SPY", "date": ss, "open": 1.0, "close": 1.0})
+    xlk = pd.DataFrame({"symbol": "XLK", "date": ss, "open": 1.0, "close": 1.05})
+    ev = pd.DataFrame([{"event_type": "GAP_UP_3", "symbol": "AAA", "entry_date": ss[3], "bucket": "L1"},
+                       {"event_type": "GAP_UP_3", "symbol": "AAA", "entry_date": ss[15], "bucket": "L1"}])
+    obs, _ = E.outcomes(ev, px, {"SPY": spy, "XLK": xlk}, lambda s_, d: "XLK" if d >= ss[10] else "SPY", ss)
+    h0 = obs[obs["horizon"] == "H0"].set_index("entry_date")
+    assert h0.loc[ss[3], "benchmark"] == "SPY" and h0.loc[ss[15], "benchmark"] == "XLK"
+    assert h0.loc[ss[15], "ret_sector_rel"] == pytest.approx(0.05)
+
+
+def test_r7_header_sic_and_dated_timeline():
+    assert I.header_sic("<SEC-HEADER>\nSTANDARD INDUSTRIAL CLASSIFICATION:\tBLANK CHECKS [6770]\n") == "6770"
+    assert I.header_sic("no sic here") is None
+    tl = I.sic_timeline("3714", date(2021, 6, 1), "6770")
+    assert I.sic_on(tl, date(2020, 1, 2)) == "6770" and I.sic_on(tl, date(2021, 6, 1)) == "3714"
+    assert I.sic_timeline("7372", None, None) == [(I.FAR_PAST, "7372")]
+    fl = [{"form": "10-Q", "filingDate": "2021-05-10", "accessionNumber": "a1"},
+          {"form": "4", "filingDate": "2021-05-30", "accessionNumber": "a2"},
+          {"form": "8-K", "filingDate": "2021-06-01", "accessionNumber": "a3"}]
+    assert I.last_company_filing(fl, date(2021, 6, 1))["accessionNumber"] == "a1"       # strictly before; Form 4 skipped
+
+
+def test_r7_sic6770_day_mask():
+    from research.event_response_map_v1 import phase_d as P
+    elig = pd.DataFrame([{"symbol": "SPAC", "date": date(2021, 5, 28), "eligible": True, "bucket": "L2"},
+                         {"symbol": "SPAC", "date": date(2021, 6, 2), "eligible": True, "bucket": "L2"},
+                         {"symbol": "OPCO", "date": date(2021, 5, 28), "eligible": True, "bucket": "L1"}])
+    e2, n = P.mask_sic6770(elig, {"SPAC": [["2019-01-02", "2021-06-01"]]})
+    assert n == 1 and list(e2["eligible"]) == [False, True, True] and pd.isna(e2["bucket"].iloc[0])
+
+
+def test_r1fix_form345_ticker_obs_parser():
+    import io as _io
+    import zipfile as _zf
+    buf = _io.BytesIO()
+    with _zf.ZipFile(buf, "w") as z:
+        z.writestr("2020q1_form345/SUBMISSION.tsv",
+                   "ACCESSION_NUMBER\tFILING_DATE\tISSUERCIK\tISSUERTRADINGSYMBOL\n"
+                   "a\t03-FEB-2020\t1326801\tNASDAQ: fb\n"
+                   "b\t03-FEB-2025\t1326801\tMETA\n"
+                   "c\t04-FEB-2020\t77\tNONE\n")
+    assert I.form345_ticker_obs(buf.getvalue()) == [("FB", "0001326801", date(2020, 2, 3))]

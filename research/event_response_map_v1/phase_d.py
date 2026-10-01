@@ -45,11 +45,12 @@ def preflight(args) -> dict:
     cand_bytes = (OUT / "candidates.json").read_bytes()
     if lf_sha256(OUT / "candidates.json") != lock["candidates_sha256"]:
         raise SystemExit("candidates.json differs from the locked candidate list")
-    if lf_sha256(OUT / "candidates_r1.json") != lock["candidates_r1_sha256"]:
-        raise SystemExit("candidates_r1.json differs from the locked R1-filtered list")
-    LockedRangeGuard(EVENT_RESPONSE_MAP_V1).record({"event": "phase_d_preflight", "fingerprint": fp})
+    if lf_sha256(OUT / "candidates_r3.json") != lock["candidates_r3_sha256"]:
+        raise SystemExit("candidates_r3.json differs from the locked revision-3 candidate list")
+    LockedRangeGuard(EVENT_RESPONSE_MAP_V1).record({"event": "phase_d_preflight", "fingerprint": fp,
+                                                   "lock_revision": lock.get("lock_revision")})
     cand = json.loads(cand_bytes)
-    cand["r1"] = json.loads((OUT / "candidates_r1.json").read_text())
+    cand["r3"] = json.loads((OUT / "candidates_r3.json").read_text())
     return cand
 
 
@@ -71,23 +72,38 @@ class Sec:
         body = urllib.request.urlopen(urllib.request.Request(url, headers=SEC_UA), timeout=120).read()
         p.write_bytes(gzip.compress(body, mtime=0))
         self.manifest["files"].append({"file": p.name, "url": url, "sha256": hashlib.sha256(body).hexdigest()})
-        (self.arch / "manifest.json").write_text(json.dumps(self.manifest, indent=1))
+        if len(self.manifest["files"]) % 100 == 0:
+            self.flush()
         return body
+
+    def flush(self) -> None:
+        """Write the manifest; any archived file missing from it (interrupted run) is added with its sha256."""
+        listed = {f["file"] for f in self.manifest["files"]}
+        for p in sorted(self.arch.glob("*.gz")):
+            if p.name not in listed:
+                self.manifest["files"].append({"file": p.name, "url": None,
+                                               "sha256": hashlib.sha256(gzip.decompress(p.read_bytes())).hexdigest()})
+        (self.arch / "manifest.json").write_text(json.dumps(self.manifest, indent=1), encoding="utf-8", newline="\n")
 
 
 def stage_download(cand: dict, headers: dict) -> None:
-    syms = sorted(cand["r1"]["kept"])                       # LOCK REV 2: only R1-kept candidates are downloaded
+    syms = sorted(cand["r3"]["kept"])                       # LOCK REV 3: only kept candidates form the universe
     dl = D.Downloader(ARCH / "alpaca", headers)
     dl.pass_(syms + list(D.BENCHMARKS), purpose="RETURNS")
     dl.pass_(syms, purpose="ELIGIBILITY_ONLY")
+    diag = sorted(cand["r3"]["r1a_removed_for_survivorship_diagnostic"])   # R1-FIX c (non-gating diagnostic)
+    dd = D.Downloader(ARCH / "alpaca_diag", headers)
+    dd.pass_(diag, purpose="RETURNS")
+    dd.pass_(diag, purpose="ELIGIBILITY_ONLY")
     sec = Sec(ARCH / "sec")
     sec.get("https://www.sec.gov/files/company_tickers.json", "company_tickers.json")
     sec.get("https://www.sec.gov/Archives/edgar/cik-lookup-data.txt", "cik-lookup-data.txt")
     for q in FORM345_QUARTERS:
         sec.get(FORM345_URL.format(q), f"{q}_form345.zip")
-    for cik in sorted({c for c, _ in cik_map(cand, sec).values() if c}):
-        for _ in submissions(cik, sec):                     # fetch + archive every overlapping page
+    for cik in sorted(cand["r3"]["intervals"]):             # already archived by the rev-3 metadata stage
+        for _ in submissions(cik, sec):
             continue
+    sec.flush()
 
 
 def cik_map(cand: dict, sec: Sec) -> dict:
@@ -139,53 +155,46 @@ def stage_run(cand: dict) -> None:
     bench = {b: bars[bars["symbol"] == b] for b in D.BENCHMARKS}
     eq = bars[~bars["symbol"].isin(D.BENCHMARKS)]
     elig = U.eligibility(raw, sessions)
+    r3 = cand["r3"]
+    elig, n_masked = mask_sic6770(elig, r3["sic6770_windows"])              # R1b on the DATED SIC (R7)
+    intervals = {c: [(s_, date.fromisoformat(lo), date.fromisoformat(hi)) for s_, lo, hi in v]
+                 for c, v in r3["intervals"].items()}
+    from research.event_response_map_v1 import identity as I
+    bysym = I.by_symbol(intervals)
     sec = Sec(ARCH / "sec")
-    cmap = cik_map(cand, sec)
     mapping = json.loads((ROOT / "docs/research/preregistration/rs_sector_mapping_v1.json").read_text())["mapping"]
-    filings, symbol_bench, cik_to_symbol, inactive = [], {}, {}, 0
-    for sym, (cik, how) in sorted(cmap.items()):
-        if not cik:
-            continue
-        main = json.loads(sec.get(f"https://data.sec.gov/submissions/CIK{cik}.json", f"sub_CIK{cik}.json"))
-        f = _filings_frame(cik, sec)
-        if f.empty:
-            cmap[sym] = (None, "UNMAPPED_INACTIVE_CIK")
-            inactive += 1
-            continue
-        symbol_bench[sym] = E.sic_benchmark(main.get("sic"), mapping)
-        cik_to_symbol.setdefault(cik, sym)
-        filings.append(f)
-    filings = pd.concat(filings, ignore_index=True) if filings else pd.DataFrame(
-        columns=["cik", "form", "filingDate", "acceptanceDateTime", "items"])
-    # FORM4_CLUSTER: V2@1 unchanged (task107a parser -> runtime from_rows -> detect_episodes)
-    sp = importlib.util.spec_from_file_location("t107a", ROOT / "research/scripts/task107a_form4_build.py")
-    t107 = importlib.util.module_from_spec(sp)
-    sp.loader.exec_module(t107)
-    from talonx_v2.cluster_engine import detect_episodes
-    from talonx_v2.config import V2Config
-    from talonx_v2.form4_source import from_rows
-    rows = []
-    for q in FORM345_QUARTERS:
-        p = OUT / "_tmp_form345.zip"
-        p.write_bytes(sec.get(FORM345_URL.format(q), f"{q}_form345.zip"))
-        rows += t107.parse_zip(p)
-        p.unlink()
-    recs = from_rows([{"symbol": r["issuer_sym"], "issuer_cik": r.get("issuer_cik", ""), "owner_cik": r["owner_cik"],
-                       "filing_date": r["filing_date"], "accession": r.get("accession", ""),
-                       "transaction_date": r.get("trans_date"), "transaction_value": r.get("value"),
-                       "is_officer": bool(r.get("is_officer")), "is_director": bool(r.get("is_director")),
-                       "is_ten_percent": bool(r.get("is_ten_pct")), "transaction_code": "P"}
-                      for r in rows if str(r.get("code", "")).upper() == "P"
-                      and r.get("filing_date") and date(2019, 1, 2) <= r["filing_date"] <= date(2023, 12, 29)])
-    ev = pd.concat([E.gap_events(eq, sessions).drop(columns="gap"),
-                    E.eight_k_events(filings, cik_to_symbol, sessions).drop(columns="causal_utc"),
-                    E.form4_cluster_events(detect_episodes(recs, config=V2Config()), sessions)], ignore_index=True)
-    ev = E.attach_bucket(E.dedup(ev), elig)
+    cur_sic = {c: json.loads(sec.get(f"https://data.sec.gov/submissions/CIK{c}.json", f"sub_CIK{c}.json")).get("sic")
+               for c in intervals}
+
+    def bench_of(sym, d):                                 # R6: dated ticker -> CIK, then that CIK's sector ETF
+        c = I.symbol_cik_on(sym, d, bysym)
+        return E.sic_benchmark(cur_sic.get(c), mapping) if c else "SPY"
+
+    filings = pd.DataFrame([{**f, "cik": c} for c in sorted(intervals) for f in _dev_filings(c, sec)],
+                           columns=["cik", "form", "filingDate", "acceptanceDateTime", "items", "accessionNumber"])
+    form4_rows = _form4_p_rows(sec)
+
+    def events_for(bars_eq, elig_):
+        have = pd.MultiIndex.from_arrays([bars_eq["symbol"], bars_eq["date"]])
+        k8, k8c = E.eight_k_events_dated(filings, intervals, sessions, lambda s_, d: (s_, d) in have)
+        k8 = k8[k8["symbol"].isin(set(bars_eq["symbol"]))]
+        f4rows, f4c = E.form4_rows_dated(form4_rows, intervals)
+        f4rows = [r for r in f4rows if r["issuer_sym"] in set(bars_eq["symbol"])]
+        ev_ = pd.concat([E.gap_events(bars_eq, sessions).drop(columns="gap"), k8.drop(columns="causal_utc"),
+                         E.form4_cluster_events(_episodes(f4rows), sessions)], ignore_index=True)
+        return E.attach_bucket(E.dedup(ev_), elig_), {"eight_k": k8c, "form4": f4c}
+
+    ev, attribution = events_for(eq, elig)
     ev = pd.concat([ev, E.no_event_control(ev, elig, sessions)], ignore_index=True)
-    obs, counts = E.outcomes(ev, eq, bench, symbol_bench, sessions)
+    obs, counts = E.outcomes(ev, eq, bench, bench_of, sessions)
     (OUT / "d0_coverage.json").write_text(json.dumps(d0_coverage(eq, elig, cand, obs), indent=1, default=str))
     ledger = M.evaluate(obs)
     calib = M.classify(ledger)                              # LOCK REV 2 (R2)
+    diag = survivorship_diagnostic(ledger, obs, sessions, bench, bench_of, events_for, guard)   # R1-FIX c
+    cmap = {s_: (v["cik"], v["method"]) for s_, v in r3["identity"].items()}
+    inactive = 0
+    counts.update({"sic6770_symbol_days_masked": n_masked, "attribution": attribution,
+                   "survivorship_diagnostic": diag["summary"]})
     (OUT / "trial_ledger.json").write_text(json.dumps({"null_calibration": calib, "cells": ledger, "integrity": {**counts, **dq_all,
         "eligibility_raw": dq_raw, "cik_methods": _count(m for _, m in cmap.values()),
         "unmapped_inactive_cik": inactive}}, indent=1, default=str))
@@ -208,11 +217,14 @@ def report_md(calib: dict, ledger: list[dict], counts: dict) -> str:
              f"- cells evaluated: {len(ledger)}; SCREEN_PASS: {calib['screen_pass_total']}; "
              f"nominatable: {calib['nominatable_cells']}",
              f"- integrity: {json.dumps(counts)}", "",
-             "| cell | n | dates | mean sector-rel | CI | missing exit | label |", "|---|---|---|---|---|---|---|"]
+             f"- survivorship diagnostic (non-gating): {json.dumps(counts.get('survivorship_diagnostic', {}).get('EXCLUSION_DEPENDENT_cells'))} SCREEN_PASS cells EXCLUSION_DEPENDENT",
+             "", "| cell | n | dates | mean sector-rel | CI | missing exit | label | exclusion-dependent |",
+             "|---|---|---|---|---|---|---|---|"]
     for c in passed:
         m = c["metrics"]
         lines.append(f"| {c['cell']} | {m['n']} | {m['distinct_dates']} | {m['mean_sector_relative']:+.4f} | "
-                     f"[{m['ci_low']:+.4f}, {m['ci_high']:+.4f}] | {m['missing_exit_rate']:.2%} | {c['screen']['label']} |")
+                     f"[{m['ci_low']:+.4f}, {m['ci_high']:+.4f}] | {m['missing_exit_rate']:.2%} | {c['screen']['label']} | "
+                     f"{c['screen'].get('survivorship_diagnostic', {}).get('EXCLUSION_DEPENDENT', 'n/a')} |")
     return "\n".join(lines) + "\n"
 
 
@@ -234,6 +246,89 @@ def r1_metadata() -> dict:
     doc["counts"]["mapped_ciks"] = len(sic)
     R1.write(doc, OUT / "candidates_r1.json")
     return doc
+
+
+def mask_sic6770(elig, windows: dict):
+    """R1b point in time (R7): symbol-days inside a SIC-6770 window of the symbol's dated CIK are not eligible."""
+    if not windows:
+        return elig, 0
+    e = elig.copy()
+    hit = [any(lo <= str(d) < hi for lo, hi in windows.get(s_, ())) for s_, d in zip(e["symbol"], e["date"])]
+    import numpy as np
+    hit = np.array(hit, dtype=bool) & e["eligible"].to_numpy(dtype=bool)
+    e.loc[hit, "eligible"] = False
+    e.loc[hit, "bucket"] = None
+    return e, int(hit.sum())
+
+
+def _dev_filings(cik: str, sec: Sec) -> list[dict]:
+    from research.event_response_map_v1.r3_metadata import dev_filings
+    return dev_filings(sec, cik)
+
+
+def _form4_p_rows(sec: Sec) -> list[dict]:
+    """V2@1 input rows, unchanged parser (task107a) -> code P, development period."""
+    sp = importlib.util.spec_from_file_location("t107a", ROOT / "research/scripts/task107a_form4_build.py")
+    t107 = importlib.util.module_from_spec(sp)
+    sp.loader.exec_module(t107)
+    rows = []
+    for q in FORM345_QUARTERS:
+        p = OUT / "_tmp_form345.zip"
+        p.write_bytes(sec.get(FORM345_URL.format(q), f"{q}_form345.zip"))
+        rows += t107.parse_zip(p)
+        p.unlink()
+    return [r for r in rows if str(r.get("code", "")).upper() == "P" and r.get("filing_date")
+            and date(2019, 1, 2) <= r["filing_date"] <= date(2023, 12, 29)]
+
+
+def _episodes(rows: list[dict]):
+    from talonx_v2.cluster_engine import detect_episodes
+    from talonx_v2.config import V2Config
+    from talonx_v2.form4_source import from_rows
+    recs = from_rows([{"symbol": r["issuer_sym"], "issuer_cik": r.get("issuer_cik", ""), "owner_cik": r["owner_cik"],
+                       "filing_date": r["filing_date"], "accession": r.get("accession", ""),
+                       "transaction_date": r.get("trans_date"), "transaction_value": r.get("value"),
+                       "is_officer": bool(r.get("is_officer")), "is_director": bool(r.get("is_director")),
+                       "is_ten_percent": bool(r.get("is_ten_pct")), "transaction_code": "P"} for r in rows])
+    return detect_episodes(recs, config=V2Config())
+
+
+def survivorship_diagnostic(ledger, obs, sessions, bench, bench_of, events_for, guard) -> dict:
+    """R1-FIX c (NON-GATING). Symbols removed by R1a are downloaded separately (archive alpaca_diag). Reports how
+    many pass $5/$20M eligibility by bucket x year; for SCREEN_PASS cells only, re-computes the cell with those
+    symbols' events added (same event rules; the NO_EVENT control is not re-drawn) and flags EXCLUSION_DEPENDENT
+    when the cell no longer passes."""
+    import pandas as pd
+    try:
+        dbars, _ = D.load(ARCH / "alpaca_diag", purpose="RETURNS", guard=guard)
+        draw, _ = D.load(ARCH / "alpaca_diag", purpose="ELIGIBILITY_ONLY", guard=guard)
+    except FileNotFoundError:
+        return {"summary": {"status": "NO_DIAGNOSTIC_ARCHIVE"}}
+    delig = U.eligibility(draw, sessions)
+    e = delig[delig["eligible"]]
+    by = {}
+    for (b, y), g in e.assign(y=[d.year for d in e["date"]]).groupby(["bucket", "y"]):
+        by[f"{b}|{y}"] = {"eligible_symbol_days": len(g), "distinct_symbols": int(g["symbol"].nunique())}
+    dev, _ = events_for(dbars, delig)
+    dobs, _ = E.outcomes(dev, dbars, bench, bench_of, sessions)
+    flagged = 0
+    for c in ledger:
+        if not c["screen"]["SCREEN_PASS"]:
+            continue
+        ext = pd.concat([obs, dobs], ignore_index=True) if len(dobs) else obs
+        sub = ext[(ext["event_type"] == c["event_type"]) & (ext["horizon"] == c["horizon"]) & (ext["bucket"] == c["bucket"])]
+        m2 = M.cell_metrics(sub, c["direction"], c["bucket"])
+        s2 = M.screen(m2, c["event_type"])
+        dep = not s2["SCREEN_PASS"]
+        flagged += dep
+        c["screen"]["survivorship_diagnostic"] = {"EXCLUSION_DEPENDENT": dep, "n_with_removed": m2.get("n"),
+                                                  "mean_sector_relative_with_removed": m2.get("mean_sector_relative"),
+                                                  "criteria_with_removed": s2["criteria"]}
+    return {"summary": {"diagnostic_symbols_with_bars": int(dbars["symbol"].nunique()),
+                        "eligible_by_bucket_year": dict(sorted(by.items())),
+                        "diagnostic_events": int(len(dev)), "screen_pass_cells_checked":
+                            sum(1 for c in ledger if c["screen"]["SCREEN_PASS"]),
+                        "EXCLUSION_DEPENDENT_cells": int(flagged)}}
 
 
 def d0_coverage(eq, elig, cand: dict, obs=None) -> dict:
@@ -265,7 +360,8 @@ def d0_coverage(eq, elig, cand: dict, obs=None) -> dict:
 
 def bucket_year_coverage(eq, elig, obs=None) -> dict:
     e = elig[elig["eligible"]][["symbol", "date", "bucket"]]
-    have = set(zip(eq["symbol"], eq["date"]))
+    import pandas as pd
+    have = pd.MultiIndex.from_arrays([eq["symbol"], eq["date"]])
     res = {}
     for (b, y), g in e.assign(y=[d.year for d in e["date"]]).groupby(["bucket", "y"]):
         pres = sum((s, d) in have for s, d in zip(g["symbol"], g["date"]))

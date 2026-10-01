@@ -83,6 +83,73 @@ def eight_k_events(filings: pd.DataFrame, cik_to_symbol: dict, sessions: list[da
     return pd.DataFrame(out, columns=["event_type", "symbol", "event_date", "entry_date", "causal_utc"])
 
 
+def eight_k_events_dated(filings: pd.DataFrame, intervals: dict, sessions: list[date],
+                         has_bar) -> tuple[pd.DataFrame, dict]:
+    """LOCK REV 3 (R6). filings: [cik, form, filingDate, acceptanceDateTime, items] (development period only).
+    Each 8-K is assigned to the ONE ticker valid for its CIK on the FILING DATE via the dated rename chain
+    (identity.assign). Bar presence on the entry date is a CONSISTENCY CHECK only:
+      AMBIGUOUS (several tickers valid) or NO_VALID_TICKER     -> excluded, counted
+      DISAGREE  (assigned ticker has no ALL bar on the entry date but another ticker of the CIK does) -> excluded
+      NO_BAR_ANY (no ticker of the CIK has a bar)               -> kept (becomes DATA_MISSING_ENTRY downstream)
+    has_bar(symbol, date) -> bool."""
+    from research.event_response_map_v1.identity import assign
+    counts = {"ASSIGNED_CONSISTENT": 0, "AMBIGUOUS": 0, "NO_VALID_TICKER": 0, "DISAGREE": 0, "NO_BAR_ANY": 0}
+    out = []
+    for r in filings.itertuples(index=False):
+        fd = date.fromisoformat(str(r.filingDate)[:10])
+        if r.form != "8-K" or not (DEV_START <= fd <= DEV_END):
+            continue
+        items = {x.strip() for x in str(r.items or "").split(",")} & set(EIGHT_K_ITEMS)
+        if not items:
+            continue
+        cik = str(r.cik).zfill(10)
+        sym, status = assign(cik, fd, intervals)
+        if sym is None:
+            counts[status] += len(items)
+            continue
+        causal = edgar_acceptance_causal(str(r.acceptanceDateTime))
+        ent = entry_session(causal, sessions)
+        if ent is None:
+            continue
+        if not has_bar(sym, ent):
+            others = [s for s, _, _ in intervals.get(cik, []) if s != sym and has_bar(s, ent)]
+            if others:
+                counts["DISAGREE"] += len(items)
+                continue
+            counts["NO_BAR_ANY"] += len(items)
+        else:
+            counts["ASSIGNED_CONSISTENT"] += len(items)
+        for it in sorted(items):
+            out.append({"event_type": f"8K_{it}", "symbol": sym, "event_date": fd, "entry_date": ent,
+                        "causal_utc": causal.isoformat()})
+    return pd.DataFrame(out, columns=["event_type", "symbol", "event_date", "entry_date", "causal_utc"]), counts
+
+
+def form4_rows_dated(rows: list[dict], intervals: dict) -> tuple[list[dict], dict]:
+    """LOCK REV 3 (R6) Form 4 symbol mapping: the row's symbol is the ticker valid for its ISSUER CIK on the filing
+    date (dated rule). The reported issuer trading symbol must agree (normalized), else DISAGREE -> excluded.
+    AMBIGUOUS / NO_VALID_TICKER / CIK_NOT_IN_UNIVERSE -> excluded. All counted."""
+    from research.event_response_map_v1.identity import assign, norm_ticker
+    counts = {"MATCH": 0, "DISAGREE": 0, "AMBIGUOUS": 0, "NO_VALID_TICKER": 0, "CIK_NOT_IN_UNIVERSE": 0}
+    out = []
+    for r in rows:
+        cik = str(r.get("issuer_cik") or "").zfill(10)
+        if cik not in intervals:
+            counts["CIK_NOT_IN_UNIVERSE"] += 1
+            continue
+        fd = r["filing_date"] if isinstance(r["filing_date"], date) else date.fromisoformat(str(r["filing_date"])[:10])
+        sym, status = assign(cik, fd, intervals)
+        if sym is None:
+            counts[status] += 1
+            continue
+        if norm_ticker(r.get("issuer_sym")) != sym:
+            counts["DISAGREE"] += 1
+            continue
+        counts["MATCH"] += 1
+        out.append({**r, "issuer_sym": sym})
+    return out, counts
+
+
 def form4_cluster_events(episodes: list, sessions: list[date]) -> pd.DataFrame:
     """episodes: talonx_v2.cluster_engine.ClusterEpisode (V2@1, unchanged). Causal = end of the activation filing
     day (23:59:59 ET) -> entry = next session open."""
@@ -166,7 +233,8 @@ def outcomes(ev: pd.DataFrame, bars: pd.DataFrame, bench: dict[str, pd.DataFrame
                             "missing_exit": True})
                 continue
             ret = g.at[d1, "close"] / g.at[r.entry_date, "open"] - 1.0
-            sec = symbol_bench.get(r.symbol, "SPY")
+            sec = (symbol_bench(r.symbol, r.entry_date) if callable(symbol_bench)        # LOCK REV 3: dated
+                   else symbol_bench.get(r.symbol, "SPY"))
             br = {}
             for name in ("SPY", sec):
                 b = bpx[name]

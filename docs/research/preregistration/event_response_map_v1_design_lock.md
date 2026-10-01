@@ -1,5 +1,57 @@
 # EVENT_RESPONSE_MAP_V1: design lock (Gate C)
 
+## Revision 3 (owner, 2026-10-01; no data existed, so re-locking was allowed)
+
+Revision 3 makes only the following changes. The frozen list is `candidates_r3.json`, whose sha256 is pinned; it supersedes `candidates_r1.json`.
+
+| # | Change |
+|---|---|
+| R1-FIX a | Point-in-time S&P 500 members (any day, 2019–2023) are **exempt from R1a**. R1b still applies where a CIK exists. |
+| R1-FIX b | **Identity resolution before R1a** (`identity.py`). Sources, in order:<br>1. Dated Alpaca rename chain, forward. Renames processed after 2023 are used **for identity only**, and the Task75 reserved windows were **not queried**.<br>2. SEC `company_tickers` and the submissions `tickers` field, never for a ticker that was later renamed away.<br>3. Rename chain, backward.<br>4. The issuer trading symbol on Form 3/4/5 filings 2019–2023, when it names exactly one issuer CIK.<br>5. A unique normalized name across `cik-lookup-data` and each company's submissions `name` and `formerNames`. |
+| R1-FIX c | **Survivorship diagnostic (non-gating).** Phase D also downloads ALL and raw development bars for every symbol still removed by R1a (2,769 symbols, separate archive `alpaca_diag`). It reports how many pass $5/$20M eligibility, by bucket × year. For SCREEN_PASS cells only, it recomputes the cell with those symbols' events added and flags **EXCLUSION_DEPENDENT** if the cell no longer passes. |
+| R6 | **Dated attribution.** Each 8-K goes to the one ticker valid for its CIK on the **filing date**, using the dated rename chain. A ticker is valid from the processing date of the rename into it until the rename out of it.<br>• Bar presence on the entry date is a consistency check only.<br>• AMBIGUOUS, NO_VALID_TICKER and DISAGREE filings are excluded and counted.<br>**Audit of every one-ticker-per-CIK use:**<br>1. 8-K attribution: dated rule.<br>2. Sector benchmark: dated symbol→CIK on the entry date, else SPY.<br>3. Form 4 symbol: the dated ticker of the issuer CIK on the filing date. The reported symbol must agree, else the row is excluded and counted.<br>4. The rev-1 `UNMAPPED_INACTIVE_CIK` map is retired. |
+| R7 | **Chosen: dated SIC.** R7 is implemented, not written in as a limitation.<br>• SIC comes from the EDGAR filing header of the CIK's last company filing on or before 2023-12-29.<br>• If the CIK filed an 8-K item 5.06 (change in shell company status) in the period, the header SIC of its last company filing before that 8-K applies before the 8-K.<br>• If the CIK has no company filing in the period, the current SIC is used, and this fallback is counted.<br>• R1b removes a symbol whose SIC is 6770 for the whole period, and masks the 6770 days of a symbol that was 6770 for only part of it.<br>**Cost:** about one header per CIK plus one per item-5.06 CIK, 6,000–7,000 SEC requests at ≤ 2.9/s (about 40 minutes off-hours), so it was affordable.<br>**Residual limitation:** an SIC reclassification inside the period without an item 5.06 is not dated. |
+
+### Revision 3 results (metadata only)
+
+The SEC archive holds 13,558 files. Alpaca returned 1,542 post-2023 rename records; 2,667 dated rename edges were used in total.
+
+**R1a removals, by stage:**
+
+| Stage | R1a total | No CIK | CIK without 10-K/10-Q | Source B | Source C | Source D |
+|---|---|---|---|---|---|---|
+| Rev 2 (no exemption, rev-2 identity) | 3,467 | 3,415 | 52 | 835 | 2,659 | 47 |
+| + S&P 500 exemption | 3,420 | 3,368 | 52 | 833 | 2,651 | 0 |
+| **+ identity resolution (final)** | **2,769** | 2,628 | 141 | 494 | 2,290 | 0 |
+
+Source counts overlap, because a symbol can come from several sources.
+
+| Count | Value |
+|---|---|
+| R1b, SIC 6770 for the whole period (dated) | 390 removed |
+| R1b, SIC 6770 for part of the period | 46 symbols, those days masked |
+| **Kept** | **7,613** (removed 3,159 = R1a 2,769 + R1b 390) |
+| Identity methods | SEC_TICKERS 5,628; FORM345_TICKER 1,303; RENAME_CHAIN_FWD 731; UNIQUE_NAME_MATCH 52; RENAME_CHAIN_BWD 14; FORM345_AMBIGUOUS 29; UNMAPPED 3,015 |
+| R7 SIC sources (per CIK) | Last-filing header 5,689; current-SIC fallback 1,209; item-5.06 split 299 |
+
+**Point-in-time S&P 500 coverage after revision 3:** 100.0 % in 2019, 2020, 2021, 2022 and 2023 (metadata). Bar availability is measured in D0.
+
+**8-K attribution (R6), metadata stage.** Counts are per (filing, target item):
+
+| Outcome | Count |
+|---|---|
+| Assigned | 195,210 |
+| **Excluded: NO_VALID_TICKER** | **14,099** |
+| **Excluded: AMBIGUOUS** (dual share classes and similar) | **5,530** |
+| Assigned to an R1-removed symbol | 1,212 |
+
+DISAGREE is the bar-consistency check, so it is counted in Phase D.
+
+**Form 3/4/5 dated-symbol audit** (all 1,007,910 filing observations): MATCH 777,164; DISAGREE 12,396; AMBIGUOUS 16,813; NO_VALID_TICKER 36,510; CIK_NOT_IN_UNIVERSE 165,027.
+
+**Residual limitation:** Alpaca renames processed inside the Task75 reserved windows were not queried. Those identities rely on EDGAR sources only.
+
+
 ## Revision 2 (owner, Gate C, 2026-10-01; no data existed, so re-locking was allowed)
 
 The owner approved decisions 1–4 at Gate C:
@@ -52,7 +104,7 @@ Point-in-time S&P 500 coverage after R1:
 Before R1 it was 93.6–95.2 % (metadata). This is a survivorship bias against names renamed or delisted after 2023. It is recorded here and raised to the owner.
 
 
-**Status:** DESIGN_LOCKED, **revision 2** (fingerprint in `design_lock.json` and the commit message; supersedes rev 1 `067ed29` / `0b379979…`). **No price data exists** for this program at lock time.
+**Status:** DESIGN_LOCKED, **revision 3**. The fingerprint is in `design_lock.json` and the commit message. This supersedes rev 2 `8a57c33` / `bdf4a160…` and rev 1 `067ed29` / `0b379979…`. **No price data exists** for this program at lock time.
 
 | Item | Value |
 |---|---|
