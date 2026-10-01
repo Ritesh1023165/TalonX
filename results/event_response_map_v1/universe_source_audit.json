@@ -1,0 +1,242 @@
+{
+ "assets_total": 33561,
+ "assets_listed_common": 6764,
+ "assets_listed_common_active": 5618,
+ "assets_listed_common_inactive": 1146,
+ "name_rule_exclusions": {
+  "WARRANT": 432,
+  "FUND_ETF_ETN": 6555,
+  "RIGHT": 151,
+  "UNIT": 629,
+  "PREFERRED": 134,
+  "NOTE_DEBT": 261,
+  "DEPOSITARY_NON_ADR": 10
+ },
+ "name_changes_2019_2023": 1832,
+ "mergers_2019_2023": 3347,
+ "candidate_symbols_total": 11088,
+ "coverage_vs_pit_sp500": {
+  "2019": {
+   "sp500_members_any_day": 533,
+   "covered_direct_asset": 472,
+   "covered_via_rename_or_merger": 27,
+   "missing": 34,
+   "coverage_pct": 93.62,
+   "missing_examples": [
+    "ABMD",
+    "ANSS",
+    "AVB",
+    "BHGE",
+    "BK",
+    "CMA",
+    "DFS",
+    "DISCA",
+    "DISH",
+    "EA",
+    "EQR",
+    "FL",
+    "FLT",
+    "FRC",
+    "GPS",
+    "HBI",
+    "HES",
+    "HOLX",
+    "HRS",
+    "IPG",
+    "JNPR",
+    "JWN",
+    "K",
+    "LEG",
+    "MMC"
+   ]
+  },
+  "2020": {
+   "sp500_members_any_day": 524,
+   "covered_direct_asset": 472,
+   "covered_via_rename_or_merger": 23,
+   "missing": 29,
+   "coverage_pct": 94.47,
+   "missing_examples": [
+    "ABMD",
+    "ANSS",
+    "AVB",
+    "BK",
+    "CMA",
+    "CTLT",
+    "DFS",
+    "DISCA",
+    "DISH",
+    "EA",
+    "EQR",
+    "FLT",
+    "FRC",
+    "GPS",
+    "HBI",
+    "HES",
+    "HOLX",
+    "IPG",
+    "JNPR",
+    "JWN",
+    "K",
+    "LEG",
+    "MMC",
+    "MRO",
+    "PXD"
+   ]
+  },
+  "2021": {
+   "sp500_members_any_day": 525,
+   "covered_direct_asset": 475,
+   "covered_via_rename_or_merger": 20,
+   "missing": 30,
+   "coverage_pct": 94.29,
+   "missing_examples": [
+    "ABMD",
+    "ANSS",
+    "AVB",
+    "BK",
+    "CDAY",
+    "CMA",
+    "CTLT",
+    "DFS",
+    "DISCA",
+    "DISH",
+    "EA",
+    "EQR",
+    "FLT",
+    "FRC",
+    "GPS",
+    "HBI",
+    "HES",
+    "HOLX",
+    "IPG",
+    "JNPR",
+    "K",
+    "LEG",
+    "MMC",
+    "MRO",
+    "PXD"
+   ]
+  },
+  "2022": {
+   "sp500_members_any_day": 526,
+   "covered_direct_asset": 481,
+   "covered_via_rename_or_merger": 17,
+   "missing": 28,
+   "coverage_pct": 94.68,
+   "missing_examples": [
+    "ABMD",
+    "ANSS",
+    "AVB",
+    "BK",
+    "CDAY",
+    "CMA",
+    "CTLT",
+    "DFS",
+    "DISCA",
+    "DISH",
+    "EA",
+    "EQR",
+    "FLT",
+    "FRC",
+    "GPS",
+    "HES",
+    "HOLX",
+    "IPG",
+    "JNPR",
+    "K",
+    "MMC",
+    "MRO",
+    "PXD",
+    "SBNY",
+    "SEE"
+   ]
+  },
+  "2023": {
+   "sp500_members_any_day": 521,
+   "covered_direct_asset": 489,
+   "covered_via_rename_or_merger": 7,
+   "missing": 25,
+   "coverage_pct": 95.2,
+   "missing_examples": [
+    "ANSS",
+    "AVB",
+    "BK",
+    "CDAY",
+    "CMA",
+    "CTLT",
+    "DFS",
+    "DISH",
+    "EA",
+    "EQR",
+    "FLT",
+    "FRC",
+    "HES",
+    "HOLX",
+    "IPG",
+    "JNPR",
+    "K",
+    "MMC",
+    "MRO",
+    "PXD",
+    "SBNY",
+    "SEE",
+    "SIVB",
+    "WBA",
+    "WRK"
+   ]
+  }
+ },
+ "renames_sample": [
+  [
+   "AFGE",
+   "AFGE.CL",
+   "2019-11-27"
+  ],
+  [
+   "AFGE",
+   "AFGE.CL",
+   "2019-11-29"
+  ],
+  [
+   "ALL.PRA",
+   "ALL.PRACL",
+   "2019-12-10"
+  ],
+  [
+   "ANFI",
+   "RYCE",
+   "2019-12-23"
+  ],
+  [
+   "AXS.PRD",
+   "AXS.PRDCL",
+   "2019-12-18"
+  ],
+  [
+   "BAC.PRY",
+   "BAC.PRYCL",
+   "2019-12-19"
+  ],
+  [
+   "BBT",
+   "TFC",
+   "2019-12-09"
+  ],
+  [
+   "BBT.PRF",
+   "TFC.PRF",
+   "2019-12-10"
+  ],
+  [
+   "BBT.PRG",
+   "TFC.PRG",
+   "2019-12-10"
+  ],
+  [
+   "BBT.PRH",
+   "TFC.PRH",
+   "2019-12-10"
+  ]
+ ]
+}

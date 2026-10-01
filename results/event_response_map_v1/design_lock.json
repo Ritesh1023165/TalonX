@@ -1,0 +1,295 @@
+{
+ "program": "EVENT_RESPONSE_MAP_V1",
+ "status": "DESIGN_LOCKED_GATE_C (no price data exists)",
+ "locked_at_utc": "2026-10-01T00:16:42+00:00",
+ "branch": "research/event_response_map_v1",
+ "base_sha": "86f7375ea5e718a00d63884da84d67ad1be6d15e",
+ "fingerprint": "b5c2f4797b6f897541ca6c6c5b6b193d476f0a7b9083c89cb47c06b362a8ea48",
+ "file_sha256": {
+  "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
+  "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
+  "research/event_response_map_v1/spec.py": "d02c990a1030c7325399acadf136e7540e3450f304480ca487e018dbedcadf4e",
+  "research/event_response_map_v1/data.py": "654b70574852c2d723417544237f8b423599ad9c902e6d199726763d527d7918",
+  "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
+  "research/event_response_map_v1/events.py": "c043c547bd3cc8b8a4315d95fc050c80f009540c2cc31b8bd13a32be986d38d4",
+  "research/event_response_map_v1/metrics.py": "545bf95867efe09b85c269244590563f09901983afd1bd44abb30508d5184b47",
+  "research/event_response_map_v1/phase_d.py": "f683b1ecde17e8a63430a35e81cc563b2280e6c299ba29c72ea2b5c79c9589ac",
+  "research/event_response_map_v1/fingerprint.py": "ebbe988749ddcac8f8e6cda4394970dbcdee5714fd6722a1439d0eaaf6e3bb74",
+  "docs/research/preregistration/rs_sector_mapping_v1.json": "7ac052e08e35059acf92b26c28f892aabf10f8aee25b996b8f0a4381a66bd21b",
+  "talonx_v2/cluster_engine.py": "874300546772ecc9b7ef43db15ce92dca1bfc82acc8834a44be92f2401eb4d8b",
+  "talonx_v2/config.py": "fdc361612e57102ed55daa472d8f02cf59e65a9baeb572350c75c3a4704efa56",
+  "talonx_v2/form4_source.py": "1f9e6ab27c2c35397daa8e0dd0525b25e5c46df248de921695392f6e023a2c47",
+  "talonx_v2/calendar.py": "deb1c0d37301457eafbc270b72601fa6dad4976ec4a21facc9cf85331fba572d",
+  "research/scripts/task107a_form4_build.py": "f2b80009e41751facc18c6d15e2715f2e043c884f5425f7ddff7b1e58d9885c9",
+  "talonx_premarket/universe.py": "4cfd45f527b4c4d27e0dbfd59266c6befa3465c01af471ce92163794c6c5d105",
+  "research/event_response_map_v1/universe_source.py": "7d064a1590f71f291eca3072d2f698ea3f68114fd54f51e2d7cf615759c5a686"
+ },
+ "candidates_sha256": "c41297936d7585b27aed4854402e907371310da79218c5c3fefba2e705bb4a17",
+ "candidates": {
+  "total": 10772,
+  "source_counts": {
+   "A": 6764,
+   "B": 1454,
+   "C": 3242,
+   "D": 614
+  },
+  "only_from": {
+   "A": 5692,
+   "B": 1194,
+   "C": 2592,
+   "D": 37
+  },
+  "named": 7220
+ },
+ "universe_coverage_vs_pit_sp500_metadata": {
+  "2019": {
+   "sp500_members_any_day": 533,
+   "coverage_pct": 93.62,
+   "missing": 34
+  },
+  "2020": {
+   "sp500_members_any_day": 524,
+   "coverage_pct": 94.47,
+   "missing": 29
+  },
+  "2021": {
+   "sp500_members_any_day": 525,
+   "coverage_pct": 94.29,
+   "missing": 30
+  },
+  "2022": {
+   "sp500_members_any_day": 526,
+   "coverage_pct": 94.68,
+   "missing": 28
+  },
+  "2023": {
+   "sp500_members_any_day": 521,
+   "coverage_pct": 95.2,
+   "missing": 25
+  }
+ },
+ "universe_source_audit": {
+  "assets_total": 33561,
+  "assets_listed_common": 6764,
+  "assets_listed_common_active": 5618,
+  "assets_listed_common_inactive": 1146,
+  "name_changes_2019_2023": 1832,
+  "mergers_2019_2023": 3347
+ },
+ "corporate_action_audit_v2_development": {
+  "method": "CA audit V2: process-date query by year 2019-2023, local ex-date selection; all symbols",
+  "events": 3178,
+  "by_type": {
+   "forward_splits": 437,
+   "reverse_splits": 2670,
+   "spin_offs": 71
+  },
+  "by_ex_year": {
+   "2019": 226,
+   "2020": 824,
+   "2021": 576,
+   "2022": 659,
+   "2023": 893
+  },
+  "events_on_candidate_symbols": 898,
+  "candidate_symbols_with_split_or_spinoff": 772,
+  "use": "metadata only: documents why eligibility needs as-traded D-1 values (adjusted floors would be look-ahead)"
+ },
+ "cells": 390,
+ "independent_sign_tests": 195,
+ "spec": {
+  "program": "EVENT_RESPONSE_MAP_V1",
+  "status": "DISCOVERY_ONLY -- nothing produced by this program is validated; at most ONE hypothesis may later be nominated, frozen and pre-registered in a separate task",
+  "periods": {
+   "DEVELOPMENT_events": [
+    "2019-01-02",
+    "2023-12-29"
+   ],
+   "data_lookback_start": "2018-11-01",
+   "EXCLUDED_2024": [
+    "2024-01-01",
+    "2024-12-31"
+   ],
+   "FUTURE_CONFIRMATION_LOCKED": [
+    "2025-01-02",
+    "open-ended"
+   ],
+   "horizon_rule": "an event enters a horizon cell only if that horizon's exit session is <= 2023-12-29 (no 2024 bar is ever needed or read)",
+   "guard": "research/common/locked_range_guard.py EVENT_RESPONSE_MAP_V1 (download AND load layers)"
+  },
+  "universe": {
+   "definition": "point-in-time liquid US common stocks, decided with data as of D-1 only",
+   "candidate_sources": {
+    "A": "Alpaca /v2/assets us_equity, status active AND inactive, exchanges NYSE/NASDAQ/AMEX/ARCA/BATS, symbol ^[A-Z]{1,5}(\\.[A-Z])?$, instrument-type name rules reused from talonx_premarket/universe.py::_NAME_RULES (status, tradable and CIK NOT required)",
+    "B": "Alpaca /v1/corporate-actions name_change 2019-2023: every old_symbol (pre-rename ticker) is a candidate",
+    "C": "Alpaca /v1/corporate-actions cash/stock/stock-and-cash mergers 2019-2023: every acquiree_symbol is a candidate",
+    "D": "Task95F point-in-time S&P 500 membership (fja05680/Wikipedia): every ticker that was a member on any day 2019-2023"
+   },
+   "how_delisted_and_renamed_enter": "delisted names enter via A(inactive) if Alpaca still lists them, else via C (acquirees) or D (former S&P members); renamed names enter under their OLD ticker via B and their NEW ticker via A; whether Alpaca returns bars for each candidate symbol is MEASURED in Phase D step D0 (per-year bar coverage reported) -- a symbol without bars cannot enter",
+   "not_used": "today's DTU / ELIGIBLE list is NEVER used for history",
+   "eligibility_D_minus_1": {
+    "close_min_usd": 5.0,
+    "adv20_min_usd": 20000000,
+    "adv20_definition": "mean over the 20 sessions ending D-1 of (as-traded close x as-traded volume); >= 20 prior sessions required",
+    "price_basis": "AS-TRADED (adjustment=raw) daily close/volume of D-1, used ONLY for this point-in-time eligibility test -- never for returns, features or benchmarks. Reason: adjustment=all back-adjusts past prices by FUTURE splits/dividends (3,178 splits/spin-offs in 2019-2023, 2,670 of them reverse splits), so an adjusted $5 or $ADV floor would be look-ahead.",
+    "owner_approval_required": "YES (Gate C): this raw ELIGIBILITY_ONLY pull deviates from the instruction 'all downloads adjustment=all'. If not approved, V1 is not run; a V1.1 lock would derive as-traded values from ALL bars + CA factors before any data."
+   },
+   "liquidity_buckets_adv20_usd": {
+    "L1": [
+     20000000,
+     100000000
+    ],
+    "L2": [
+     100000000,
+     1000000000
+    ],
+    "L3": [
+     1000000000,
+     null
+    ]
+   },
+   "survivorship_limitation": "NOT survivorship-free. Alpaca's asset list omits some names delisted/renamed after 2023 (e.g. K, EA, IPG, HOLX, PXD, SIVB, DISCA, FLT absent from active AND inactive). Metadata coverage of the point-in-time S&P 500 by sources A|B|C: 2019 93.6 %, 2020 94.5 %, 2021 94.3 %, 2022 94.7 %, 2023 95.2 % (source D adds the remainder as candidate symbols; bar availability measured in D0). Coverage of smaller liquid names has no free reference and is presumed no better. Results are conditional on this universe. Instrument-type name rules apply to source A (and to B tickers that inherit a name); C/D-only symbols without a name (3,552 of 10,772 have no name) are not instrument-filtered and are counted in the integrity report. Frozen candidate list: results/event_response_map_v1/candidates.json (10,772 symbols; A 6,764 | B 1,454 | C 3,242 | D 614; only-D 37), sha256 pinned in design_lock.json.",
+   "cik_and_sic": "CIK: SEC company_tickers.json (current); a pre-rename ticker (source B) inherits the CIK of its new_symbol; else an exact normalized-name match (upper-case, punctuation and INC/CORP/CO/LTD/PLC/HOLDINGS suffixes removed) in SEC cik-lookup-data.txt, accepted only if UNIQUE; a mapping is kept only if that CIK has >= 1 EDGAR filing dated 2019-01-02..2023-12-29 (guards against recycled tickers), else UNMAPPED_INACTIVE_CIK; SIC from EDGAR submissions JSON. No CIK -> no 8-K events for that symbol and SIC unknown -> benchmark SPY (per SIC_ETF_MAP_V1 default). Both counts are reported."
+  },
+  "data": {
+   "returns_and_benchmarks": "Alpaca SIP 1Day adjustment=all for equities, SPY and sector ETFs (XLE, XBI, XLV, XLK, XLI, XLF) -- ONE downloader module (research/event_response_map_v1/data.py), identical parameters",
+   "eligibility_only": "same downloader module, adjustment=raw, purpose=ELIGIBILITY_ONLY (see universe.eligibility_D_minus_1.owner_approval_required)",
+   "filings": "EDGAR submissions JSON per CIK (items + acceptanceDateTime); SEC Form 3/4/5 quarterly bulk 2019Q1-2023Q4 for FORM4_CLUSTER",
+   "archive": "archived bytes are authoritative; manifest with per-file sha256, aggregate hash, download UTC, missing / duplicate sessions, 0 synthetic bars"
+  },
+  "events": {
+   "GAP_UP_3": "open_D/close_{D-1} - 1 >= +3 %  (ALL bars)",
+   "GAP_UP_5": ">= +5 %",
+   "GAP_UP_10": ">= +10 %",
+   "GAP_DOWN_3": "<= -3 %",
+   "GAP_DOWN_5": "<= -5 %",
+   "GAP_DOWN_10": "<= -10 %",
+   "gap_note": "thresholds are NESTED (a +12 % gap is in GAP_UP_3, _5 and _10), as specified; the trial ledger counts every cell",
+   "gap_causal_timestamp": "D 09:30 ET opening print; the gap is observable only AT the print, so under the strict entry rule entry = OPEN of session D+1 (trading the gap-day open itself would not be causal)",
+   "8K_2.02": "8-K item 2.02",
+   "8K_1.01": "item 1.01",
+   "8K_5.02": "item 5.02",
+   "8K_7.01": "item 7.01",
+   "8K_8.01": "item 8.01",
+   "8k_rules": "form 8-K only (8-K/A excluded); a filing with several items counts once in each item cell; filings with filingDate outside 2019-01-02..2023-12-29 are dropped at parse time before any field is used (the submissions endpoint has no date filter); causal timestamp = EDGAR acceptanceDateTime under CONSERVATIVE_DUAL_INTERPRETATION: the LATER of reading it as UTC and as ET (EDGAR surfaces have been inconsistent; this is causal under either)",
+   "FORM4_CLUSTER": "talonx_v2.cluster_engine.detect_episodes (V2@1 definition, unchanged) on SEC bulk code-P rows; causal = end of the activation filing day; LABEL: KNOWN_UNSUPPORTED_BASELINE (calibration, never nominatable)",
+   "NO_EVENT": "control: for each (entry date, liquidity bucket) with k distinct event stock-days, draw k eligible stock-days with NO event of any type whose entry falls within +/-2 sessions; sorted candidates, seed 670067; LABEL: CONTROL (never nominatable)",
+   "dedup": "one observation per (event type, symbol, entry session)"
+  },
+  "entry": "OPEN of the first regular session that STARTS strictly after the causal timestamp (an event after the 16:00 ET close, or on a non-session day, belongs to the next session; acceptance before 09:30 ET enters that day's open). No intraday entry.",
+  "horizons": {
+   "H0": "close of the entry session",
+   "H1": "close of entry + 1 session",
+   "H3": "+3",
+   "H5": "+5",
+   "H10": "+10"
+  },
+  "directions": {
+   "LONG": "exit/entry - 1",
+   "SHORT": "-(exit/entry - 1); RESEARCH_SHORT_REFERENCE"
+  },
+  "metrics": [
+   "n",
+   "distinct_dates",
+   "distinct_symbols",
+   "mean_raw",
+   "median_raw",
+   "mean_spy_relative",
+   "mean_sector_relative (SIC_ETF_MAP_V1, docs/research/preregistration/rs_sector_mapping_v1.json)",
+   "hit_rate (sector-relative gross > 0)",
+   "dispersion (sd of sector-relative gross)",
+   "date_cluster_ci (sector-relative gross; research.common.research_stats.bootstrap_ci_clustered, group=entry date, 10,000 resamples, 95 %, seed 670067)",
+   "top1/top3/top5 removal (sector-relative gross)",
+   "per-year sign stability 2019..2023 (years with n < 20 count as NOT stable)"
+  ],
+  "relative_returns": "benchmark return over the SAME entry-open -> exit-close interval from ALL bars; benchmark missing -> event dropped (counted)",
+  "costs_round_trip_bps": {
+   "L1": 30,
+   "L2": 20,
+   "L3": 12,
+   "label": "RESEARCH ASSUMPTIONS, declared up front, never tuned"
+  },
+  "screen": {
+   "SCREEN_PASS_all_of": [
+    "n >= 300",
+    "distinct_dates >= 150",
+    "mean sector-relative gross IN THE CELL'S DIRECTION >= 2 x bucket cost (i.e. |mean| >= 2x cost with the sign matching the direction; LONG/SHORT cells are mirrors, so 390 cells = 195 independent sign tests and a pair can pass at most once)",
+    "date-cluster 95 % CI of mean sector-relative gross excludes zero on the side of the mean",
+    "sign of yearly mean sector-relative gross equals the overall sign in >= 4 of 5 development years",
+    "removing the top 5 trades (by sector-relative gross in the cell's direction) does not flip the sign"
+   ],
+   "scope": "a screening rule for THIS program only, not a permanent TalonX law",
+   "non_nominatable": [
+    "FORM4_CLUSTER (known unsupported baseline)",
+    "NO_EVENT (control)"
+   ]
+  },
+  "trial_ledger": "every evaluated cell is recorded (metrics + screen result); the trial count is the number of cells evaluated",
+  "cells": "13 event types x 2 directions x 5 horizons x 3 liquidity buckets = 390",
+  "integrity_tolerances": {
+   "synthetic_bars": "NONE -- no interpolation, no forward fill",
+   "missing_bar": "an event lacking its entry-open or exit-close bar (stock or benchmark) is dropped from that horizon cell and counted as DATA_MISSING",
+   "duplicate_session": "a symbol-session with duplicate daily rows is excluded entirely and counted",
+   "suspect_adjustment": "|close_t / close_{t-1} - 1| > 75 % on ALL bars inside an event's entry..exit window -> event RETAINED, flagged SUSPECT_ADJUSTMENT, counted; a pre-declared NON-GATING sensitivity (flagged events excluded) is reported",
+   "eligibility_raw_missing": "no as-traded D-1 bar -> not eligible that day",
+   "cent_rounding": "NOT APPLICABLE and NOT carried over from Task75 (this program never compares RAW and ALL prices)",
+   "tolerance_changes": "none permitted after data exists; any change = new version"
+  },
+  "run_once": "Phase D runs the locked extraction and metrics exactly once; outputs results/event_response_map_v1/{cells.csv, screen.csv, trial_ledger.json, report.md}"
+ },
+ "data_plan": {
+  "alpaca": {
+   "symbols": 10779,
+   "equity_candidates": 10772,
+   "benchmarks": [
+    "SPY",
+    "XLE",
+    "XBI",
+    "XLV",
+    "XLK",
+    "XLI",
+    "XLF"
+   ],
+   "range": [
+    "2018-11-01",
+    "2023-12-29"
+   ],
+   "timeframe": "1Day",
+   "feed": "sip",
+   "batch": 100,
+   "batches_per_pass": 108,
+   "passes": {
+    "RETURNS (adjustment=all, equities+benchmarks)": [
+     756,
+     1404
+    ],
+    "ELIGIBILITY_ONLY (adjustment=raw, equities only; needs owner approval)": [
+     756,
+     1404
+    ]
+   },
+   "requests_total_range": [
+    1512,
+    2808
+   ],
+   "rate_per_min": 37.5,
+   "minutes_range": [
+    40,
+    75
+   ]
+  },
+  "sec": {
+   "company_tickers.json": 1,
+   "cik-lookup-data.txt": 1,
+   "form345_quarterly_zips_2019q1_2023q4": 20,
+   "submissions_json": "one per mapped CIK + older pages overlapping 2019-2023; estimate 8,000-11,000",
+   "rate_per_s": 2.94,
+   "minutes_range": [
+    45,
+    65
+   ]
+  },
+  "schedule": "OFF-HOURS ONLY, enforced in code for Alpaca AND SEC: weekday 13:00-20:30Z refused. Proposed: stage=download on the first evening after go starting >= 21:00Z (or a weekend), ~2-2.5 h worst case, finishing well before 13:00Z; stage=run reads the archive only (no network for prices).",
+  "after_download": "D0 integrity report: per-year bar coverage of candidates and of the PIT S&P 500 reference, missing/duplicate sessions, CIK-method counts, unnamed-symbol count"
+ }
+}

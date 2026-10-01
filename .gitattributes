@@ -3,3 +3,8 @@
 # another. The evidence manifest additionally hashes git-normalized (LF)
 # bytes, so verification holds even where a checkout ignores this file.
 results/task83_r1_production_collector_closure/** text eol=lf
+# EVENT_RESPONSE_MAP_V1 -- research/common/research_stats.py is pinned byte-identical (sha256 test) and the design-lock
+# fingerprint hashes these files; keep them LF in every checkout.
+research/common/** text eol=lf
+research/event_response_map_v1/** text eol=lf
+results/event_response_map_v1/** text eol=lf
