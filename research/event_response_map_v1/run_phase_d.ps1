@@ -15,8 +15,8 @@ $PY   = 'C:\workspace\TalonX\.venv\Scripts\python.exe'
 $GIT  = 'C:\Program Files\Git\cmd\git.exe'
 $OUT  = Join-Path $WT 'results\event_response_map_v1'
 $LOG  = Join-Path $OUT 'phase_d_runner.log'
-$EXPECT_FP   = '94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7'
-$LOCK_COMMIT = 'ed16b69d027ae0080e96708b6a667727cbfd7137'
+$EXPECT_FP   = 'ad68792d18c67a7f201af3f4a5b0e3565a26759c7e8c904bc035c48e327a7bd2'
+$LOCK_COMMIT = '055efd379b427e83cc6224f6361f76dbad9f9a63'
 $UTF8 = New-Object System.Text.UTF8Encoding $false
 
 function Log([hashtable]$h) {
