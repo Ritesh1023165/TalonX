@@ -135,12 +135,17 @@ def no_event_control(events: pd.DataFrame, elig: pd.DataFrame, sessions: list[da
 def outcomes(ev: pd.DataFrame, bars: pd.DataFrame, bench: dict[str, pd.DataFrame], symbol_bench: dict,
              sessions: list[date]) -> tuple[pd.DataFrame, dict]:
     """Per event x horizon: raw / SPY-relative / sector-relative gross LONG return, entry OPEN -> exit CLOSE, ALL bars.
-    Exit session must be <= DEV_END. Missing stock or benchmark bar -> DATA_MISSING (dropped, counted).
-    SUSPECT_ADJUSTMENT: any |close_t/close_{t-1} - 1| > 75 % inside entry..exit (retained, flagged)."""
+    Exit session must be <= DEV_END. Missing ENTRY bar -> DATA_MISSING_ENTRY (dropped, counted). Missing benchmark
+    bar -> BENCH_MISSING (dropped, counted). LOCK REV 2 (R3): entry bar present but EXIT bar missing ->
+    DATA_MISSING_EXIT, emitted as a row with missing_exit=True and NaN returns, so each cell reports its missing-exit
+    rate and the non-gating bound sensitivity. SUSPECT_ADJUSTMENT: any |close_t/close_{t-1} - 1| > 75 % inside
+    entry..exit (retained, flagged)."""
     idx = {d: i for i, d in enumerate(sessions)}
     px = {s: g.set_index("date") for s, g in bars.groupby("symbol")}
     bpx = {k: v.set_index("date") for k, v in bench.items()}
-    counts = {"DATA_MISSING": 0, "BENCH_MISSING": 0, "BEYOND_DEV_END": 0, "SUSPECT_ADJUSTMENT": 0}
+    counts = {"DATA_MISSING_ENTRY": 0, "DATA_MISSING_EXIT": 0, "BENCH_MISSING": 0, "BEYOND_DEV_END": 0,
+              "SUSPECT_ADJUSTMENT": 0}
+    nan = float("nan")
     out = []
     for r in ev.itertuples(index=False):
         g = px.get(r.symbol)
@@ -150,8 +155,15 @@ def outcomes(ev: pd.DataFrame, bars: pd.DataFrame, bench: dict[str, pd.DataFrame
                 counts["BEYOND_DEV_END"] += 1
                 continue
             d1 = sessions[i0 + k]
-            if g is None or r.entry_date not in g.index or d1 not in g.index:
-                counts["DATA_MISSING"] += 1
+            if g is None or r.entry_date not in g.index:
+                counts["DATA_MISSING_ENTRY"] += 1
+                continue
+            if d1 not in g.index:
+                counts["DATA_MISSING_EXIT"] += 1
+                out.append({"event_type": r.event_type, "symbol": r.symbol, "entry_date": r.entry_date,
+                            "bucket": r.bucket, "horizon": h, "ret_raw": nan, "ret_spy_rel": nan,
+                            "ret_sector_rel": nan, "benchmark": None, "suspect_adjustment": False,
+                            "missing_exit": True})
                 continue
             ret = g.at[d1, "close"] / g.at[r.entry_date, "open"] - 1.0
             sec = symbol_bench.get(r.symbol, "SPY")
@@ -168,7 +180,7 @@ def outcomes(ev: pd.DataFrame, bars: pd.DataFrame, bench: dict[str, pd.DataFrame
             counts["SUSPECT_ADJUSTMENT"] += suspect
             out.append({"event_type": r.event_type, "symbol": r.symbol, "entry_date": r.entry_date, "bucket": r.bucket,
                         "horizon": h, "ret_raw": ret, "ret_spy_rel": ret - br["SPY"], "ret_sector_rel": ret - br[sec],
-                        "benchmark": sec, "suspect_adjustment": suspect})
+                        "benchmark": sec, "suspect_adjustment": suspect, "missing_exit": False})
     return pd.DataFrame(out), counts
 
 

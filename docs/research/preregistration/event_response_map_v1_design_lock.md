@@ -1,6 +1,58 @@
 # EVENT_RESPONSE_MAP_V1: design lock (Gate C)
 
-**Status:** DESIGN_LOCKED, fingerprint `0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546` (locked 2026-10-01T00:18:20Z). **No price data exists** for this program at lock time.
+## Revision 2 (owner, Gate C, 2026-10-01; no data existed, so re-locking was allowed)
+
+The owner approved decisions 1–4 at Gate C:
+1. Raw as-traded D-1 data is used **for ELIGIBILITY ONLY**. Returns stay `adjustment=all`.
+2. Gaps enter at the D+1 open.
+3. 8-K acceptance time is read conservatively (the later of the UTC and ET readings).
+4. The cost test is directional.
+
+Revision 2 makes only the following changes:
+
+| # | Change |
+|---|---|
+| R1 | **Instrument filter**, applied before any price download and frozen as `candidates_r1.json` (sha256 pinned):<br>• R1a: a candidate with no known name is kept only if it maps to a CIK with a 10-K, 10-K/A, 10-Q or 10-Q/A filed 2019–2023 (EDGAR `master.idx`, 2019Q1–2023Q4).<br>• R1b: any candidate whose CIK has SIC 6770 (blank checks; current EDGAR SIC) is excluded. |
+| R2 | **Null calibration.** If any NO_EVENT cell is SCREEN_PASS, the map is classified MAP_MISCALIBRATED and every nomination is blocked until that is explained. The NO_EVENT pass count is the **first line** of `report.md`. |
+| R3 | **Missing exits.** Each cell reports its missing-exit rate (entry bar present, exit bar absent). A cell above **2 %** cannot be SCREEN_PASS. Cells at or below 2 % also get a **non-gating** bound sensitivity that fills missing exits two ways: (LONG −100 %, SHORT 0 %) and the mirror (LONG 0 %, SHORT −100 %). |
+| R4 | **Coverage.** The D0 report breaks out by **liquidity bucket × year**: eligible symbol-days, distinct symbols, ALL-bar present rate and missing-exit rate. This is in addition to the source and point-in-time S&P 500 breakdowns. |
+| R5 | **Off-hours guard.** Alpaca and SEC calls are refused on weekdays between **09:00 and 16:30 America/New_York**, using `zoneinfo` so it follows DST (US DST ends 2026-11-01). |
+| Schedule | Phase D runs on **Sat 2026-10-03 or Sun 2026-10-04**, while the live engine is in CLOSED phase, with `--go --eligibility-raw-approved`. |
+
+### R1 result (metadata only: SEC archive of 5,844 files, 185 MB, fetched 2026-10-01 07:23–08:02Z)
+
+| Count | Value |
+|---|---|
+| Candidates in | 10,772 |
+| R1a removed: no known name | **3,467** |
+| … of which no CIK | 3,415 |
+| … of which a CIK with no 10-K or 10-Q in 2019–2023 | 52 |
+| R1b removed: SIC 6770 | **279** |
+| Removed by both rules | 1 |
+| **Removed in total** | **3,745** |
+| **Kept** | **7,027** |
+| Kept with no known name (they passed R1a) | 85 of 3,552 |
+| Kept with a mapped CIK but unknown SIC | 170 |
+| CIK methods | SEC_TICKERS 5,638; RENAME_CHAIN 592; UNIQUE_NAME_MATCH 197; UNMAPPED 4,345 |
+
+**Side effect: R1a removes former S&P 500 members.** It removes **47 of the 614** point-in-time S&P 500 members (any day, 2019–2023), every one of them as R1A_UNNAMED_NO_CIK. Examples: BK, MMC, AVB, EQR, EA, HES, WBA, K, ATVI, TWTR, SIVB, FRC, PXD and JNPR.
+
+These are common stocks. They fail R1a only because their ticker changed or they were delisted after 2023: BK is now BNY and MMC is now MRSH, so neither SEC's current ticker map nor Alpaca carries the old symbol.
+
+Point-in-time S&P 500 coverage after R1:
+
+| Year | Coverage |
+|---|---|
+| 2019 | 91.74 % |
+| 2020 | 92.94 % |
+| 2021 | 92.95 % |
+| 2022 | 93.35 % |
+| 2023 | 94.82 % |
+
+Before R1 it was 93.6–95.2 % (metadata). This is a survivorship bias against names renamed or delisted after 2023. It is recorded here and raised to the owner.
+
+
+**Status:** DESIGN_LOCKED, **revision 2** (fingerprint in `design_lock.json` and the commit message; supersedes rev 1 `067ed29` / `0b379979…`). **No price data exists** for this program at lock time.
 
 | Item | Value |
 |---|---|

@@ -1,20 +1,26 @@
 {
  "program": "EVENT_RESPONSE_MAP_V1",
- "status": "DESIGN_LOCKED_GATE_C (no price data exists)",
- "locked_at_utc": "2026-10-01T00:18:20+00:00",
+ "status": "DESIGN_LOCKED_GATE_C_REV2 (no price data exists)",
+ "lock_revision": 2,
+ "supersedes": {
+  "rev1_commit": "067ed29",
+  "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546"
+ },
+ "locked_at_utc": "2026-10-01T08:03:17+00:00",
  "branch": "research/event_response_map_v1",
- "base_sha": "7e2d29ee1454bb4c901f5df2823e12b265603618",
- "fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
+ "base_sha": "525d1c5c8929ccb0f9f0c8868e87bfdf91f10dc9",
+ "fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22",
  "file_sha256": {
   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
-  "research/event_response_map_v1/spec.py": "d02c990a1030c7325399acadf136e7540e3450f304480ca487e018dbedcadf4e",
-  "research/event_response_map_v1/data.py": "654b70574852c2d723417544237f8b423599ad9c902e6d199726763d527d7918",
+  "research/event_response_map_v1/spec.py": "af9efaeff99d9f495b38c25ad5fe19b5a64dfc01457b723793d280c2424b62f4",
+  "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
-  "research/event_response_map_v1/events.py": "c043c547bd3cc8b8a4315d95fc050c80f009540c2cc31b8bd13a32be986d38d4",
-  "research/event_response_map_v1/metrics.py": "545bf95867efe09b85c269244590563f09901983afd1bd44abb30508d5184b47",
-  "research/event_response_map_v1/phase_d.py": "f33ebadd95d1fbf73ad6f8e5e29d28eabc3b7cb1b7afb8996105fe398c914f5a",
-  "research/event_response_map_v1/fingerprint.py": "9fba15460af58af07a63d8949e0f2b27c6c361f557784aa3d2ba7324c15ccf84",
+  "research/event_response_map_v1/events.py": "cc41bef5b5569e5485d4b4bc7bb526d162e2d38828bfc690a88b6be1aca43f8f",
+  "research/event_response_map_v1/metrics.py": "9172acfca4662f7d70012a61b19b1fb2ea5352300c9522b3aacaac527aeca07d",
+  "research/event_response_map_v1/phase_d.py": "ff9d608b4959ddc3e405156724dcf4a96a096bedcba4ea24a1101c9dd5c3126d",
+  "research/event_response_map_v1/instrument_filter.py": "622df0bd9bdb34ff945583db1bf8851241dd68f31ef1f6e5acaea48d8db408d3",
+  "research/event_response_map_v1/fingerprint.py": "070efd762efec52f9265e307646a0b3a84146e33ba31df8686bf31b4befb8fe6",
   "docs/research/preregistration/rs_sector_mapping_v1.json": "7ac052e08e35059acf92b26c28f892aabf10f8aee25b996b8f0a4381a66bd21b",
   "talonx_v2/cluster_engine.py": "874300546772ecc9b7ef43db15ce92dca1bfc82acc8834a44be92f2401eb4d8b",
   "talonx_v2/config.py": "fdc361612e57102ed55daa472d8f02cf59e65a9baeb572350c75c3a4704efa56",
@@ -26,6 +32,27 @@
  },
  "candidates_sha256": "a865fce26673a4fbf5df3819c1456fb100d2bfb53432af632bc8ef69e1e1f61c",
  "candidates_sha256_note": "sha256 of LF-normalized bytes",
+ "candidates_r1_sha256": "9d57afdd8ad15f6544600af25fe55437135a6d9da052d0146dbd04e9ca61de25",
+ "r1_instrument_filter_counts": {
+  "R1a_unnamed_cik_without_10k_10q": 52,
+  "R1a_unnamed_no_cik": 3415,
+  "R1a_unnamed_removed": 3467,
+  "R1b_sic_6770_removed": 279,
+  "candidates_in": 10772,
+  "cik_methods": {
+   "RENAME_CHAIN": 592,
+   "SEC_TICKERS": 5638,
+   "UNIQUE_NAME_MATCH": 197,
+   "UNMAPPED": 4345
+  },
+  "kept": 7027,
+  "mapped_cik_sic_unknown": 170,
+  "mapped_ciks": 5821,
+  "removed_by_both": 1,
+  "removed_total": 3745,
+  "unnamed_in": 3552,
+  "unnamed_kept": 85
+ },
  "candidates": {
   "total": 10772,
   "source_counts": {
@@ -101,6 +128,17 @@
  "spec": {
   "program": "EVENT_RESPONSE_MAP_V1",
   "status": "DISCOVERY_ONLY -- nothing produced by this program is validated; at most ONE hypothesis may later be nominated, frozen and pre-registered in a separate task",
+  "lock_revision": 2,
+  "revision_2_changes (owner, Gate C; no data existed)": {
+   "approved_decisions": "1 raw as-traded D-1 data for ELIGIBILITY ONLY (returns stay adjustment=all); 2 gap entry D+1 open; 3 8-K conservative dual acceptance reading; 4 directional cost test",
+   "R1_instrument_filter": "a candidate WITHOUT a known name is kept only if it maps to a CIK with a 10-K/10-K/A/10-Q/10-Q/A filed 2019-01-01..2023-12-31 (EDGAR full-index master.idx 2019Q1-2023Q4); ANY candidate whose mapped CIK has SIC 6770 (blank checks; current EDGAR SIC) is excluded; applied before any price download; frozen as candidates_r1.json (sha256 pinned); counts per rule reported",
+   "R1_result": "10,772 in -> 7,027 kept; removed 3,745 = R1a 3,467 (3,415 unnamed with no CIK + 52 unnamed CIK without 10-K/10-Q) + R1b 279 (SIC 6770), 1 removed by both; SIDE EFFECT: R1a removes 47 of 614 PIT S&P 500 members 2019-2023 (e.g. BK, MMC, AVB, EQR, EA, HES, WBA) whose tickers changed or delisted after 2023; PIT S&P coverage after R1: 2019 91.74 %, 2020 92.94 %, 2021 92.95 %, 2022 93.35 %, 2023 94.82 %",
+   "R2_null_calibration": "if ANY NO_EVENT cell is SCREEN_PASS the map is MAP_MISCALIBRATED and no candidate may be nominated until explained (all nominatable flags forced False); the NO_EVENT SCREEN_PASS count is the FIRST line of report.md",
+   "R3_missing_exits": "per cell missing_exit_rate = exits missing (entry bar present, exit bar absent) / (valid + missing); a cell with > 2 % cannot be SCREEN_PASS; for cells <= 2 % a NON-GATING bound sensitivity fills missing exits with (LONG -100 %, SHORT 0 %) and the mirror (LONG 0 %, SHORT -100 %) as sector-relative values",
+   "R4_coverage": "the D0 bar-coverage report breaks out by liquidity bucket x year (eligible symbol-days, distinct symbols, ALL-bar present rate, missing-exit rate), in addition to sources and the PIT S&P 500",
+   "R5_off_hours": "Alpaca and SEC network calls refused on a weekday between 09:00 and 16:30 America/New_York (regular hours +/- 30 min, zoneinfo, DST-aware; US DST ends 2026-11-01)",
+   "phase_d_schedule": "weekend (Sat 2026-10-03 or Sun 2026-10-04), live engine in CLOSED phase, --eligibility-raw-approved"
+  },
   "periods": {
    "DEVELOPMENT_events": [
     "2019-01-02",
@@ -153,9 +191,10 @@
    "cik_and_sic": "CIK: SEC company_tickers.json (current); a pre-rename ticker (source B) inherits the CIK of its new_symbol; else an exact normalized-name match (upper-case, punctuation and INC/CORP/CO/LTD/PLC/HOLDINGS suffixes removed) in SEC cik-lookup-data.txt, accepted only if UNIQUE; a mapping is kept only if that CIK has >= 1 EDGAR filing dated 2019-01-02..2023-12-29 (guards against recycled tickers), else UNMAPPED_INACTIVE_CIK; SIC from EDGAR submissions JSON. No CIK -> no 8-K events for that symbol and SIC unknown -> benchmark SPY (per SIC_ETF_MAP_V1 default). Both counts are reported."
   },
   "data": {
-   "returns_and_benchmarks": "Alpaca SIP 1Day adjustment=all for equities, SPY and sector ETFs (XLE, XBI, XLV, XLK, XLI, XLF) -- ONE downloader module (research/event_response_map_v1/data.py), identical parameters",
+   "returns_and_benchmarks": "Alpaca SIP 1Day adjustment=all for equities, SPY and sector ETFs (XLE, XBI, XLV, XLK, XLI, XLF) -- ONE downloader module (research/event_response_map_v1/data.py), identical parameters; only R1-kept candidates are requested",
+   "off_hours": "R5: weekday 09:00-16:30 America/New_York refused for Alpaca and SEC",
    "eligibility_only": "same downloader module, adjustment=raw, purpose=ELIGIBILITY_ONLY (see universe.eligibility_D_minus_1.owner_approval_required)",
-   "filings": "EDGAR submissions JSON per CIK (items + acceptanceDateTime); SEC Form 3/4/5 quarterly bulk 2019Q1-2023Q4 for FORM4_CLUSTER",
+   "filings": "EDGAR submissions JSON per CIK (items + acceptanceDateTime + sic); EDGAR full-index master.idx 2019Q1-2023Q4 (R1 periodic-filer test); SEC Form 3/4/5 quarterly bulk 2019Q1-2023Q4 for FORM4_CLUSTER",
    "archive": "archived bytes are authoritative; manifest with per-file sha256, aggregate hash, download UTC, missing / duplicate sessions, 0 synthetic bars"
   },
   "events": {
@@ -217,8 +256,10 @@
     "mean sector-relative gross IN THE CELL'S DIRECTION >= 2 x bucket cost (i.e. |mean| >= 2x cost with the sign matching the direction; LONG/SHORT cells are mirrors, so 390 cells = 195 independent sign tests and a pair can pass at most once)",
     "date-cluster 95 % CI of mean sector-relative gross excludes zero on the side of the mean",
     "sign of yearly mean sector-relative gross equals the overall sign in >= 4 of 5 development years",
-    "removing the top 5 trades (by sector-relative gross in the cell's direction) does not flip the sign"
+    "removing the top 5 trades (by sector-relative gross in the cell's direction) does not flip the sign",
+    "R3: missing-exit rate <= 2 %"
    ],
+   "null_calibration": "R2: any NO_EVENT SCREEN_PASS -> MAP_MISCALIBRATED, nomination blocked until explained",
    "scope": "a screening rule for THIS program only, not a permanent TalonX law",
    "non_nominatable": [
     "FORM4_CLUSTER (known unsupported baseline)",
@@ -229,7 +270,7 @@
   "cells": "13 event types x 2 directions x 5 horizons x 3 liquidity buckets = 390",
   "integrity_tolerances": {
    "synthetic_bars": "NONE -- no interpolation, no forward fill",
-   "missing_bar": "an event lacking its entry-open or exit-close bar (stock or benchmark) is dropped from that horizon cell and counted as DATA_MISSING",
+   "missing_bar": "missing entry-open bar -> dropped, DATA_MISSING_ENTRY; missing benchmark bar -> dropped, BENCH_MISSING; missing exit-close bar (entry present) -> DATA_MISSING_EXIT, kept as a flagged row for the R3 rate/gate/bounds, excluded from every metric",
    "duplicate_session": "a symbol-session with duplicate daily rows is excluded entirely and counted",
    "suspect_adjustment": "|close_t / close_{t-1} - 1| > 75 % on ALL bars inside an event's entry..exit window -> event RETAINED, flagged SUSPECT_ADJUSTMENT, counted; a pre-declared NON-GATING sensitivity (flagged events excluded) is reported",
    "eligibility_raw_missing": "no as-traded D-1 bar -> not eligible that day",
@@ -240,8 +281,8 @@
  },
  "data_plan": {
   "alpaca": {
-   "symbols": 10779,
-   "equity_candidates": 10772,
+   "symbols": 7034,
+   "equity_candidates_after_R1": 7027,
    "benchmarks": [
     "SPY",
     "XLE",
@@ -258,39 +299,36 @@
    "timeframe": "1Day",
    "feed": "sip",
    "batch": 100,
-   "batches_per_pass": 108,
+   "batches_per_pass": 71,
    "passes": {
     "RETURNS (adjustment=all, equities+benchmarks)": [
-     756,
-     1404
+     497,
+     923
     ],
     "ELIGIBILITY_ONLY (adjustment=raw, equities only; needs owner approval)": [
-     756,
-     1404
+     497,
+     923
     ]
    },
    "requests_total_range": [
-    1512,
-    2808
+    994,
+    1846
    ],
    "rate_per_min": 37.5,
    "minutes_range": [
-    40,
-    75
+    27,
+    49
    ]
   },
   "sec": {
    "company_tickers.json": 1,
    "cik-lookup-data.txt": 1,
    "form345_quarterly_zips_2019q1_2023q4": 20,
-   "submissions_json": "one per mapped CIK + older pages overlapping 2019-2023; estimate 8,000-11,000",
-   "rate_per_s": 2.94,
-   "minutes_range": [
-    45,
-    65
-   ]
+   "master_idx_2019q1_2023q4": "20 (already archived at lock rev 2)",
+   "submissions_json": "main file per mapped CIK already archived at lock rev 2 (R1 SIC); Phase D adds only older pages overlapping 2019-2023",
+   "rate_per_s": 2.94
   },
-  "schedule": "OFF-HOURS ONLY, enforced in code for Alpaca AND SEC: weekday 13:00-20:30Z refused. Proposed: stage=download on the first evening after go starting >= 21:00Z (or a weekend), ~2-2.5 h worst case, finishing well before 13:00Z; stage=run reads the archive only (no network for prices).",
+  "schedule": "OWNER: weekend Sat 2026-10-03 or Sun 2026-10-04 (live engine CLOSED phase), --go --eligibility-raw-approved. Code-enforced R5 guard: weekday 09:00-16:30 America/New_York refused for Alpaca and SEC. stage=run reads the archive only.",
   "after_download": "D0 integrity report: per-year bar coverage of candidates and of the PIT S&P 500 reference, missing/duplicate sessions, CIK-method counts, unnamed-symbol count"
  }
 }

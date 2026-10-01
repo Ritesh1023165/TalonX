@@ -10,6 +10,17 @@ STATUS = "DISCOVERY_ONLY -- nothing produced by this program is validated; at mo
 SPEC = {
     "program": PROGRAM,
     "status": STATUS,
+    "lock_revision": 2,
+    "revision_2_changes (owner, Gate C; no data existed)": {
+        "approved_decisions": "1 raw as-traded D-1 data for ELIGIBILITY ONLY (returns stay adjustment=all); 2 gap entry D+1 open; 3 8-K conservative dual acceptance reading; 4 directional cost test",
+        "R1_instrument_filter": "a candidate WITHOUT a known name is kept only if it maps to a CIK with a 10-K/10-K/A/10-Q/10-Q/A filed 2019-01-01..2023-12-31 (EDGAR full-index master.idx 2019Q1-2023Q4); ANY candidate whose mapped CIK has SIC 6770 (blank checks; current EDGAR SIC) is excluded; applied before any price download; frozen as candidates_r1.json (sha256 pinned); counts per rule reported",
+        "R1_result": "10,772 in -> 7,027 kept; removed 3,745 = R1a 3,467 (3,415 unnamed with no CIK + 52 unnamed CIK without 10-K/10-Q) + R1b 279 (SIC 6770), 1 removed by both; SIDE EFFECT: R1a removes 47 of 614 PIT S&P 500 members 2019-2023 (e.g. BK, MMC, AVB, EQR, EA, HES, WBA) whose tickers changed or delisted after 2023; PIT S&P coverage after R1: 2019 91.74 %, 2020 92.94 %, 2021 92.95 %, 2022 93.35 %, 2023 94.82 %",
+        "R2_null_calibration": "if ANY NO_EVENT cell is SCREEN_PASS the map is MAP_MISCALIBRATED and no candidate may be nominated until explained (all nominatable flags forced False); the NO_EVENT SCREEN_PASS count is the FIRST line of report.md",
+        "R3_missing_exits": "per cell missing_exit_rate = exits missing (entry bar present, exit bar absent) / (valid + missing); a cell with > 2 % cannot be SCREEN_PASS; for cells <= 2 % a NON-GATING bound sensitivity fills missing exits with (LONG -100 %, SHORT 0 %) and the mirror (LONG 0 %, SHORT -100 %) as sector-relative values",
+        "R4_coverage": "the D0 bar-coverage report breaks out by liquidity bucket x year (eligible symbol-days, distinct symbols, ALL-bar present rate, missing-exit rate), in addition to sources and the PIT S&P 500",
+        "R5_off_hours": "Alpaca and SEC network calls refused on a weekday between 09:00 and 16:30 America/New_York (regular hours +/- 30 min, zoneinfo, DST-aware; US DST ends 2026-11-01)",
+        "phase_d_schedule": "weekend (Sat 2026-10-03 or Sun 2026-10-04), live engine in CLOSED phase, --eligibility-raw-approved",
+    },
     # ---------------------------------------------------------------------------------------------- C2 periods
     "periods": {
         "DEVELOPMENT_events": ["2019-01-02", "2023-12-29"],
@@ -42,9 +53,10 @@ SPEC = {
     },
     # ---------------------------------------------------------------------------------------------- data (C-DATA)
     "data": {
-        "returns_and_benchmarks": "Alpaca SIP 1Day adjustment=all for equities, SPY and sector ETFs (XLE, XBI, XLV, XLK, XLI, XLF) -- ONE downloader module (research/event_response_map_v1/data.py), identical parameters",
+        "returns_and_benchmarks": "Alpaca SIP 1Day adjustment=all for equities, SPY and sector ETFs (XLE, XBI, XLV, XLK, XLI, XLF) -- ONE downloader module (research/event_response_map_v1/data.py), identical parameters; only R1-kept candidates are requested",
+        "off_hours": "R5: weekday 09:00-16:30 America/New_York refused for Alpaca and SEC",
         "eligibility_only": "same downloader module, adjustment=raw, purpose=ELIGIBILITY_ONLY (see universe.eligibility_D_minus_1.owner_approval_required)",
-        "filings": "EDGAR submissions JSON per CIK (items + acceptanceDateTime); SEC Form 3/4/5 quarterly bulk 2019Q1-2023Q4 for FORM4_CLUSTER",
+        "filings": "EDGAR submissions JSON per CIK (items + acceptanceDateTime + sic); EDGAR full-index master.idx 2019Q1-2023Q4 (R1 periodic-filer test); SEC Form 3/4/5 quarterly bulk 2019Q1-2023Q4 for FORM4_CLUSTER",
         "archive": "archived bytes are authoritative; manifest with per-file sha256, aggregate hash, download UTC, missing / duplicate sessions, 0 synthetic bars",
     },
     # ---------------------------------------------------------------------------------------------- C3 events
@@ -78,7 +90,9 @@ SPEC = {
                                "mean sector-relative gross IN THE CELL'S DIRECTION >= 2 x bucket cost (i.e. |mean| >= 2x cost with the sign matching the direction; LONG/SHORT cells are mirrors, so 390 cells = 195 independent sign tests and a pair can pass at most once)",
                                "date-cluster 95 % CI of mean sector-relative gross excludes zero on the side of the mean",
                                "sign of yearly mean sector-relative gross equals the overall sign in >= 4 of 5 development years",
-                               "removing the top 5 trades (by sector-relative gross in the cell's direction) does not flip the sign"],
+                               "removing the top 5 trades (by sector-relative gross in the cell's direction) does not flip the sign",
+                               "R3: missing-exit rate <= 2 %"],
+        "null_calibration": "R2: any NO_EVENT SCREEN_PASS -> MAP_MISCALIBRATED, nomination blocked until explained",
         "scope": "a screening rule for THIS program only, not a permanent TalonX law",
         "non_nominatable": ["FORM4_CLUSTER (known unsupported baseline)", "NO_EVENT (control)"],
     },
@@ -87,7 +101,7 @@ SPEC = {
     # ---------------------------------------------------------------------------------------------- integrity tolerances
     "integrity_tolerances": {
         "synthetic_bars": "NONE -- no interpolation, no forward fill",
-        "missing_bar": "an event lacking its entry-open or exit-close bar (stock or benchmark) is dropped from that horizon cell and counted as DATA_MISSING",
+        "missing_bar": "missing entry-open bar -> dropped, DATA_MISSING_ENTRY; missing benchmark bar -> dropped, BENCH_MISSING; missing exit-close bar (entry present) -> DATA_MISSING_EXIT, kept as a flagged row for the R3 rate/gate/bounds, excluded from every metric",
         "duplicate_session": "a symbol-session with duplicate daily rows is excluded entirely and counted",
         "suspect_adjustment": "|close_t / close_{t-1} - 1| > 75 % on ALL bars inside an event's entry..exit window -> event RETAINED, flagged SUSPECT_ADJUSTMENT, counted; a pre-declared NON-GATING sensitivity (flagged events excluded) is reported",
         "eligibility_raw_missing": "no as-traded D-1 bar -> not eligible that day",

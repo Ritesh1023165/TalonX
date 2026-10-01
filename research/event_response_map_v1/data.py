@@ -4,7 +4,7 @@ DOWNLOAD layer: every request range is checked by the program's LockedRangeGuard
 LOAD layer:     every loaded frame is checked (range + interior rows) BEFORE it is used.
 Adjustment:     'all' for returns/benchmarks. 'raw' only with purpose=ELIGIBILITY_ONLY and never for a benchmark.
 Rate:           <= 37.5 requests/min (1.6 s spacing) and OFF-HOURS ONLY: refuses to start or continue on a weekday
-                between 13:00 and 20:30 UTC (the live engine shares the IP during 13:30-20:00Z).
+                (America/New_York) between 09:00 and 16:30 ET = regular hours 09:30-16:00 +/- 30 min, DST-aware.
 Archive:        each response body is written verbatim (gzip) and listed in manifest.json with sha256; the archive,
                 not a re-download, is authoritative.
 """
@@ -16,8 +16,9 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, time as dtime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from research.common.locked_range_guard import EVENT_RESPONSE_MAP_V1, HoldoutViolation, LockedRangeGuard, assert_research_path
 
@@ -34,10 +35,14 @@ class MarketHoursRefusal(RuntimeError):
     pass
 
 
+NY = ZoneInfo("America/New_York")
+BLOCK_ET = (dtime(9, 0), dtime(16, 30))          # regular hours 09:30-16:00 ET plus a 30-minute margin
+
+
 def market_hours_blocked(now: datetime) -> bool:
-    """Weekday 13:00-20:30 UTC is blocked (covers 13:30-20:00Z with a 30-min buffer, either DST regime)."""
-    m = now.hour * 60 + now.minute
-    return now.weekday() < 5 and 13 * 60 <= m < 20 * 60 + 30
+    """LOCK REV 2 (R5): blocked on a weekday (in New York) between 09:00 and 16:30 America/New_York, DST-aware."""
+    et = now.astimezone(NY)
+    return et.weekday() < 5 and BLOCK_ET[0] <= et.time() < BLOCK_ET[1]
 
 
 def request_params(symbols: list[str], start: str, end: str, *, purpose: str, page_token: str | None = None) -> dict:
@@ -73,7 +78,7 @@ class Downloader:
 
     def _get(self, params: dict) -> bytes:
         if market_hours_blocked(self.clock()):
-            raise MarketHoursRefusal("off-hours only: weekday 13:00-20:30Z is blocked")
+            raise MarketHoursRefusal("off-hours only: weekday 09:00-16:30 America/New_York is blocked")
         wait = MIN_SPACING_S - (time.monotonic() - self.last)
         if wait > 0:
             self.sleep(wait)

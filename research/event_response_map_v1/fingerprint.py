@@ -16,6 +16,7 @@ LOCKED_FILES = (
     "research/event_response_map_v1/events.py",
     "research/event_response_map_v1/metrics.py",
     "research/event_response_map_v1/phase_d.py",
+    "research/event_response_map_v1/instrument_filter.py",
     "research/event_response_map_v1/fingerprint.py",
     "docs/research/preregistration/rs_sector_mapping_v1.json",
     "talonx_v2/cluster_engine.py",

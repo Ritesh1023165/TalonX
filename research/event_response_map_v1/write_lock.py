@@ -34,11 +34,12 @@ def main() -> dict:
     cand = json.loads((OUT / "candidates.json").read_text())
     audit = json.loads((OUT / "universe_source_audit.json").read_text())
     ca = json.loads((OUT / "ca_audit_v2_development.json").read_text())
-    n = len(cand["symbols"]) + len(D.BENCHMARKS)
+    r1 = json.loads((OUT / "candidates_r1.json").read_text())
+    n = len(r1["kept"]) + len(D.BENCHMARKS)
     batches = math.ceil(n / D.BATCH)
     lo, hi = D.estimate_requests(n, coverage=0.5), D.estimate_requests(n, coverage=1.0)
     plan = {
-        "alpaca": {"symbols": n, "equity_candidates": len(cand["symbols"]), "benchmarks": list(D.BENCHMARKS),
+        "alpaca": {"symbols": n, "equity_candidates_after_R1": len(r1["kept"]), "benchmarks": list(D.BENCHMARKS),
                    "range": [D.DATA_START, D.DATA_END], "timeframe": "1Day", "feed": "sip", "batch": D.BATCH,
                    "batches_per_pass": batches,
                    "passes": {"RETURNS (adjustment=all, equities+benchmarks)": [lo, hi],
@@ -46,22 +47,26 @@ def main() -> dict:
                    "requests_total_range": [2 * lo, 2 * hi], "rate_per_min": 60 / D.MIN_SPACING_S,
                    "minutes_range": [round(2 * lo * D.MIN_SPACING_S / 60), round(2 * hi * D.MIN_SPACING_S / 60)]},
         "sec": {"company_tickers.json": 1, "cik-lookup-data.txt": 1, "form345_quarterly_zips_2019q1_2023q4": 20,
-                "submissions_json": "one per mapped CIK + older pages overlapping 2019-2023; estimate 8,000-11,000",
-                "rate_per_s": round(1 / 0.34, 2), "minutes_range": [45, 65]},
-        "schedule": "OFF-HOURS ONLY, enforced in code for Alpaca AND SEC: weekday 13:00-20:30Z refused. Proposed: "
-                    "stage=download on the first evening after go starting >= 21:00Z (or a weekend), ~2-2.5 h worst "
-                    "case, finishing well before 13:00Z; stage=run reads the archive only (no network for prices).",
+                "master_idx_2019q1_2023q4": "20 (already archived at lock rev 2)",
+                "submissions_json": "main file per mapped CIK already archived at lock rev 2 (R1 SIC); Phase D adds only older pages overlapping 2019-2023",
+                "rate_per_s": round(1 / 0.34, 2)},
+        "schedule": "OWNER: weekend Sat 2026-10-03 or Sun 2026-10-04 (live engine CLOSED phase), "
+                    "--go --eligibility-raw-approved. Code-enforced R5 guard: weekday 09:00-16:30 America/New_York "
+                    "refused for Alpaca and SEC. stage=run reads the archive only.",
         "after_download": "D0 integrity report: per-year bar coverage of candidates and of the PIT S&P 500 reference, "
                           "missing/duplicate sessions, CIK-method counts, unnamed-symbol count",
     }
     base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     lock = {
-        "program": "EVENT_RESPONSE_MAP_V1", "status": "DESIGN_LOCKED_GATE_C (no price data exists)",
+        "program": "EVENT_RESPONSE_MAP_V1", "status": "DESIGN_LOCKED_GATE_C_REV2 (no price data exists)",
+        "lock_revision": 2, "supersedes": {"rev1_commit": "067ed29", "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546"},
         "locked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "branch": "research/event_response_map_v1", "base_sha": base,
         "fingerprint": fingerprint(ROOT), "file_sha256": file_hashes(ROOT),
         "candidates_sha256": lf_sha256(OUT / "candidates.json"),
         "candidates_sha256_note": "sha256 of LF-normalized bytes",
+        "candidates_r1_sha256": lf_sha256(OUT / "candidates_r1.json"),
+        "r1_instrument_filter_counts": r1["counts"],
         "candidates": {"total": len(cand["symbols"]), "source_counts": cand["source_counts"],
                        "only_from": cand["only_from"], "named": len(cand["names"])},
         "universe_coverage_vs_pit_sp500_metadata": {y: {k: v[k] for k in ("sp500_members_any_day", "coverage_pct", "missing")}

@@ -7,6 +7,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -48,9 +49,22 @@ def test_downloader_refuses_market_hours(tmp_path):
     with pytest.raises(D.MarketHoursRefusal):
         dl.pass_(["AAA"], purpose="RETURNS")
     assert calls == []
-    assert D.market_hours_blocked(datetime(2026, 10, 1, 20, 29, tzinfo=UTC))
-    assert not D.market_hours_blocked(datetime(2026, 10, 1, 20, 30, tzinfo=UTC))
-    assert not D.market_hours_blocked(datetime(2026, 10, 3, 15, 0, tzinfo=UTC))       # Saturday
+
+
+@pytest.mark.parametrize("utc,blocked", [
+    # EDT (UTC-4): block 13:00-20:30Z
+    (datetime(2026, 10, 1, 12, 59, tzinfo=UTC), False), (datetime(2026, 10, 1, 13, 0, tzinfo=UTC), True),
+    (datetime(2026, 10, 1, 20, 29, tzinfo=UTC), True), (datetime(2026, 10, 1, 20, 30, tzinfo=UTC), False),
+    # EST (UTC-5) after DST ends 2026-11-01: block 14:00-21:30Z -- a fixed-UTC rule would get these wrong
+    (datetime(2026, 11, 2, 13, 30, tzinfo=UTC), False), (datetime(2026, 11, 2, 14, 0, tzinfo=UTC), True),
+    (datetime(2026, 11, 2, 21, 0, tzinfo=UTC), True), (datetime(2026, 11, 2, 21, 30, tzinfo=UTC), False),
+    # weekend in New York (Saturday) and Friday-evening UTC that is still Friday in New York
+    (datetime(2026, 10, 3, 15, 0, tzinfo=UTC), False), (datetime(2026, 10, 2, 19, 0, tzinfo=UTC), True),
+    # Monday 01:00Z is Sunday evening in New York -> allowed
+    (datetime(2026, 10, 5, 1, 0, tzinfo=UTC), False),
+])
+def test_r5_off_hours_guard_is_new_york_time_and_dst_aware(utc, blocked):
+    assert D.market_hours_blocked(utc) is blocked
 
 
 def test_adjustment_per_purpose_and_benchmarks_never_raw():
@@ -196,7 +210,7 @@ def test_outcomes_horizons_relative_returns_and_integrity():
     h1 = obs[obs["horizon"] == "H1"].iloc[0]
     assert h1["ret_raw"] == pytest.approx(10.6 / 10 - 1)
     assert h1["ret_spy_rel"] == pytest.approx(0.06 - 0.01) and h1["ret_sector_rel"] == pytest.approx(0.06)
-    assert cnt["DATA_MISSING"] == 5 and len(obs) == 5
+    assert cnt["DATA_MISSING_ENTRY"] == 5 and len(obs) == 5 and not obs["missing_exit"].any()
     late = pd.DataFrame([{"event_type": "GAP_UP_3", "symbol": "AAA", "entry_date": date(2023, 12, 26), "bucket": "L1"}])
     s2 = sessions(10, date(2023, 12, 20))
     px2 = pd.DataFrame({"symbol": "AAA", "date": s2, "open": 1.0, "close": 1.0})
@@ -296,3 +310,125 @@ def test_design_lock_matches_code_when_present():
     assert F.lf_sha256(F.ROOT / "results/event_response_map_v1/candidates.json") == lock["candidates_sha256"]
 
 
+
+
+# ------------------------------------------------------------------------------------------------ LOCK REV 2
+def test_r1_master_idx_parse_and_instrument_filter():
+    from research.event_response_map_v1 import instrument_filter as R1
+    idx = ("Description: Master Index\n--------\n"
+           "1|ALPHA INC|10-K|2020-03-01|edgar/data/1/a.txt\n"
+           "2|BETA SPAC|10-Q/A|2018-12-31|edgar/data/2/b.txt\n"          # outside 2019-2023
+           "3|GAMMA|8-K|2021-05-05|edgar/data/3/c.txt\n"
+           "4|DELTA|10-Q|2023-12-29|edgar/data/4/d.txt\n")
+    periodic, any_ = R1.parse_master_idx(idx)
+    assert periodic == {"0000000001", "0000000004"} and any_ == {"0000000001", "0000000003", "0000000004"}
+    cand = {"symbols": {"NAMD": ["A"], "UNA": ["C"], "UNB": ["C"], "UNC": ["C"], "SPAC": ["A"], "UND": ["C"]},
+            "names": {"NAMD": "Named Corp", "SPAC": "Blank Check Acquisition Corp"}}
+    cmap = {"NAMD": (None, "UNMAPPED"), "UNA": ("0000000001", "SEC_TICKERS"), "UNB": ("0000000003", "SEC_TICKERS"),
+            "UNC": (None, "UNMAPPED"), "SPAC": ("0000000004", "SEC_TICKERS"), "UND": ("0000000004", "SEC_TICKERS")}
+    doc = R1.apply(cand, cmap, periodic, {"0000000001": "3674", "0000000004": "6770"})
+    assert doc["kept"] == ["NAMD", "UNA"]                         # named+unmapped kept; unnamed periodic filer kept
+    assert doc["removed"] == {"SPAC": ["R1B_SIC_6770"], "UNB": ["R1A_UNNAMED_CIK_NO_10K_10Q_2019_2023"],
+                              "UNC": ["R1A_UNNAMED_NO_CIK"], "UND": ["R1B_SIC_6770"]}
+    c = doc["counts"]
+    assert (c["R1a_unnamed_removed"], c["R1a_unnamed_no_cik"], c["R1a_unnamed_cik_without_10k_10q"],
+            c["R1b_sic_6770_removed"], c["removed_total"]) == (2, 1, 1, 2, 4)
+
+
+def _cell_obs(n_valid, n_missing, value=0.02):
+    rows = []
+    for i in range(n_valid + n_missing):
+        miss = i >= n_valid
+        d = date(2019 + (i % 5), 1, 2) + timedelta(days=i // 5 % 300)
+        rows.append({"symbol": f"S{i % 60}", "entry_date": d, "missing_exit": miss,
+                     "ret_raw": float("nan") if miss else value + (0.01 if i % 2 else -0.005),
+                     "ret_spy_rel": float("nan") if miss else value, "ret_sector_rel": float("nan") if miss else value + (0.01 if i % 2 else -0.005)})
+    return pd.DataFrame(rows)
+
+
+def test_r3_missing_exit_rate_gates_screen_and_is_excluded_from_metrics():
+    ok = M.cell_metrics(_cell_obs(1000, 20), "LONG", "L3", n_resamples=200)        # 1.96 %
+    assert ok["n"] == 1000 and ok["n_missing_exit"] == 20 and ok["missing_exit_rate"] == pytest.approx(20 / 1020)
+    assert np.isfinite(ok["mean_sector_relative"])
+    s_ok = M.screen(ok, "GAP_UP_3")
+    assert s_ok["criteria"]["missing_exit_rate_le_2pct"] and s_ok["SCREEN_PASS"]
+    bad = M.cell_metrics(_cell_obs(1000, 25), "LONG", "L3", n_resamples=200)       # 2.44 %
+    s_bad = M.screen(bad, "GAP_UP_3")
+    assert not s_bad["criteria"]["missing_exit_rate_le_2pct"] and not s_bad["SCREEN_PASS"]
+    assert "missing_exit_bounds" not in bad                                      # bounds only for remaining cells
+
+
+def test_r3_bound_sensitivity_values_and_is_non_gating():
+    m = M.cell_metrics(_cell_obs(1000, 20), "LONG", "L3", n_resamples=200)
+    b = m["missing_exit_bounds"]
+    x = m["mean_sector_relative"]
+    assert b["BOUND_LONG_MINUS100_SHORT_0"]["mean_sector_relative"] == pytest.approx((1000 * x - 20) / 1020)
+    assert b["BOUND_MIRROR_LONG_0_SHORT_MINUS100"]["mean_sector_relative"] == pytest.approx(1000 * x / 1020)
+    for v in b.values():
+        assert v["mean_ge_2x_cost"] == (v["mean_sector_relative"] >= 2 * 12 / 1e4)
+    assert M.screen(m, "GAP_UP_3")["SCREEN_PASS"]                               # ... but the bound never gates
+    sh = M.cell_metrics(_cell_obs(1000, 20), "SHORT", "L3", n_resamples=200)["missing_exit_bounds"]
+    assert sh["BOUND_LONG_MINUS100_SHORT_0"]["mean_sector_relative"] == pytest.approx(-1000 * x / 1020)
+    assert sh["BOUND_MIRROR_LONG_0_SHORT_MINUS100"]["mean_sector_relative"] == pytest.approx((-1000 * x - 20) / 1020)
+
+
+def test_r3_outcomes_emit_flagged_missing_exit_rows():
+    ss = sessions(20)
+    px = pd.DataFrame({"symbol": "AAA", "date": ss[:8], "open": 10.0, "close": 10.0})        # delisted after ss[7]
+    spy = pd.DataFrame({"symbol": "SPY", "date": ss, "open": 100.0, "close": 100.0})
+    ev = pd.DataFrame([{"event_type": "GAP_UP_3", "symbol": "AAA", "entry_date": ss[5], "bucket": "L1"}])
+    obs, cnt = E.outcomes(ev, px, {"SPY": spy}, {}, ss)
+    assert dict(zip(obs["horizon"], obs["missing_exit"])) == {"H0": False, "H1": False, "H3": True, "H5": True,
+                                                             "H10": True}
+    assert cnt["DATA_MISSING_EXIT"] == 3 and obs.loc[obs["missing_exit"], "ret_sector_rel"].isna().all()
+
+
+def _ledger(no_event_pass: bool):
+    led = M.evaluate(pd.DataFrame(columns=["event_type", "horizon", "bucket", "symbol", "entry_date", "ret_raw",
+                                           "ret_spy_rel", "ret_sector_rel", "missing_exit"]), n_resamples=10)
+    for c in led:
+        if c["cell"] in ("GAP_UP_5|LONG|H1|L2", "NO_EVENT|LONG|H3|L1") and (no_event_pass or c["event_type"] != "NO_EVENT"):
+            c["screen"]["SCREEN_PASS"] = True
+            c["screen"]["nominatable"] = c["event_type"] not in E.NON_NOMINATABLE
+    return led
+
+
+def test_r2_any_no_event_pass_marks_map_miscalibrated_and_blocks_nomination():
+    led = _ledger(True)
+    cal = M.classify(led)
+    assert cal["no_event_screen_pass"] == 1 and cal["classification"] == "MAP_MISCALIBRATED"
+    assert not cal["nomination_allowed"] and cal["nominatable_cells"] == 0
+    assert all(not c["screen"]["nominatable"] for c in led)
+    clean = M.classify(_ledger(False))
+    assert clean["classification"] == "NULL_CALIBRATION_CLEAN" and clean["nominatable_cells"] == 1
+
+
+def test_r2_report_md_first_line_is_no_event_pass_count():
+    from research.event_response_map_v1 import phase_d as P
+    led = _ledger(True)
+    for c in led:          # give passing cells printable metrics
+        if c["screen"]["SCREEN_PASS"]:
+            c["metrics"].update({"n": 400, "distinct_dates": 200, "mean_sector_relative": 0.01, "ci_low": 0.002,
+                                 "ci_high": 0.02, "missing_exit_rate": 0.0})
+    md = P.report_md(M.classify(led), led, {"DATA_MISSING_EXIT": 0})
+    assert md.splitlines()[0].startswith("**NO_EVENT SCREEN_PASS: 1 of 30**") and "MAP_MISCALIBRATED" in md.splitlines()[0]
+
+
+def test_r4_coverage_breaks_out_by_bucket_and_year():
+    from research.event_response_map_v1 import phase_d as P
+    elig = pd.DataFrame([{"symbol": "A", "date": date(2019, 3, 1), "eligible": True, "bucket": "L1"},
+                         {"symbol": "A", "date": date(2019, 3, 4), "eligible": True, "bucket": "L1"},
+                         {"symbol": "B", "date": date(2020, 3, 2), "eligible": True, "bucket": "L3"},
+                         {"symbol": "C", "date": date(2020, 3, 2), "eligible": False, "bucket": None}])
+    eq = pd.DataFrame({"symbol": ["A", "B"], "date": [date(2019, 3, 1), date(2020, 3, 2)]})
+    obs = pd.DataFrame({"bucket": ["L1", "L1"], "entry_date": [date(2019, 3, 1)] * 2, "missing_exit": [True, False]})
+    cov = P.bucket_year_coverage(eq, elig, obs)
+    assert cov["L1|2019"] == {"eligible_symbol_days": 2, "distinct_symbols": 1, "all_bar_present_rate": 0.5,
+                              "missing_exit_rate": 0.5}
+    assert cov["L3|2020"]["all_bar_present_rate"] == 1.0 and set(cov) == {"L1|2019", "L3|2020"}
+
+
+def test_lock_revision_2_recorded_in_spec():
+    from research.event_response_map_v1.spec import SPEC
+    assert SPEC["lock_revision"] == 2
+    assert any(k.startswith("revision_2_changes") for k in SPEC)

@@ -1,6 +1,7 @@
 """EVENT_RESPONSE_MAP_V1 Phase D orchestrator -- LOCKED at Gate C, runs only after the owner's "go".
 
-  python -m research.event_response_map_v1.phase_d --go --eligibility-raw-approved [--stage download|run]
+  python -m research.event_response_map_v1.phase_d --go --eligibility-raw-approved --stage download|run
+  python -m research.event_response_map_v1.phase_d --stage r1-metadata     (lock rev 2, SEC metadata only, no go)
 
 Refuses unless: --go is given, the design-lock fingerprint verifies, candidates.json matches its locked sha256, and the
 raw ELIGIBILITY_ONLY pull is explicitly approved. Alpaca is called only through data.Downloader (guarded, off-hours,
@@ -23,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from research.common.locked_range_guard import EVENT_RESPONSE_MAP_V1, LockedRangeGuard  # noqa: E402
-from research.event_response_map_v1 import data as D, events as E, metrics as M, universe as U  # noqa: E402
+from research.event_response_map_v1 import data as D, events as E, instrument_filter as R1, metrics as M, universe as U  # noqa: E402
 from research.event_response_map_v1.fingerprint import lf_sha256, verify  # noqa: E402
 
 OUT = ROOT / "results" / "event_response_map_v1"
@@ -44,8 +45,12 @@ def preflight(args) -> dict:
     cand_bytes = (OUT / "candidates.json").read_bytes()
     if lf_sha256(OUT / "candidates.json") != lock["candidates_sha256"]:
         raise SystemExit("candidates.json differs from the locked candidate list")
+    if lf_sha256(OUT / "candidates_r1.json") != lock["candidates_r1_sha256"]:
+        raise SystemExit("candidates_r1.json differs from the locked R1-filtered list")
     LockedRangeGuard(EVENT_RESPONSE_MAP_V1).record({"event": "phase_d_preflight", "fingerprint": fp})
-    return json.loads(cand_bytes)
+    cand = json.loads(cand_bytes)
+    cand["r1"] = json.loads((OUT / "candidates_r1.json").read_text())
+    return cand
 
 
 class Sec:
@@ -60,7 +65,7 @@ class Sec:
             return gzip.decompress(p.read_bytes())
         from datetime import datetime, timezone
         if D.market_hours_blocked(datetime.now(timezone.utc)):   # live engine polls SEC from this IP too
-            raise D.MarketHoursRefusal("SEC fetch: off-hours only (weekday 13:00-20:30Z blocked)")
+            raise D.MarketHoursRefusal("SEC fetch: off-hours only (weekday 09:00-16:30 America/New_York blocked)")
         time.sleep(max(0.0, SEC_SPACING_S - (time.monotonic() - self.last)))
         self.last = time.monotonic()
         body = urllib.request.urlopen(urllib.request.Request(url, headers=SEC_UA), timeout=120).read()
@@ -71,7 +76,7 @@ class Sec:
 
 
 def stage_download(cand: dict, headers: dict) -> None:
-    syms = sorted(cand["symbols"])
+    syms = sorted(cand["r1"]["kept"])                       # LOCK REV 2: only R1-kept candidates are downloaded
     dl = D.Downloader(ARCH / "alpaca", headers)
     dl.pass_(syms + list(D.BENCHMARKS), purpose="RETURNS")
     dl.pass_(syms, purpose="ELIGIBILITY_ONLY")
@@ -134,7 +139,6 @@ def stage_run(cand: dict) -> None:
     bench = {b: bars[bars["symbol"] == b] for b in D.BENCHMARKS}
     eq = bars[~bars["symbol"].isin(D.BENCHMARKS)]
     elig = U.eligibility(raw, sessions)
-    (OUT / "d0_coverage.json").write_text(json.dumps(d0_coverage(eq, elig, cand), indent=1))
     sec = Sec(ARCH / "sec")
     cmap = cik_map(cand, sec)
     mapping = json.loads((ROOT / "docs/research/preregistration/rs_sector_mapping_v1.json").read_text())["mapping"]
@@ -179,19 +183,63 @@ def stage_run(cand: dict) -> None:
     ev = E.attach_bucket(E.dedup(ev), elig)
     ev = pd.concat([ev, E.no_event_control(ev, elig, sessions)], ignore_index=True)
     obs, counts = E.outcomes(ev, eq, bench, symbol_bench, sessions)
+    (OUT / "d0_coverage.json").write_text(json.dumps(d0_coverage(eq, elig, cand, obs), indent=1, default=str))
     ledger = M.evaluate(obs)
-    (OUT / "trial_ledger.json").write_text(json.dumps({"cells": ledger, "integrity": {**counts, **dq_all,
+    calib = M.classify(ledger)                              # LOCK REV 2 (R2)
+    (OUT / "trial_ledger.json").write_text(json.dumps({"null_calibration": calib, "cells": ledger, "integrity": {**counts, **dq_all,
         "eligibility_raw": dq_raw, "cik_methods": _count(m for _, m in cmap.values()),
         "unmapped_inactive_cik": inactive}}, indent=1, default=str))
     pd.DataFrame([{"cell": c["cell"], **{k: v for k, v in c["metrics"].items() if k != "per_year"},
                    **c["screen"]["criteria"], "SCREEN_PASS": c["screen"]["SCREEN_PASS"],
                    "nominatable": c["screen"]["nominatable"], "label": c["screen"]["label"]} for c in ledger]
                  ).to_csv(OUT / "cells.csv", index=False)
-    guard.record({"event": "phase_d_run_complete", "cells": len(ledger), "observations": len(obs)})
+    (OUT / "report.md").write_text(report_md(calib, ledger, counts), encoding="utf-8", newline="\n")
+    guard.record({"event": "phase_d_run_complete", "cells": len(ledger), "observations": len(obs),
+                  "classification": calib["classification"]})
 
 
-def d0_coverage(eq, elig, cand: dict) -> dict:
-    """D0: per-year bar availability of candidates (by source) and of the PIT S&P 500 reference; eligible names/year."""
+def report_md(calib: dict, ledger: list[dict], counts: dict) -> str:
+    """LOCK REV 2 (R2): the NO_EVENT SCREEN_PASS count is the FIRST line of report.md."""
+    passed = [c for c in ledger if c["screen"]["SCREEN_PASS"]]
+    lines = [f"**NO_EVENT SCREEN_PASS: {calib['no_event_screen_pass']} of {calib['no_event_cells']}** -> "
+             f"{calib['classification']}" + ("" if calib["nomination_allowed"] else
+                                              " (no candidate may be nominated until explained)"),
+             "", "# EVENT_RESPONSE_MAP_V1 -- Phase D report", "",
+             f"- cells evaluated: {len(ledger)}; SCREEN_PASS: {calib['screen_pass_total']}; "
+             f"nominatable: {calib['nominatable_cells']}",
+             f"- integrity: {json.dumps(counts)}", "",
+             "| cell | n | dates | mean sector-rel | CI | missing exit | label |", "|---|---|---|---|---|---|---|"]
+    for c in passed:
+        m = c["metrics"]
+        lines.append(f"| {c['cell']} | {m['n']} | {m['distinct_dates']} | {m['mean_sector_relative']:+.4f} | "
+                     f"[{m['ci_low']:+.4f}, {m['ci_high']:+.4f}] | {m['missing_exit_rate']:.2%} | {c['screen']['label']} |")
+    return "\n".join(lines) + "\n"
+
+
+def r1_metadata() -> dict:
+    """LOCK REV 2 (R1), METADATA ONLY: CIK mapping, EDGAR master.idx 2019Q1-2023Q4 (10-K/10-Q filers) and the main
+    submissions JSON of every mapped CIK (SIC). Archived in the SEC archive (reused by Phase D). Writes candidates_r1.json."""
+    cand = json.loads((OUT / "candidates.json").read_text())
+    sec = Sec(ARCH / "sec")
+    cmap = cik_map(cand, sec)
+    periodic = set()
+    for q in R1.QUARTERS:
+        body = sec.get(R1.MASTER_URL.format(q), "master_" + q.replace("/", "_") + ".idx")
+        periodic |= R1.parse_master_idx(body.decode("latin-1"))[0]
+    sic = {}
+    for cik in sorted({c for c, _ in cmap.values() if c}):
+        sic[cik] = json.loads(sec.get(f"https://data.sec.gov/submissions/CIK{cik}.json", f"sub_CIK{cik}.json")).get("sic")
+    doc = R1.apply(cand, cmap, periodic, sic)
+    doc["counts"]["cik_methods"] = _count(m for _, m in cmap.values())
+    doc["counts"]["mapped_ciks"] = len(sic)
+    R1.write(doc, OUT / "candidates_r1.json")
+    return doc
+
+
+def d0_coverage(eq, elig, cand: dict, obs=None) -> dict:
+    """D0: per-year bar availability of candidates (by source) and of the PIT S&P 500 reference; eligible names/year.
+    LOCK REV 2 (R4): also broken out by LIQUIDITY BUCKET x YEAR: eligible symbol-days, distinct symbols, share of
+    eligible symbol-days with an ALL-adjusted bar on D, and the event missing-exit rate."""
     import csv
     from research.event_response_map_v1.universe_source import PIT
     yr = eq.assign(y=[d.year for d in eq["date"]]).groupby("y")["symbol"].apply(set).to_dict()
@@ -211,7 +259,23 @@ def d0_coverage(eq, elig, cand: dict) -> dict:
                        "pit_sp500_with_bars_pct": round(100 * len(members.get(y, set()) & have) / max(1, len(members.get(y, set()))), 2),
                        "pit_sp500_without_bars": sorted(members.get(y, set()) - have)[:50],
                        "eligible_symbols": int(ey.get(y, 0))}
+    out["by_bucket_year"] = bucket_year_coverage(eq, elig, obs)
     return out
+
+
+def bucket_year_coverage(eq, elig, obs=None) -> dict:
+    e = elig[elig["eligible"]][["symbol", "date", "bucket"]]
+    have = set(zip(eq["symbol"], eq["date"]))
+    res = {}
+    for (b, y), g in e.assign(y=[d.year for d in e["date"]]).groupby(["bucket", "y"]):
+        pres = sum((s, d) in have for s, d in zip(g["symbol"], g["date"]))
+        res[f"{b}|{y}"] = {"eligible_symbol_days": len(g), "distinct_symbols": int(g["symbol"].nunique()),
+                           "all_bar_present_rate": round(pres / len(g), 6)}
+    if obs is not None and len(obs):
+        o = obs.assign(y=[d.year for d in obs["entry_date"]])
+        for (b, y), g in o.groupby(["bucket", "y"]):
+            res.setdefault(f"{b}|{y}", {})["missing_exit_rate"] = round(float(g["missing_exit"].mean()), 6)
+    return dict(sorted(res.items()))
 
 
 def _count(it) -> dict:
@@ -225,8 +289,11 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--go", action="store_true")
     ap.add_argument("--eligibility-raw-approved", action="store_true")
-    ap.add_argument("--stage", choices=("download", "run"), required=True)
+    ap.add_argument("--stage", choices=("download", "run", "r1-metadata"), required=True)
     args = ap.parse_args(argv)
+    if args.stage == "r1-metadata":
+        print(json.dumps(r1_metadata()["counts"], indent=1))
+        return
     cand = preflight(args)
     if args.stage == "download":
         from research.event_response_map_v1.universe_source import headers
