@@ -402,8 +402,11 @@ class DTU:
     # -- one ingestion cycle ------------------------------------------------------------------------------------
     def active_symbols(self, w, base: list[str], *, members: list[dict], daily: dict[str, list[dict]],
                        sip_as_of: datetime, operator_added: set[str], operator_excluded: set[str],
-                       v2_forced: set[str]) -> tuple[list[str], dict]:
-        """Effective fetch list for this cycle (a subset of ``base`` + operator adds). Any error -> FULL ``base``."""
+                       v2_forced: set[str], defer_write: bool = False) -> tuple[list[str], dict]:
+        """Effective fetch list for this cycle (a subset of ``base`` + operator adds). Any error -> FULL ``base``.
+        ``defer_write`` (2026-10-01, P0 consistent snapshots): the dtu_active row is NOT committed here; it is kept in
+        ``pending_active`` for the caller (ingestion) to write inside the SAME transaction as the cycle's aggregates
+        and as_of, then ``confirm_pending()`` after that commit. The resolution itself is unchanged."""
         now = self.clock()
         try:
             snap = self.ensure_snapshot(w, members, daily)
@@ -432,14 +435,37 @@ class DTU:
             fetch, counts, sweep, fb = list(base), {"effective_active": len(base)}, {}, \
                 f"{type(exc).__name__}: {str(exc)[:200]}"
         changed = fetch != self._last_fetch                  # the symbol list is stored only when it changes
-        self._last_fetch = list(fetch)
-        with self.con:
-            self.con.execute("INSERT OR REPLACE INTO dtu_active VALUES (?,?,?,?,?,?,?)",
-                             (w.window_id, iso(now), len(fetch), json.dumps(counts),
-                              json.dumps(fetch) if changed else None, fb, self.policy.fingerprint()))
+        row = (w.window_id, iso(now), len(fetch), json.dumps(counts), json.dumps(fetch) if changed else None, fb,
+               self.policy.fingerprint())
+        if defer_write:
+            self.pending_active = (row, list(fetch))        # written + confirmed by the caller's cycle transaction
+        else:
+            self._last_fetch = list(fetch)
+            with self.con:
+                self.con.execute("INSERT OR REPLACE INTO dtu_active VALUES (?,?,?,?,?,?,?)", row)
         self.last = {"mode": ACTIVE, "window_id": w.window_id, "effective_active": len(fetch), "counts": counts,
                      "fallback": fb, "sweep": sweep}
         return fetch, self.last
+
+
+    pending_active: tuple | None = None
+
+    def write_pending(self) -> str | None:
+        """Write the deferred dtu_active row on the caller's OPEN transaction (no commit). Returns its cycle_utc."""
+        if self.pending_active is None:
+            return None
+        row, _ = self.pending_active
+        self.con.execute("INSERT OR REPLACE INTO dtu_active VALUES (?,?,?,?,?,?,?)", row)
+        return row[1]
+
+    def confirm_pending(self) -> None:
+        """After the caller's commit: the stored symbol list is now the one to diff against."""
+        if self.pending_active is not None:
+            self._last_fetch = list(self.pending_active[1])
+            self.pending_active = None
+
+    def discard_pending(self) -> None:
+        self.pending_active = None
 
 
 def latest_active(con: sqlite3.Connection, window_id: str) -> dict | None:

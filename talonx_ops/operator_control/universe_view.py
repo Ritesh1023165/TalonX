@@ -17,6 +17,10 @@ class UniverseView:
         self.root = Path(root) if root else REPO_ROOT / "results" / "opportunity"
         p = self.root / "market.db"
         self.m = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5) if p.exists() else None
+        if self.m is not None:
+            # 2026-10-01 (P0): one read transaction per view instance (one Sentinel command) -> every DTU table read
+            # by this view comes from the same committed ingestion generation, never a mix of two cycles.
+            self.m.execute("BEGIN")
         self.wid = window_id
         if self.m is not None and self.wid is None:
             try:
@@ -27,6 +31,14 @@ class UniverseView:
 
     def available(self) -> bool:
         return self.m is not None and self.wid is not None
+
+    def close(self) -> None:
+        if self.m is not None:
+            try:
+                self.m.rollback()
+            finally:
+                self.m.close()
+                self.m = None
 
     def latest(self) -> dict:
         r = self.m.execute("SELECT cycle_utc, n_active, counts_json, fallback_reason FROM dtu_active WHERE window_id=? "

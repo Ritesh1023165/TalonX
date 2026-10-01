@@ -362,6 +362,7 @@ class RuntimeStore:
 # component run loop: lock, deployment boundary, heartbeat, graceful stop flag, crash recording
 # ------------------------------------------------------------------------------------------------------------------
 def _pid_alive(pid: int) -> bool:
+    """Display helper only. NEVER used to decide ownership or liveness (PIDs are reused after a reboot)."""
     try:
         import psutil
         return psutil.pid_exists(pid) and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
@@ -375,6 +376,11 @@ def lock_path(root, name: str) -> Path:
     return d / (name.replace(":", "_") + ".lock")
 
 
+def pid_path(root, name: str) -> Path:
+    """Display-only PID file written by the lock owner. Never trusted for liveness."""
+    return lock_path(root, name).with_suffix(".pid")
+
+
 def stop_flag(root, name: str) -> Path:
     d = root_dir(root) / "control"
     d.mkdir(parents=True, exist_ok=True)
@@ -385,17 +391,122 @@ class AlreadyRunning(RuntimeError):
     pass
 
 
-def acquire_lock(root, name: str) -> Path:
-    p = lock_path(root, name)
-    if p.exists():
+def _os_lock(fh) -> None:
+    fh.seek(0)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)        # raises OSError when another handle holds byte 0
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _os_unlock(fh) -> None:
+    fh.seek(0)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
+class ComponentLock:
+    """Exclusive OS-level lock (msvcrt byte-range lock on Windows, flock elsewhere) held for the component's whole
+    lifetime. The OS releases it when the owning process exits for ANY reason (crash, kill, reboot), so ownership
+    can never outlive its owner and a reused PID can never impersonate it. Liveness == "the lock is held"."""
+
+    def __init__(self, path: Path):
+        self.path = Path(path)
+        self._fh = None
+
+    @property
+    def held(self) -> bool:
+        return self._fh is not None
+
+    def try_acquire(self) -> bool:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(self.path, "a+b")                          # create if missing; never truncates a held file
         try:
-            pid = int(p.read_text().strip() or 0)
-        except ValueError:
-            pid = 0
-        if pid and pid != os.getpid() and _pid_alive(pid):
-            raise AlreadyRunning(f"component {name} already running (pid {pid})")
-    p.write_text(str(os.getpid()))
-    return p
+            _os_lock(fh)
+        except OSError:
+            fh.close()
+            return False
+        self._fh = fh
+        return True
+
+    def release(self) -> None:
+        if self._fh is None:
+            return
+        try:
+            _os_unlock(self._fh)
+        except OSError:
+            pass
+        finally:
+            self._fh.close()
+            self._fh = None
+
+
+# A liveness probe holds the lock for microseconds; a starting component retries this long so a concurrent probe can
+# never make it give up. Kept short so a second instance still fails fast while the first one is alive.
+ACQUIRE_RETRY_S = 0.5
+
+
+def lock_held(root, name: str) -> bool:
+    """Liveness: True iff some process currently holds ``name``'s OS lock (probe = try to take it, release at once)."""
+    p = lock_path(root, name)
+    if not p.exists():
+        return False
+    probe = ComponentLock(p)
+    if probe.try_acquire():
+        probe.release()
+        return False
+    return True
+
+
+def read_pid(root, name: str) -> int | None:
+    """The PID the current lock owner wrote (display only)."""
+    try:
+        return int(pid_path(root, name).read_text().strip() or 0) or None
+    except (OSError, ValueError):
+        return None
+
+
+def acquire_lock(root, name: str, *, retry_s: float = ACQUIRE_RETRY_S) -> ComponentLock:
+    lk = ComponentLock(lock_path(root, name))
+    deadline = time.monotonic() + retry_s
+    while not lk.try_acquire():
+        if time.monotonic() >= deadline:
+            raise AlreadyRunning(f"component {name} already running (lock held; pid file says {read_pid(root, name)})")
+        time.sleep(0.02)
+    try:
+        pid_path(root, name).write_text(str(os.getpid()))
+    except OSError:
+        pass                                                   # display only
+    return lk
+
+
+HEARTBEAT_ATTEMPTS = 3
+
+
+def _beat(rt: "RuntimeStore", name: str, **kw) -> bool:
+    """Registry/heartbeat write that is retried and NEVER fatal: a locked or briefly unavailable runtime.db must not
+    kill a component. A final failure is recorded as HEARTBEAT_WRITE_FAILED (best effort) and the loop continues."""
+    import sqlite3
+    err = None
+    for attempt in range(HEARTBEAT_ATTEMPTS):
+        try:
+            rt.set_component(name, **kw)
+            return True
+        except sqlite3.Error as exc:
+            err = exc
+            time.sleep(0.1 * (attempt + 1))
+    try:
+        rt.event(name, "HEARTBEAT_WRITE_FAILED", {"error": f"{type(err).__name__}: {err}"[:300],
+                                                   "fields": sorted(kw)})
+    except sqlite3.Error:
+        print(f"{iso()} {name} HEARTBEAT_WRITE_FAILED {type(err).__name__}: {err}", file=sys.stderr, flush=True)
+    return False
 
 
 def run_component(name: str, *, tick: Callable[[], float], config_fps: dict[str, str] | None = None,
@@ -403,20 +514,25 @@ def run_component(name: str, *, tick: Callable[[], float], config_fps: dict[str,
                   sleep: Callable[[float], None] = time.sleep, detail: Callable[[], dict] | None = None) -> str:
     """Run ``tick()`` until a stop flag appears (or ``max_ticks``). ``tick`` returns seconds until the next tick.
     A tick exception is recorded (CRASH event, state DEGRADED) and the loop keeps going with backoff -- a component
-    never dies silently; an unrecoverable startup error is recorded and re-raised."""
-    rt = RuntimeStore(root)
+    never dies silently; an unrecoverable startup error is recorded and re-raised. Ownership is the exclusive OS
+    lock, acquired BEFORE anything is recorded and held until the process exits."""
     lock = acquire_lock(root, name)
+    try:
+        rt = RuntimeStore(root)
+    except BaseException:
+        lock.release()
+        raise
     flag = stop_flag(root, name)
     if flag.exists():
         flag.unlink()
     version, commit = component_version(name), commit_sha()
-    dep = rt.record_start(name, version=version, config_fps=config_fps or {}, commit=commit, reason=reason)
-    rt.set_component(name, pid=os.getpid(), state="RUNNING", started_utc=iso(), heartbeat_utc=iso(),
-                     version=version, config_fps_json=j(config_fps or {}), commit_sha=commit,
-                     detail_json=j({"deployment": dep}), bump_restarts=True)
-    rt.event(name, "START", {"deployment": dep, "argv": sys.argv})
     end_state, n, failures = "STOPPED", 0, 0
     try:
+        dep = rt.record_start(name, version=version, config_fps=config_fps or {}, commit=commit, reason=reason)
+        rt.set_component(name, pid=os.getpid(), state="RUNNING", started_utc=iso(), heartbeat_utc=iso(),
+                         version=version, config_fps_json=j(config_fps or {}), commit_sha=commit,
+                         detail_json=j({"deployment": dep}), bump_restarts=True)
+        rt.event(name, "START", {"deployment": dep, "argv": sys.argv})
         while True:
             if flag.exists():
                 end_state = "STOPPED"
@@ -429,14 +545,17 @@ def run_component(name: str, *, tick: Callable[[], float], config_fps: dict[str,
                 failures += 1
                 wait = min(300.0, 10.0 * 2 ** min(failures, 5))
                 state = "DEGRADED"
-                rt.event(name, "TICK_ERROR", {"error": f"{type(exc).__name__}: {exc}"[:500], "failures": failures})
+                try:
+                    rt.event(name, "TICK_ERROR", {"error": f"{type(exc).__name__}: {exc}"[:500], "failures": failures})
+                except Exception:  # noqa: BLE001
+                    pass
             info = {"deployment_id": dep["deployment_id"], "consecutive_failures": failures}
             if detail is not None:
                 try:
                     info.update(detail())
                 except Exception as exc:  # noqa: BLE001
                     info["detail_error"] = str(exc)[:200]
-            rt.set_component(name, state=state, heartbeat_utc=iso(), detail_json=j(info))
+            _beat(rt, name, state=state, heartbeat_utc=iso(), detail_json=j(info))
             n += 1
             if max_ticks is not None and n >= max_ticks:
                 break
@@ -446,20 +565,27 @@ def run_component(name: str, *, tick: Callable[[], float], config_fps: dict[str,
                 if flag.exists():
                     break
                 sleep(min(5.0, max(0.0, deadline - time.monotonic())))
-                rt.set_component(name, heartbeat_utc=iso())
+                _beat(rt, name, heartbeat_utc=iso())             # retried, non-fatal
     except KeyboardInterrupt:
         end_state = "STOPPED"
     except BaseException as exc:
         end_state = "CRASHED"
-        rt.event(name, "CRASH", {"error": f"{type(exc).__name__}: {exc}"[:500]})
+        try:
+            rt.event(name, "CRASH", {"error": f"{type(exc).__name__}: {exc}"[:500]})
+        except Exception:  # noqa: BLE001
+            pass
         raise
     finally:
-        rt.set_component(name, state=end_state, heartbeat_utc=iso())
-        rt.event(name, end_state, {})
+        _beat(rt, name, state=end_state, heartbeat_utc=iso())
+        try:
+            rt.event(name, end_state, {})
+        except Exception:  # noqa: BLE001
+            pass
         rt.close()
         try:
-            if lock.exists() and lock.read_text().strip() == str(os.getpid()):
-                lock.unlink()
+            if read_pid(root, name) == os.getpid():
+                pid_path(root, name).unlink()
         except OSError:
             pass
+        lock.release()
     return end_state

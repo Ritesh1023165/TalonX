@@ -147,7 +147,14 @@ def main(argv=None) -> int:
     if a.cmd == "status":
         return _print_status(a.json)
     if a.cmd == "restart":
-        print(f"restarted {a.component} pid={SV.restart(root, a.component)}")
+        res = SV.cli_restart(root, a.component)       # one restart authority (supervisor when alive)
+        if res.get("requested"):
+            print(f"restart of {a.component} requested; the running supervisor performs it")
+        elif res.get("ok"):
+            print(f"restarted {a.component} pid={res['pid']} (no live supervisor: direct)")
+        else:
+            print(f"RESTART_ABORTED_STOP_FAILED {a.component}: {res.get('reason')}")
+            return 1
         return 0
     if a.cmd == "stop":
         print(f"stopped {a.component}: {SV.stop(root, a.component)}")

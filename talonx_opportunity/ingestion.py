@@ -8,6 +8,11 @@ Per cycle (default every 60 s while a usable phase is open):
   * fold NEW 1-minute SIP bars (exclusive end, per-symbol watermark) into window-to-date aggregates. A symbol whose
     batch failed keeps its watermark and is reported INCOMPLETE -- never "no prints" -- and is re-requested next
     cycle. Bars are never fabricated and never taken from a different feed.
+
+Consistent snapshots (2026-10-01, P0): every cycle publishes ONE generation. Its aggregates, its universe state (the
+DTU active set it used) and its as_of are written in ONE transaction, together with the snapshot_generations row; the
+generation is visible to readers only after that commit. ``read_state`` reads one committed generation inside one
+read transaction and serves a DTU active set only if it is the one recorded for that generation.
 """
 from __future__ import annotations
 
@@ -37,7 +42,11 @@ CREATE TABLE IF NOT EXISTS cycles (id INTEGER PRIMARY KEY AUTOINCREMENT, at_utc 
     failed_batches INTEGER, retried_batches INTEGER, duration_s REAL, note TEXT);
 CREATE TABLE IF NOT EXISTS probes (id INTEGER PRIMARY KEY AUTOINCREMENT, at_utc TEXT, phase TEXT, feed TEXT,
     ok INTEGER, detail TEXT);
+CREATE TABLE IF NOT EXISTS snapshot_generations (window_id TEXT, generation INTEGER, as_of_utc TEXT, cycle_utc TEXT,
+    dtu_cycle_utc TEXT, symbols_changed INTEGER, PRIMARY KEY (window_id, generation));
 """
+# additive columns (existing stores are migrated in place; old rows read as generation NULL)
+_ADDED_COLUMNS = {"ingestion_state": "generation", "aggregates": "generation"}
 
 UNIVERSE_MAX_AGE_H = 30.0
 
@@ -55,6 +64,11 @@ class Ingestion:
         self._dtu_cache: tuple[str, list[dict], dict] | None = None
         self.root = root
         self.con = connect(market_db(root), schema=SCHEMA)
+        for table, col in _ADDED_COLUMNS.items():
+            if col not in {r[1] for r in self.con.execute(f"PRAGMA table_info({table})")}:
+                self.con.execute(f"ALTER TABLE {table} ADD COLUMN {col} INTEGER")
+        self.con.commit()
+        self.published_generation: int | None = None
         self._data = data
         self.cycle_s, self.probe_every_s = cycle_s, probe_every_s
         self.clock = clock or utcnow
@@ -197,15 +211,37 @@ class Ingestion:
                 self._wm[s] = end
                 changed.add(s)
         incomplete = sorted(s for s in symbols if self._wm.get(s, bounds_start) < end)
-        with self.con:
-            for s in changed:
-                a = self._aggs.get(s)
-                self.con.execute("INSERT OR REPLACE INTO aggregates VALUES (?,?,?,?)",
-                                 (w.window_id, s, j(a.as_dict() if a else SymbolAggregate(s, w.window_id).as_dict()),
-                                  self._wm[s].isoformat()))
-            self.con.execute("INSERT OR REPLACE INTO ingestion_state VALUES (?,?,?,?,?,?,?,?)",
-                             (w.window_id, end.isoformat(), iso(now), phase, len(symbols), j(incomplete),
-                              getattr(self.data, "requests", 0), j(list(getattr(self.data, "errors", []))[-5:])))
+        dtu = self._dtu if self.dtu_mode == U.ACTIVE else None
+        # ONE generation: aggregates + universe state (DTU active set) + as_of in ONE transaction, published on commit
+        try:
+            with self.con:
+                if not self.con.in_transaction:
+                    self.con.execute("BEGIN IMMEDIATE")      # write lock before the generation number is taken
+                gen = self.con.execute("SELECT COALESCE(MAX(generation), 0) + 1 FROM snapshot_generations "
+                                       "WHERE window_id=?", (w.window_id,)).fetchone()[0]
+                dtu_cycle = dtu.write_pending() if dtu is not None else None
+                for s in changed:
+                    a = self._aggs.get(s)
+                    self.con.execute("INSERT OR REPLACE INTO aggregates (window_id, symbol, agg_json, watermark_utc, "
+                                     "generation) VALUES (?,?,?,?,?)",
+                                     (w.window_id, s,
+                                      j(a.as_dict() if a else SymbolAggregate(s, w.window_id).as_dict()),
+                                      self._wm[s].isoformat(), gen))
+                self.con.execute("INSERT OR REPLACE INTO ingestion_state (window_id, as_of_utc, cycle_utc, phase, "
+                                 "symbols, incomplete_json, requests, errors_json, generation) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?)",
+                                 (w.window_id, end.isoformat(), iso(now), phase, len(symbols), j(incomplete),
+                                  getattr(self.data, "requests", 0), j(list(getattr(self.data, "errors", []))[-5:]),
+                                  gen))
+                self.con.execute("INSERT INTO snapshot_generations VALUES (?,?,?,?,?,?)",
+                                 (w.window_id, gen, end.isoformat(), iso(now), dtu_cycle, len(changed)))
+        except BaseException:
+            if dtu is not None:
+                dtu.discard_pending()
+            raise
+        if dtu is not None:
+            dtu.confirm_pending()
+        self.published_generation = gen                   # published only after the commit
         self.last_note = f"{phase}: as_of {aiso(end)} bars+{nbars} incomplete {len(incomplete)}"
         self._write_cycle(w, phase, end, len(changed), nbars, (len(failed), agg_stats), t0, self.last_note)
         return self.cycle_s
@@ -235,7 +271,8 @@ class Ingestion:
             return symbols
         fetch, self.dtu_last = self._dtu.active_symbols(
             w, symbols, members=self._dtu_cache[1], daily=self._dtu_cache[2], sip_as_of=data_as_of(now),
-            operator_added=set(added), operator_excluded=set(excluded) | set(removed), v2_forced=v2)
+            operator_added=set(added), operator_excluded=set(excluded) | set(removed), v2_forced=v2,
+            defer_write=True)                         # written in the cycle's generation transaction (P0)
         return fetch
 
     def latest_probe(self, phase: str) -> dict | None:
@@ -260,8 +297,12 @@ class Ingestion:
 
 # -- read-only accessors used by other components -------------------------------------------------------------
 def read_state(root, window_id: str) -> dict:
+    """ONE committed generation, read inside ONE read transaction (WAL snapshot): as_of, aggregates, universe and
+    DTU active set can never come from different ingestion cycles. The DTU active set is served only if it is the
+    one recorded for this generation (else None -> discovery's existing fail-safe full-universe path)."""
     con = connect(market_db(root), readonly=True)
     try:
+        con.execute("BEGIN")                              # deferred: the snapshot is pinned at the first SELECT
         st = con.execute("SELECT * FROM ingestion_state WHERE window_id=?", (window_id,)).fetchone()
         uni = con.execute("SELECT * FROM universe WHERE window_id=?", (window_id,)).fetchone()
         daily = {r["symbol"]: unj(r["bars_json"], []) for r in
@@ -272,10 +313,21 @@ def read_state(root, window_id: str) -> dict:
         for r in con.execute("SELECT * FROM probes ORDER BY id"):
             probes[r["phase"]] = {"ok": bool(r["ok"]), "at_utc": r["at_utc"], "detail": r["detail"]}
         from talonx_opportunity.universe_tiers import latest_active
+        dtu = latest_active(con, window_id)
+        gen = st["generation"] if st is not None and "generation" in st.keys() else None
+        meta = None
+        if gen is not None:
+            meta = con.execute("SELECT * FROM snapshot_generations WHERE window_id=? AND generation=?",
+                               (window_id, gen)).fetchone()
+            if dtu is not None and (meta is None or meta["dtu_cycle_utc"] != dtu["cycle_utc"]):
+                dtu = None                                # not this generation's universe state: never mix
         return {"state": dict(st) if st else None, "members": unj(uni["members_json"], []) if uni else [],
-                "daily": daily, "aggs": aggs, "probes": probes, "dtu": latest_active(con, window_id)}
+                "daily": daily, "aggs": aggs, "probes": probes, "dtu": dtu, "generation": gen}
     finally:
-        con.close()
+        try:
+            con.rollback()                                # end the read transaction (nothing to commit)
+        finally:
+            con.close()
 
 
 def main(argv=None) -> int:
