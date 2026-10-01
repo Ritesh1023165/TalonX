@@ -1,12 +1,14 @@
 {
  "program": "EVENT_RESPONSE_MAP_V1",
- "status": "DESIGN_LOCKED_GATE_C_REV3 (no price data exists)",
- "lock_revision": 3,
+ "status": "DESIGN_LOCKED_GATE_C_REV3.1 (no price data exists)",
+ "lock_revision": "3.1",
  "supersedes": {
   "rev1_commit": "067ed29",
   "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
   "rev2_commit": "8a57c33",
-  "rev2_fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22"
+  "rev2_fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22",
+  "rev3_commit": "ed16b69",
+  "rev3_fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7"
  },
  "candidates_r3_sha256": "a7095779e32ad0aa3530410f5a5d238dd8a1005a873ca09bd7d9350f488502ad",
  "rev3_counts": {
@@ -167,19 +169,19 @@
    "UNMAPPED": 4345
   }
  },
- "locked_at_utc": "2026-10-01T09:24:31+00:00",
+ "locked_at_utc": "2026-10-01T12:42:43+00:00",
  "branch": "research/event_response_map_v1",
- "base_sha": "8a57c3345e8a2e927ce66f01a22cc387988dce05",
- "fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7",
+ "base_sha": "00a88bb4fa7a4d2a729ceece5b117b9299dc43d5",
+ "fingerprint": "ad68792d18c67a7f201af3f4a5b0e3565a26759c7e8c904bc035c48e327a7bd2",
  "file_sha256": {
   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
-  "research/event_response_map_v1/spec.py": "a861852cdd23cce540a42277e18e3a226e0047bdc68fa97931cb35915be59cd6",
+  "research/event_response_map_v1/spec.py": "ae8560a01105d5ef28b43a16dd317a7a2115df8ca50992b3305d2c6716db7385",
   "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
   "research/event_response_map_v1/events.py": "b6abfd0571cd3d704946ef5fcc4710b2627e5d26401c4bcb56561f827b715950",
   "research/event_response_map_v1/metrics.py": "9172acfca4662f7d70012a61b19b1fb2ea5352300c9522b3aacaac527aeca07d",
-  "research/event_response_map_v1/phase_d.py": "cd6ae6a2d261fa104656a2727fe6e8320b3e2ff1b71392e931bb91b5996e2723",
+  "research/event_response_map_v1/phase_d.py": "02a5c7e31e74c8c47b994820deb721199144f0de3645ffa32716637b297dc085",
   "research/event_response_map_v1/instrument_filter.py": "622df0bd9bdb34ff945583db1bf8851241dd68f31ef1f6e5acaea48d8db408d3",
   "research/event_response_map_v1/identity.py": "194e9ee41ecfc6223b96f6b19682cb7dc1ea65789a99caed52a8adbc9a92574e",
   "research/event_response_map_v1/r3_metadata.py": "0f58f05e9be2638efbcb4941b6f5efdf13940f5c36dac203ea6c8b47f57eab53",
@@ -291,7 +293,8 @@
  "spec": {
   "program": "EVENT_RESPONSE_MAP_V1",
   "status": "DISCOVERY_ONLY -- nothing produced by this program is validated; at most ONE hypothesis may later be nominated, frozen and pre-registered in a separate task",
-  "lock_revision": 3,
+  "lock_revision": "3.1",
+  "revision_3_1_change (owner, 2026-10-01; no data existed)": "MECHANICAL ONLY: in phase_d.py the one-shot marker trial_ledger.json is now written LAST (write_outputs: cells.csv, report.md, then the marker); the run-once check that refuses when the marker exists is unchanged. A scoring pass that crashed before the marker may be re-run once; once the marker exists a re-run is refused. No rule, threshold, metric, universe, data, cost, screen or tolerance changed; the downloader is unchanged; no price data existed.",
   "revision_3_changes (owner, 2026-10-01; no data existed)": {
    "R1_FIX_a_sp500_exemption": "point-in-time S&P 500 members (any day 2019-2023) are exempt from R1a (index membership = operating common stock); R1b still applies where a CIK exists",
    "R1_FIX_b_identity_resolution": "before R1a, candidate tickers are resolved to CIKs (research/event_response_map_v1/identity.py): forward dated Alpaca rename chain (2019-2023 + post-2023 renames, identity only, Task75 reserved windows NOT queried) to a current SEC ticker; SEC company_tickers / submissions 'tickers' (never for a ticker that was renamed away); backward rename chain; issuer trading symbol on Form 3/4/5 2019-2023 when it names exactly one issuer CIK; unique normalized name across cik-lookup-data + submissions name/formerNames. Metadata only, R5 guard. R1a counts reported by source (B, C, D) and reason at: rev2 | +S&P exemption | +identity resolution",

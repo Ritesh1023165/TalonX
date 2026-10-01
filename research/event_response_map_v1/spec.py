@@ -10,7 +10,8 @@ STATUS = "DISCOVERY_ONLY -- nothing produced by this program is validated; at mo
 SPEC = {
     "program": PROGRAM,
     "status": STATUS,
-    "lock_revision": 3,
+    "lock_revision": "3.1",
+    "revision_3_1_change (owner, 2026-10-01; no data existed)": "MECHANICAL ONLY: in phase_d.py the one-shot marker trial_ledger.json is now written LAST (write_outputs: cells.csv, report.md, then the marker); the run-once check that refuses when the marker exists is unchanged. A scoring pass that crashed before the marker may be re-run once; once the marker exists a re-run is refused. No rule, threshold, metric, universe, data, cost, screen or tolerance changed; the downloader is unchanged; no price data existed.",
     "revision_3_changes (owner, 2026-10-01; no data existed)": {
         "R1_FIX_a_sp500_exemption": "point-in-time S&P 500 members (any day 2019-2023) are exempt from R1a (index membership = operating common stock); R1b still applies where a CIK exists",
         "R1_FIX_b_identity_resolution": "before R1a, candidate tickers are resolved to CIKs (research/event_response_map_v1/identity.py): forward dated Alpaca rename chain (2019-2023 + post-2023 renames, identity only, Task75 reserved windows NOT queried) to a current SEC ticker; SEC company_tickers / submissions 'tickers' (never for a ticker that was renamed away); backward rename chain; issuer trading symbol on Form 3/4/5 2019-2023 when it names exactly one issuer CIK; unique normalized name across cik-lookup-data + submissions name/formerNames. Metadata only, R5 guard. R1a counts reported by source (B, C, D) and reason at: rev2 | +S&P exemption | +identity resolution",

@@ -5,8 +5,8 @@
 # Restart policy (documented in docs/research/preregistration/event_response_map_v1_nomination.md):
 #   * the locked downloader is not symbol-resumable, so a failed download is retried ONCE from scratch (partial
 #     archive moved aside; the SEC cache is reused by design);
-#   * a scoring pass that crashed before its outputs were complete is re-executed ONCE (partial outputs moved aside),
-#     recorded in this log and appended to report.md.
+#   * LOCK REV 3.1: a scoring pass that crashed before the one-shot marker (trial_ledger.json, written last) is
+#     re-run ONCE, recorded in this log and appended to report.md; once the marker exists it is never re-run.
 # The runner never pushes to git and never touches the live worktree.
 param([switch]$PreflightOnly)
 $ErrorActionPreference = 'Stop'
@@ -80,19 +80,23 @@ if ($rc -ne 0) {
 }
 
 # ------------------------------------------------------------------------------------------------ scoring (D2, once)
-$outputs = @('trial_ledger.json', 'cells.csv', 'report.md', 'd0_coverage.json') | ForEach-Object { Join-Path $OUT $_ }
+# LOCK REV 3.1: phase_d writes the one-shot marker trial_ledger.json LAST. Rule: after a failed pass, if the marker is
+# ABSENT the pass crashed before its outputs were complete -> log the crash and re-run ONCE (the re-run overwrites the
+# partial outputs); if the marker is PRESENT never re-run.
+$marker = Join-Path $OUT 'trial_ledger.json'
 $crash = $null
-$rc = RunStage 'run'; Log @{ event = 'RUN'; attempt = 1; rc = $rc }
-$complete = (($outputs | Where-Object { -not (Test-Path $_) }).Count -eq 0)
-if ($rc -ne 0 -and -not $complete) {
-    $moved = MoveAside $outputs 'crashed_run'
-    $crash = "scoring pass crashed (rc=$rc) before its outputs were complete; partial outputs moved to $moved; re-executed once"
-    Log @{ event = 'CRASH'; stage = 'run'; rc = $rc; partial_outputs_moved_to = $moved }
-    Log @{ event = 'RESTART'; stage = 'run' }
-    $rc = RunStage 'run'; Log @{ event = 'RUN'; attempt = 2; rc = $rc }
-    $complete = (($outputs | Where-Object { -not (Test-Path $_) }).Count -eq 0)
+$rc = RunStage 'run'; Log @{ event = 'RUN'; attempt = 1; rc = $rc; marker_present = (Test-Path $marker) }
+if ($rc -ne 0) {
+    if (Test-Path $marker) {
+        Log @{ event = 'RUN_FAILED_AFTER_MARKER'; rc = $rc; action = 'no re-run (marker present)' }
+    } else {
+        $crash = "scoring pass crashed (rc=$rc) before the one-shot marker was written; re-run once (partial outputs overwritten)"
+        Log @{ event = 'CRASH'; stage = 'run'; rc = $rc; marker_present = $false }
+        Log @{ event = 'RESTART'; stage = 'run' }
+        $rc = RunStage 'run'; Log @{ event = 'RUN'; attempt = 2; rc = $rc; marker_present = (Test-Path $marker) }
+    }
 }
-if (-not $complete) { Log @{ event = 'ABORT'; reasons = @("scoring outputs incomplete (rc=$rc)") }; exit 5 }
+if (-not (Test-Path $marker)) { Log @{ event = 'ABORT'; reasons = @("scoring pass did not complete (no marker, rc=$rc)") }; exit 5 }
 if ($crash) { [IO.File]::AppendAllText((Join-Path $OUT 'report.md'), "`n## Run history`n`n- $crash`n", $UTF8) }
 $first = (Get-Content (Join-Path $OUT 'report.md') -TotalCount 1)
 Log @{ event = 'END'; result = 'GATE_D_STOP'; run_rc = $rc; report_first_line = $first; crashed_and_restarted = [bool]$crash }

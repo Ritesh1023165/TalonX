@@ -430,7 +430,8 @@ def test_r4_coverage_breaks_out_by_bucket_and_year():
 
 def test_lock_revisions_recorded_in_spec():
     from research.event_response_map_v1.spec import SPEC
-    assert SPEC["lock_revision"] == 3
+    assert SPEC["lock_revision"] == "3.1"
+    assert any(k.startswith("revision_3_1_change") for k in SPEC)
     assert any(k.startswith("revision_2_changes") for k in SPEC) and any(k.startswith("revision_3_changes") for k in SPEC)
 
 
@@ -571,3 +572,44 @@ def test_r1fix_form345_ticker_obs_parser():
                    "b\t03-FEB-2025\t1326801\tMETA\n"
                    "c\t04-FEB-2020\t77\tNONE\n")
     assert I.form345_ticker_obs(buf.getvalue()) == [("FB", "0001326801", date(2020, 2, 3))]
+
+
+# ------------------------------------------------------------------------------------------------ LOCK REV 3.1
+def _tiny_ledger():
+    led = M.evaluate(pd.DataFrame(columns=["event_type", "horizon", "bucket", "symbol", "entry_date", "ret_raw",
+                                           "ret_spy_rel", "ret_sector_rel", "missing_exit"]), n_resamples=10)
+    return M.classify(led), led
+
+
+def test_rev31_crash_before_marker_leaves_no_marker_and_rerun_overwrites(tmp_path, monkeypatch):
+    from research.event_response_map_v1 import phase_d as P
+    calib, led = _tiny_ledger()
+    real_report_md = P.report_md
+
+    def crash(*a, **k):                                   # crash AFTER cells.csv is written, before the marker
+        raise RuntimeError("simulated crash")
+    monkeypatch.setattr(P, "report_md", crash)
+    with pytest.raises(RuntimeError):
+        P.write_outputs(tmp_path, calib, led, {}, {"x": 1})
+    assert (tmp_path / "cells.csv").exists() and not (tmp_path / "trial_ledger.json").exists()
+    (tmp_path / "cells.csv").write_text("PARTIAL")
+    monkeypatch.setattr(P, "OUT", tmp_path)               # the unchanged run-once check permits the re-run
+    monkeypatch.setattr(P, "LockedRangeGuard", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("past check")))
+    with pytest.raises(RuntimeError, match="past check"):
+        P.stage_run({})
+    monkeypatch.setattr(P, "report_md", real_report_md)
+    P.write_outputs(tmp_path, calib, led, {}, {"x": 1})   # re-run succeeds and overwrites the partial outputs
+    assert (tmp_path / "cells.csv").read_text() != "PARTIAL"
+    assert (tmp_path / "report.md").read_text().startswith("**NO_EVENT SCREEN_PASS: 0 of 30**")
+    assert json.loads((tmp_path / "trial_ledger.json").read_text())["integrity"] == {"x": 1}
+
+
+def test_rev31_marker_written_last_and_rerun_refused_once_marker_exists(tmp_path, monkeypatch):
+    from research.event_response_map_v1 import phase_d as P
+    calib, led = _tiny_ledger()
+    P.write_outputs(tmp_path, calib, led, {}, {})
+    mt = {f: (tmp_path / f).stat().st_mtime_ns for f in ("cells.csv", "report.md", "trial_ledger.json")}
+    assert mt["trial_ledger.json"] >= max(mt["cells.csv"], mt["report.md"])
+    monkeypatch.setattr(P, "OUT", tmp_path)
+    with pytest.raises(SystemExit, match="run-once"):
+        P.stage_run({})

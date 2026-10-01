@@ -195,16 +195,25 @@ def stage_run(cand: dict) -> None:
     inactive = 0
     counts.update({"sic6770_symbol_days_masked": n_masked, "attribution": attribution,
                    "survivorship_diagnostic": diag["summary"]})
-    (OUT / "trial_ledger.json").write_text(json.dumps({"null_calibration": calib, "cells": ledger, "integrity": {**counts, **dq_all,
-        "eligibility_raw": dq_raw, "cik_methods": _count(m for _, m in cmap.values()),
-        "unmapped_inactive_cik": inactive}}, indent=1, default=str))
+    write_outputs(OUT, calib, ledger, counts, {**counts, **dq_all, "eligibility_raw": dq_raw,
+                                               "cik_methods": _count(m for _, m in cmap.values()),
+                                               "unmapped_inactive_cik": inactive})
+    guard.record({"event": "phase_d_run_complete", "cells": len(ledger), "observations": len(obs),
+                  "classification": calib["classification"]})
+
+
+def write_outputs(out: Path, calib: dict, ledger: list[dict], counts: dict, integrity: dict) -> None:
+    """LOCK REV 3.1 (mechanical): cells.csv and report.md are written FIRST; the one-shot marker trial_ledger.json
+    is written LAST, only after every other output is complete. A crash before the marker leaves no marker, so the
+    unchanged run-once check in stage_run permits exactly the re-run; once the marker exists a re-run is refused."""
+    import pandas as pd
     pd.DataFrame([{"cell": c["cell"], **{k: v for k, v in c["metrics"].items() if k != "per_year"},
                    **c["screen"]["criteria"], "SCREEN_PASS": c["screen"]["SCREEN_PASS"],
                    "nominatable": c["screen"]["nominatable"], "label": c["screen"]["label"]} for c in ledger]
-                 ).to_csv(OUT / "cells.csv", index=False)
-    (OUT / "report.md").write_text(report_md(calib, ledger, counts), encoding="utf-8", newline="\n")
-    guard.record({"event": "phase_d_run_complete", "cells": len(ledger), "observations": len(obs),
-                  "classification": calib["classification"]})
+                 ).to_csv(out / "cells.csv", index=False)
+    (out / "report.md").write_text(report_md(calib, ledger, counts), encoding="utf-8", newline="\n")
+    (out / "trial_ledger.json").write_text(json.dumps({"null_calibration": calib, "cells": ledger,
+                                                       "integrity": integrity}, indent=1, default=str))
 
 
 def report_md(calib: dict, ledger: list[dict], counts: dict) -> str:

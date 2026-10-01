@@ -84,3 +84,15 @@ Under the ledger above:
 
   A second failure is an ABORT, and the owner decides what happens next.
 - The runner never pushes to git. The owner reviews and pushes after Gate D.
+
+### §6 note, 2026-10-01 (lock revision 3.1; append-only, §6 above is kept as written)
+
+The "Scoring (D2)" rule above is **superseded** for Phase D by lock revision 3.1, a mechanical change:
+- `phase_d.py` now writes the one-shot marker `trial_ledger.json` **last**, after `cells.csv` and `report.md` are complete.
+- The run-once check (refuse when the marker exists) is unchanged.
+
+The runner no longer moves partial scoring outputs aside. Its rule is now:
+- **Marker absent after a crash:** re-run **once**. The re-run overwrites the partial outputs, and the crash and restart are recorded in `phase_d_runner.log` and appended to `report.md`.
+- **Marker present:** **never** re-run.
+
+The "Download (D1)" rule above is unchanged: the downloader is not modified, and a failed download is still retried once from scratch with the partial Alpaca archive moved aside.
