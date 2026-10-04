@@ -61,3 +61,5 @@ The timeline row "≈ 00:08 – 00:10:11 | Worker and shim stopped (owner GO for
 **Not established:** who or what terminated the processes. At the time of this correction the owner has not confirmed whether the stop was issued from the owner's elevated shell.
 
 **Unaffected:** the outcome. There are no outputs and no marker, and the one re-execution remains allowed.
+
+**Owner confirmation (appended 2026-10-04):** the owner confirms they stopped worker 25040 (and its shim) from the elevated shell, under their own GO, between 00:07:35Z and 00:10:11Z. Attribution: **owner's manual stop**. This matches the absence of any crash, OOM or WER event.
