@@ -48,3 +48,16 @@ f4rows = [r for r in f4rows if r["issuer_sym"] in set(bars_eq["symbol"])]
 ## Why the earlier time estimates were wrong
 
 The pre-run synthetic timing exercised gap events, outcomes and the bootstrap only. It **never exercised the Form 4 / 8-K attribution path at real scale**, where the per-row set rebuild lives. Lock revision 3.2 (mechanical) fixes the hot spots, and full-scale timing of every stage is required before the one allowed re-execution.
+
+## Correction (appended 2026-10-04 ~09:10Z; the text above is kept as written)
+
+The timeline row "≈ 00:08 – 00:10:11 | Worker and shim stopped (owner GO for `Stop-Process …`)" overstates what is known.
+
+**What is established:**
+- Worker 25040 and shim 16060 were **alive at 00:07:35Z** (py-spy dump 2) and **already gone at about 00:10:11Z**. The `Stop-Process -Id 25040,16060 -Force` issued from the research session then failed with "Cannot find a process with the process identifier 25040". **That command terminated nothing.**
+- The owner's GO to stop the worker had been given just before that.
+- The Windows **Application and System event logs for 00:05–00:12Z show no python application crash (WER 1000/1001/1005), no Resource-Exhaustion-Detector (OOM) event and no other python-related entry**. That is consistent with an external `Stop-Process`/TerminateProcess, which leaves no such event, and is inconsistent with a crash or an out-of-memory kill.
+
+**Not established:** who or what terminated the processes. At the time of this correction the owner has not confirmed whether the stop was issued from the owner's elevated shell.
+
+**Unaffected:** the outcome. There are no outputs and no marker, and the one re-execution remains allowed.
