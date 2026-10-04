@@ -34,9 +34,16 @@ function Log([hashtable]$h) {
     $h['utc'] = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     [IO.File]::AppendAllText($LOG, (($h | ConvertTo-Json -Compress -Depth 5) + "`n"), $UTF8)
 }
+function Native([scriptblock]$cmd) {
+    # PowerShell 5.1 + ErrorActionPreference=Stop turns ANY native stderr line into a terminating error (e.g. the
+    # offline guard's OFFLINE_GUARD_ACTIVE notice). Capture stderr as data instead; the exit code decides.
+    $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $out = & $cmd 2>&1 } finally { $ErrorActionPreference = $prev }
+    return @{ rc = $LASTEXITCODE; lines = @($out | ForEach-Object { "$_" }) }
+}
 function Py([string]$code) {
-    $out = & $PY -c $code 2>&1
-    return @{ rc = $LASTEXITCODE; out = (($out | ForEach-Object { "$_" }) -join ' ').Trim() }
+    $r = Native { & $PY -c $code }
+    return @{ rc = $r.rc; out = (($r.lines | Where-Object { $_ -notmatch '^OFFLINE_GUARD_ACTIVE' }) -join ' ').Trim() }
 }
 function RunStage([string]$stage) {
     $so = Join-Path $OUT "phase_d_$stage.out.log"; $se = Join-Path $OUT "phase_d_$stage.err.log"
@@ -80,9 +87,9 @@ $gchk = Py "import sys; sys.path.insert(0, '.'); from research.common.locked_ran
 $checks.guard_state_ok = ($gchk.out -eq 'GUARD_OK');         if (-not $checks.guard_state_ok) { $fail += "guard: $($gchk.out)" }
 if ($ScoringOnly) {
     # (a) archived bytes == the guard-audited download (every file re-hashed)
-    $av = & $PY (Join-Path $WT 'research\event_response_map_v1\tools\verify_archive.py') $ARCHIVE_MAIN_AGG $ARCHIVE_DIAG_AGG 2>&1
-    $checks.archive_verified = ($LASTEXITCODE -eq 0);         if (-not $checks.archive_verified) { $fail += "archive verification failed: $(($av | Out-String).Trim())" }
-    $checks.archive_detail = (($av | Out-String).Trim())
+    $va = Native { & $PY (Join-Path $WT 'research\event_response_map_v1\tools\verify_archive.py') $ARCHIVE_MAIN_AGG $ARCHIVE_DIAG_AGG }
+    $checks.archive_verified = ($va.rc -eq 0);                if (-not $checks.archive_verified) { $fail += "archive verification failed: $($va.lines -join ' ')" }
+    $checks.archive_detail = ($va.lines -join ' ')
     # (b) no network: the offline guard must refuse a real connection attempt
     $env:PYTHONPATH = $OFFLINE
     $nn = Py "import socket`ntry:`n    socket.create_connection(('data.sec.gov', 443), 5); print('NETWORK_REACHED')`nexcept RuntimeError as e:`n    print('REFUSED' if 'NETWORK_REFUSED_SCORING_ONLY' in str(e) else 'OTHER:' + str(e))"
