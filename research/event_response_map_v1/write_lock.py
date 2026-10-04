@@ -64,10 +64,11 @@ def main() -> dict:
     }
     base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
     lock = {
-        "program": "EVENT_RESPONSE_MAP_V1", "status": f"DESIGN_LOCKED_GATE_C_REV{SPEC['lock_revision']} (no price data exists)",
+        "program": "EVENT_RESPONSE_MAP_V1", "status": (f"DESIGN_LOCKED_GATE_C_REV{SPEC['lock_revision']} " + ("(no price data exists)" if str(SPEC['lock_revision']) < "3.2" else "(price archive exists from Phase D attempt 1, 2026-10-03, verified against the guard audit; NO outcomes computed, NO marker)")),
         "lock_revision": SPEC["lock_revision"], "supersedes": {"rev1_commit": "067ed29", "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
                                            "rev2_commit": "8a57c33", "rev2_fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22",
-                                           "rev3_commit": "ed16b69", "rev3_fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7"},
+                                           "rev3_commit": "ed16b69", "rev3_fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7",
+                                           "rev3_1_commit": "055efd3", "rev3_1_fingerprint": "ad68792d18c67a7f201af3f4a5b0e3565a26759c7e8c904bc035c48e327a7bd2"},
         "candidates_r3_sha256": lf_sha256(OUT / "candidates_r3.json"),
         "rev3_counts": r3["counts"],
         "locked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),

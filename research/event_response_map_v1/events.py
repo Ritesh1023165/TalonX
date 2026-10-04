@@ -200,56 +200,100 @@ def no_event_control(events: pd.DataFrame, elig: pd.DataFrame, sessions: list[da
 
 
 def outcomes(ev: pd.DataFrame, bars: pd.DataFrame, bench: dict[str, pd.DataFrame], symbol_bench: dict,
-             sessions: list[date]) -> tuple[pd.DataFrame, dict]:
+             sessions: list[date], progress=None) -> tuple[pd.DataFrame, dict]:
     """Per event x horizon: raw / SPY-relative / sector-relative gross LONG return, entry OPEN -> exit CLOSE, ALL bars.
     Exit session must be <= DEV_END. Missing ENTRY bar -> DATA_MISSING_ENTRY (dropped, counted). Missing benchmark
     bar -> BENCH_MISSING (dropped, counted). LOCK REV 2 (R3): entry bar present but EXIT bar missing ->
     DATA_MISSING_EXIT, emitted as a row with missing_exit=True and NaN returns, so each cell reports its missing-exit
     rate and the non-gating bound sensitivity. SUSPECT_ADJUSTMENT: any |close_t/close_{t-1} - 1| > 75 % inside
-    entry..exit (retained, flagged)."""
+    entry..exit (retained, flagged).
+
+    LOCK REV 3.2 (mechanical, identical results): per-symbol lookups are precomputed once (date -> row position,
+    float64 open/close arrays) instead of per-row pandas ``.at`` / ``.loc``; the suspect check uses, per symbol, the
+    same pandas ``pct_change`` over its consecutive available session rows, with a prefix sum so each window test is
+    O(1). Same arithmetic (float64), same row order, same counts."""
     idx = {d: i for i, d in enumerate(sessions)}
-    px = {s: g.set_index("date") for s, g in bars.groupby("symbol")}
-    bpx = {k: v.set_index("date") for k, v in bench.items()}
     counts = {"DATA_MISSING_ENTRY": 0, "DATA_MISSING_EXIT": 0, "BENCH_MISSING": 0, "BEYOND_DEV_END": 0,
               "SUSPECT_ADJUSTMENT": 0}
     nan = float("nan")
+
+    def table(g):
+        pos = {d: i for i, d in enumerate(g["date"])}
+        return pos, g["open"].to_numpy(dtype="float64"), g["close"].to_numpy(dtype="float64")
+
+    px: dict = {}
+    for sym, g in bars.groupby("symbol"):
+        pos, op, cl = table(g)
+        # session rows only, in session order -> the exact sequence the old per-window g.loc[...] selected
+        srow = [(idx[d], i) for d, i in pos.items() if d in idx]
+        srow.sort()
+        si = np.array([a for a, _ in srow], dtype=np.int64)
+        sc = g["close"].iloc[[b for _, b in srow]].reset_index(drop=True) if srow else pd.Series([], dtype="float64")
+        big = (sc.pct_change().abs() > 0.75).to_numpy() if len(sc) else np.zeros(0, dtype=bool)
+        cs = np.cumsum(big, dtype=np.int64)
+        px[sym] = (pos, op, cl, si, cs)
+    bpx = {k: table(v) for k, v in bench.items()}
     out = []
-    for r in ev.itertuples(index=False):
-        g = px.get(r.symbol)
+    n_ev = len(ev)
+    for j, r in enumerate(ev.itertuples(index=False)):
+        if progress is not None and j and j % 200_000 == 0:
+            progress("outcomes", events_done=j, events_total=n_ev, rows=len(out))
+        t = px.get(r.symbol)
         i0 = idx.get(r.entry_date)
         for h, k in HORIZONS.items():
             if i0 is None or i0 + k >= len(sessions) or sessions[i0 + k] > DEV_END:
                 counts["BEYOND_DEV_END"] += 1
                 continue
             d1 = sessions[i0 + k]
-            if g is None or r.entry_date not in g.index:
+            if t is None or r.entry_date not in t[0]:
                 counts["DATA_MISSING_ENTRY"] += 1
                 continue
-            if d1 not in g.index:
+            pos, op, cl, si, cs = t
+            if d1 not in pos:
                 counts["DATA_MISSING_EXIT"] += 1
                 out.append({"event_type": r.event_type, "symbol": r.symbol, "entry_date": r.entry_date,
                             "bucket": r.bucket, "horizon": h, "ret_raw": nan, "ret_spy_rel": nan,
                             "ret_sector_rel": nan, "benchmark": None, "suspect_adjustment": False,
                             "missing_exit": True})
                 continue
-            ret = g.at[d1, "close"] / g.at[r.entry_date, "open"] - 1.0
+            ret = cl[pos[d1]] / op[pos[r.entry_date]] - 1.0
             sec = (symbol_bench(r.symbol, r.entry_date) if callable(symbol_bench)        # LOCK REV 3: dated
                    else symbol_bench.get(r.symbol, "SPY"))
             br = {}
             for name in ("SPY", sec):
-                b = bpx[name]
-                br[name] = (b.at[d1, "close"] / b.at[r.entry_date, "open"] - 1.0
-                            if r.entry_date in b.index and d1 in b.index else None)
+                bpos, bop, bcl = bpx[name]
+                br[name] = (bcl[bpos[d1]] / bop[bpos[r.entry_date]] - 1.0
+                            if r.entry_date in bpos and d1 in bpos else None)
             if br["SPY"] is None or br[sec] is None:
                 counts["BENCH_MISSING"] += 1
                 continue
-            win = g.loc[[d for d in sessions[max(0, i0 - 1):i0 + k + 1] if d in g.index], "close"]
-            suspect = bool((win.pct_change().abs() > 0.75).any())
+            lo = int(np.searchsorted(si, max(0, i0 - 1), side="left"))
+            hi = int(np.searchsorted(si, i0 + k, side="right"))
+            suspect = bool(hi - 1 > lo and cs[hi - 1] - cs[lo] > 0)   # any big jump between consecutive in-window rows
             counts["SUSPECT_ADJUSTMENT"] += suspect
             out.append({"event_type": r.event_type, "symbol": r.symbol, "entry_date": r.entry_date, "bucket": r.bucket,
                         "horizon": h, "ret_raw": ret, "ret_spy_rel": ret - br["SPY"], "ret_sector_rel": ret - br[sec],
                         "benchmark": sec, "suspect_adjustment": suspect, "missing_exit": False})
+    if progress is not None:
+        progress("outcomes", events_done=n_ev, events_total=n_ev, rows=len(out))
     return pd.DataFrame(out), counts
+
+
+def bar_presence(bars: pd.DataFrame):
+    """LOCK REV 3.2: ``has_bar(symbol, date)`` == "a row with that symbol and date exists" (was a pandas MultiIndex
+    membership test per call). Per-symbol sorted date ordinals + binary search; identical answers."""
+    by = {}
+    for sym, g in bars.groupby("symbol"):
+        by[sym] = np.sort(np.fromiter((d.toordinal() for d in g["date"]), dtype=np.int64, count=len(g)))
+
+    def has_bar(sym, d) -> bool:
+        a = by.get(sym)
+        if a is None:
+            return False
+        o = d.toordinal()
+        i = int(np.searchsorted(a, o))
+        return i < len(a) and int(a[i]) == o
+    return has_bar
 
 
 def sic_benchmark(sic, mapping: dict) -> str:

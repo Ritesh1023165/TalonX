@@ -1,14 +1,16 @@
 {
  "program": "EVENT_RESPONSE_MAP_V1",
- "status": "DESIGN_LOCKED_GATE_C_REV3.1 (no price data exists)",
- "lock_revision": "3.1",
+ "status": "DESIGN_LOCKED_GATE_C_REV3.2 (price archive exists from Phase D attempt 1, 2026-10-03, verified against the guard audit; NO outcomes computed, NO marker)",
+ "lock_revision": "3.2",
  "supersedes": {
   "rev1_commit": "067ed29",
   "rev1_fingerprint": "0b3799799c29802711c9ead7daeac5a91cf45fbeea1ecd7feee9ea982508e546",
   "rev2_commit": "8a57c33",
   "rev2_fingerprint": "bdf4a160426650715c772a738d563839804ab28fbb67b59ba0ff57fcc7cb7d22",
   "rev3_commit": "ed16b69",
-  "rev3_fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7"
+  "rev3_fingerprint": "94013b3e8f3999b10de7beabf35d24b5953e70f48753fc3691790d278992a0c7",
+  "rev3_1_commit": "055efd3",
+  "rev3_1_fingerprint": "ad68792d18c67a7f201af3f4a5b0e3565a26759c7e8c904bc035c48e327a7bd2"
  },
  "candidates_r3_sha256": "a7095779e32ad0aa3530410f5a5d238dd8a1005a873ca09bd7d9350f488502ad",
  "rev3_counts": {
@@ -169,19 +171,19 @@
    "UNMAPPED": 4345
   }
  },
- "locked_at_utc": "2026-10-01T12:42:43+00:00",
+ "locked_at_utc": "2026-10-04T00:40:49+00:00",
  "branch": "research/event_response_map_v1",
- "base_sha": "00a88bb4fa7a4d2a729ceece5b117b9299dc43d5",
- "fingerprint": "ad68792d18c67a7f201af3f4a5b0e3565a26759c7e8c904bc035c48e327a7bd2",
+ "base_sha": "b8571af70575da646e488b8e1e7d03eded25f5b8",
+ "fingerprint": "12a909e795986ff3abeac9ca92906a64c3387a5e3c64734f2b72031b781cb8ad",
  "file_sha256": {
   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d",
   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
-  "research/event_response_map_v1/spec.py": "ae8560a01105d5ef28b43a16dd317a7a2115df8ca50992b3305d2c6716db7385",
+  "research/event_response_map_v1/spec.py": "8cbc3369aad9b74fc7b1083a7e54252cd57b5901b50383eff142f8877156badf",
   "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
-  "research/event_response_map_v1/events.py": "b6abfd0571cd3d704946ef5fcc4710b2627e5d26401c4bcb56561f827b715950",
-  "research/event_response_map_v1/metrics.py": "9172acfca4662f7d70012a61b19b1fb2ea5352300c9522b3aacaac527aeca07d",
-  "research/event_response_map_v1/phase_d.py": "02a5c7e31e74c8c47b994820deb721199144f0de3645ffa32716637b297dc085",
+  "research/event_response_map_v1/events.py": "701abda1482d46cc12cac08c1fb8f4821df81393f52c1d076b3a132e0d83019c",
+  "research/event_response_map_v1/metrics.py": "fd876a17f21d5c8d0ce01ff61bd30518c985d2d7ed11fa1343e28caacb2469dd",
+  "research/event_response_map_v1/phase_d.py": "36f7b4f120dde4af3b694a2b2d270e9e71edf6587e3d764e729934bdee995f40",
   "research/event_response_map_v1/instrument_filter.py": "622df0bd9bdb34ff945583db1bf8851241dd68f31ef1f6e5acaea48d8db408d3",
   "research/event_response_map_v1/identity.py": "194e9ee41ecfc6223b96f6b19682cb7dc1ea65789a99caed52a8adbc9a92574e",
   "research/event_response_map_v1/r3_metadata.py": "0f58f05e9be2638efbcb4941b6f5efdf13940f5c36dac203ea6c8b47f57eab53",
@@ -293,7 +295,8 @@
  "spec": {
   "program": "EVENT_RESPONSE_MAP_V1",
   "status": "DISCOVERY_ONLY -- nothing produced by this program is validated; at most ONE hypothesis may later be nominated, frozen and pre-registered in a separate task",
-  "lock_revision": "3.1",
+  "lock_revision": "3.2",
+  "revision_3_2_change (owner, 2026-10-04; after Phase D attempt 1, no outputs/marker existed)": "MECHANICAL PERFORMANCE ONLY: (1) phase_d.events_for builds the symbol set ONCE per call (attempt 1 rebuilt set(bars_eq['symbol']) for every Form 4 row at phase_d.py:182 -> ~10 s per row, ~17 days projected); (2) events.outcomes precomputes per-symbol date->row maps and float64 open/close arrays and evaluates the SUSPECT_ADJUSTMENT window with the same pandas pct_change over consecutive available session rows plus a prefix sum (same arithmetic, row order and counts); (3) events.bar_presence replaces the per-call pandas MultiIndex membership test; (4) d0 coverage counts bar presence with one merge; the survivorship diagnostic builds its extended frame once; (5) metrics.evaluate computes cells in parallel worker processes ACROSS CELLS ONLY (same subset, same cell_metrics, same fixed seed 670067 in the byte-identical research_stats.py), ledger in locked grid order; (6) phase_d prints JSON progress lines (stage, counters, UTC). A differential test (tests/test_erm_rev32_differential.py) runs the REAL stage_run of revision 3.1 (53eb2da) and 3.2 on the same fixture store: identical events, outcomes, d0_coverage.json, cells.csv, report.md and trial_ledger.json. No rule, threshold, metric, universe, data, cost, screen, tolerance or output definition changed.",
   "revision_3_1_change (owner, 2026-10-01; no data existed)": "MECHANICAL ONLY: in phase_d.py the one-shot marker trial_ledger.json is now written LAST (write_outputs: cells.csv, report.md, then the marker); the run-once check that refuses when the marker exists is unchanged. A scoring pass that crashed before the marker may be re-run once; once the marker exists a re-run is refused. No rule, threshold, metric, universe, data, cost, screen or tolerance changed; the downloader is unchanged; no price data existed.",
   "revision_3_changes (owner, 2026-10-01; no data existed)": {
    "R1_FIX_a_sp500_exemption": "point-in-time S&P 500 members (any day 2019-2023) are exempt from R1a (index membership = operating common stock); R1b still applies where a CIK exists",

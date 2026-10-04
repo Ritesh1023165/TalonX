@@ -35,6 +35,13 @@ FORM345_QUARTERS = [f"{y}q{q}" for y in range(2019, 2024) for q in range(1, 5)]
 FORM345_URL = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{}_form345.zip"
 
 
+def progress(stage: str, **counters) -> None:
+    """LOCK REV 3.2: one JSON progress line (stage, counters, UTC) on stdout = the runner's phase_d_run.out.log."""
+    from datetime import datetime, timezone
+    print(json.dumps({"utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "stage": stage, **counters},
+                     default=str), flush=True)
+
+
 def preflight(args) -> dict:
     if not args.go:
         raise SystemExit("Phase D requires the owner's go (--go)")
@@ -151,12 +158,14 @@ def stage_run(cand: dict) -> None:
     guard = LockedRangeGuard(EVENT_RESPONSE_MAP_V1)
     bars, dq_all = D.load(ARCH / "alpaca", purpose="RETURNS", guard=guard)
     raw, dq_raw = D.load(ARCH / "alpaca", purpose="ELIGIBILITY_ONLY", guard=guard)
+    progress("loaded", returns_rows=len(bars), eligibility_rows=len(raw))
     sessions = sorted(bars.loc[bars["symbol"] == "SPY", "date"].unique())
     bench = {b: bars[bars["symbol"] == b] for b in D.BENCHMARKS}
     eq = bars[~bars["symbol"].isin(D.BENCHMARKS)]
     elig = U.eligibility(raw, sessions)
     r3 = cand["r3"]
     elig, n_masked = mask_sic6770(elig, r3["sic6770_windows"])              # R1b on the DATED SIC (R7)
+    progress("eligibility", rows=len(elig), eligible=int(elig["eligible"].sum()), sic6770_masked=n_masked)
     intervals = {c: [(s_, date.fromisoformat(lo), date.fromisoformat(hi)) for s_, lo, hi in v]
                  for c, v in r3["intervals"].items()}
     from research.event_response_map_v1 import identity as I
@@ -173,24 +182,37 @@ def stage_run(cand: dict) -> None:
     filings = pd.DataFrame([{**f, "cik": c} for c in sorted(intervals) for f in _dev_filings(c, sec)],
                            columns=["cik", "form", "filingDate", "acceptanceDateTime", "items", "accessionNumber"])
     form4_rows = _form4_p_rows(sec)
+    progress("inputs", filings=len(filings), form4_p_rows=len(form4_rows))
 
-    def events_for(bars_eq, elig_):
-        have = pd.MultiIndex.from_arrays([bars_eq["symbol"], bars_eq["date"]])
-        k8, k8c = E.eight_k_events_dated(filings, intervals, sessions, lambda s_, d: (s_, d) in have)
-        k8 = k8[k8["symbol"].isin(set(bars_eq["symbol"]))]
+    def events_for(bars_eq, elig_, tag="main"):
+        # LOCK REV 3.2: the symbol set is built ONCE per call (attempt 1 rebuilt it per Form 4 row: phase_d.py:182)
+        syms = set(bars_eq["symbol"].unique())
+        has_bar = E.bar_presence(bars_eq)
+        k8, k8c = E.eight_k_events_dated(filings, intervals, sessions, has_bar)
+        k8 = k8[k8["symbol"].isin(syms)]
+        progress("events_8k", pass_=tag, rows=len(k8), **k8c)
         f4rows, f4c = E.form4_rows_dated(form4_rows, intervals)
-        f4rows = [r for r in f4rows if r["issuer_sym"] in set(bars_eq["symbol"])]
-        ev_ = pd.concat([E.gap_events(bars_eq, sessions).drop(columns="gap"), k8.drop(columns="causal_utc"),
+        f4rows = [r for r in f4rows if r["issuer_sym"] in syms]
+        progress("events_form4", pass_=tag, rows=len(f4rows), **f4c)
+        gaps = E.gap_events(bars_eq, sessions).drop(columns="gap")
+        progress("events_gaps", pass_=tag, rows=len(gaps))
+        ev_ = pd.concat([gaps, k8.drop(columns="causal_utc"),
                          E.form4_cluster_events(_episodes(f4rows), sessions)], ignore_index=True)
-        return E.attach_bucket(E.dedup(ev_), elig_), {"eight_k": k8c, "form4": f4c}
+        out = E.attach_bucket(E.dedup(ev_), elig_)
+        progress("events_attached", pass_=tag, rows=len(out))
+        return out, {"eight_k": k8c, "form4": f4c}
 
     ev, attribution = events_for(eq, elig)
     ev = pd.concat([ev, E.no_event_control(ev, elig, sessions)], ignore_index=True)
-    obs, counts = E.outcomes(ev, eq, bench, bench_of, sessions)
+    progress("no_event_control", events_total=len(ev))
+    obs, counts = E.outcomes(ev, eq, bench, bench_of, sessions, progress=progress)
     (OUT / "d0_coverage.json").write_text(json.dumps(d0_coverage(eq, elig, cand, obs), indent=1, default=str))
-    ledger = M.evaluate(obs)
+    progress("d0_coverage")
+    ledger = M.evaluate(obs, progress=progress)
     calib = M.classify(ledger)                              # LOCK REV 2 (R2)
+    progress("classified")
     diag = survivorship_diagnostic(ledger, obs, sessions, bench, bench_of, events_for, guard)   # R1-FIX c
+    progress("survivorship_diagnostic")
     cmap = {s_: (v["cik"], v["method"]) for s_, v in r3["identity"].items()}
     inactive = 0
     counts.update({"sic6770_symbol_days_masked": n_masked, "attribution": attribution,
@@ -198,6 +220,7 @@ def stage_run(cand: dict) -> None:
     write_outputs(OUT, calib, ledger, counts, {**counts, **dq_all, "eligibility_raw": dq_raw,
                                                "cik_methods": _count(m for _, m in cmap.values()),
                                                "unmapped_inactive_cik": inactive})
+    progress("outputs_written")
     guard.record({"event": "phase_d_run_complete", "cells": len(ledger), "observations": len(obs),
                   "classification": calib["classification"]})
 
@@ -318,13 +341,13 @@ def survivorship_diagnostic(ledger, obs, sessions, bench, bench_of, events_for, 
     by = {}
     for (b, y), g in e.assign(y=[d.year for d in e["date"]]).groupby(["bucket", "y"]):
         by[f"{b}|{y}"] = {"eligible_symbol_days": len(g), "distinct_symbols": int(g["symbol"].nunique())}
-    dev, _ = events_for(dbars, delig)
-    dobs, _ = E.outcomes(dev, dbars, bench, bench_of, sessions)
+    dev, _ = events_for(dbars, delig, "survivorship")
+    dobs, _ = E.outcomes(dev, dbars, bench, bench_of, sessions, progress=progress)
     flagged = 0
+    ext = pd.concat([obs, dobs], ignore_index=True) if len(dobs) else obs     # LOCK REV 3.2: built once
     for c in ledger:
         if not c["screen"]["SCREEN_PASS"]:
             continue
-        ext = pd.concat([obs, dobs], ignore_index=True) if len(dobs) else obs
         sub = ext[(ext["event_type"] == c["event_type"]) & (ext["horizon"] == c["horizon"]) & (ext["bucket"] == c["bucket"])]
         m2 = M.cell_metrics(sub, c["direction"], c["bucket"])
         s2 = M.screen(m2, c["event_type"])
@@ -369,11 +392,13 @@ def d0_coverage(eq, elig, cand: dict, obs=None) -> dict:
 
 def bucket_year_coverage(eq, elig, obs=None) -> dict:
     e = elig[elig["eligible"]][["symbol", "date", "bucket"]]
-    import pandas as pd
-    have = pd.MultiIndex.from_arrays([eq["symbol"], eq["date"]])
+    # LOCK REV 3.2: presence of the ALL bar on each eligible symbol-day via one merge (was a per-row MultiIndex test)
+    keys = eq[["symbol", "date"]].drop_duplicates().assign(_have=True)
+    e = e.merge(keys, on=["symbol", "date"], how="left")
+    e["_have"] = e["_have"].fillna(False).astype(bool)
     res = {}
     for (b, y), g in e.assign(y=[d.year for d in e["date"]]).groupby(["bucket", "y"]):
-        pres = sum((s, d) in have for s, d in zip(g["symbol"], g["date"]))
+        pres = int(g["_have"].sum())
         res[f"{b}|{y}"] = {"eligible_symbol_days": len(g), "distinct_symbols": int(g["symbol"].nunique()),
                            "all_bar_present_rate": round(pres / len(g), 6)}
     if obs is not None and len(obs):

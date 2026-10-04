@@ -124,12 +124,58 @@ def classify(ledger: list[dict]) -> dict:
             "nominatable_cells": sum(1 for c in ledger if c["screen"]["nominatable"])}
 
 
-def evaluate(obs: pd.DataFrame, *, n_resamples: int = N_RESAMPLES) -> list[dict]:
-    """Every cell in the locked grid is evaluated and ledgered (empty cells included, n=0)."""
+def _cell_job(args):
+    sub, d, b, n = args
+    return cell_metrics(sub, d, b, n_resamples=n)
+
+
+def eval_workers() -> int:
+    """Worker processes for ``evaluate`` (env ERM_EVAL_WORKERS overrides; 1 = sequential)."""
+    import os
+    env = os.environ.get("ERM_EVAL_WORKERS")
+    return max(1, int(env)) if env else max(1, min(4, (os.cpu_count() or 2) - 2))
+
+
+def evaluate(obs: pd.DataFrame, *, n_resamples: int = N_RESAMPLES, workers: int | None = None,
+             progress=None) -> list[dict]:
+    """Every cell in the locked grid is evaluated and ledgered (empty cells included, n=0).
+    LOCK REV 3.2 (mechanical, identical results): cells are computed in parallel worker processes, ACROSS CELLS ONLY.
+    Each cell's computation is unchanged (same subset, same cell_metrics, same fixed seed 670067 inside the
+    byte-identical research_stats.bootstrap_ci_clustered), and the ledger keeps the locked grid order."""
+    grid = cells()
+    workers = eval_workers() if workers is None else max(1, workers)
+    subs: dict = {}
+
+    def job(i):
+        e, d, h, b = grid[i]
+        if (e, h, b) not in subs:                       # LONG and SHORT share one subset
+            subs.clear()
+            subs[(e, h, b)] = obs[(obs["event_type"] == e) & (obs["horizon"] == h) & (obs["bucket"] == b)]
+        return (subs[(e, h, b)], d, b, n_resamples)
+    results: list = [None] * len(grid)
+    if workers == 1:
+        for i in range(len(grid)):
+            results[i] = _cell_job(job(i))
+            if progress is not None and (i + 1) % 30 == 0:
+                progress("evaluate", cells_done=i + 1, cells_total=len(grid))
+    else:
+        from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            pending, nxt, done_n = {}, 0, 0
+            while nxt < len(grid) or pending:
+                while nxt < len(grid) and len(pending) < 2 * workers:     # bounded in-flight subsets (memory)
+                    pending[ex.submit(_cell_job, job(nxt))] = nxt
+                    nxt += 1
+                fin, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for f in fin:
+                    results[pending.pop(f)] = f.result()
+                    done_n += 1
+                    if progress is not None and done_n % 30 == 0:
+                        progress("evaluate", cells_done=done_n, cells_total=len(grid), workers=workers)
     ledger = []
-    for e, d, h, b in cells():
-        sub = obs[(obs["event_type"] == e) & (obs["horizon"] == h) & (obs["bucket"] == b)]
-        m = cell_metrics(sub, d, b, n_resamples=n_resamples)
+    for (e, d, h, b), m in zip(grid, results):
         ledger.append({"cell": f"{e}|{d}|{h}|{b}", "event_type": e, "direction": d, "horizon": h, "bucket": b,
                        "metrics": m, "screen": screen(m, e)})
+    if progress is not None:
+        progress("evaluate", cells_done=len(grid), cells_total=len(grid), workers=workers)
     return ledger

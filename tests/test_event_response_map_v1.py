@@ -430,8 +430,8 @@ def test_r4_coverage_breaks_out_by_bucket_and_year():
 
 def test_lock_revisions_recorded_in_spec():
     from research.event_response_map_v1.spec import SPEC
-    assert SPEC["lock_revision"] == "3.1"
-    assert any(k.startswith("revision_3_1_change") for k in SPEC)
+    assert SPEC["lock_revision"] == "3.2"
+    assert any(k.startswith("revision_3_1_change") for k in SPEC) and any(k.startswith("revision_3_2_change") for k in SPEC)
     assert any(k.startswith("revision_2_changes") for k in SPEC) and any(k.startswith("revision_3_changes") for k in SPEC)
 
 
