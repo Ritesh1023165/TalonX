@@ -8,3 +8,11 @@ results/task83_r1_production_collector_closure/** text eol=lf
 research/common/** text eol=lf
 research/event_response_map_v1/** text eol=lf
 results/event_response_map_v1/** text eol=lf
+# Gate D outputs (2026-10-04): committed BYTE-EXACT as written by the run (no EOL normalisation)
+results/event_response_map_v1/cells.csv -text
+results/event_response_map_v1/report.md -text
+results/event_response_map_v1/d0_coverage.json -text
+results/event_response_map_v1/trial_ledger.json -text
+results/event_response_map_v1/phase_d_runner.log -text
+results/event_response_map_v1/phase_d_run.out.log -text
+results/event_response_map_v1/phase_d_run.err.log -text

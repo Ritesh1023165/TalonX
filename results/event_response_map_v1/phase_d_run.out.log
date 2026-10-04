@@ -1,0 +1,33 @@
+{"utc": "2026-10-04T13:02:30Z", "stage": "loaded", "returns_rows": 6323392, "eligibility_rows": 6315307}
+{"utc": "2026-10-04T13:04:08Z", "stage": "eligibility", "rows": 6183597, "eligible": 2017905, "sic6770_masked": 370}
+{"utc": "2026-10-04T13:05:28Z", "stage": "inputs", "filings": 1906075, "form4_p_rows": 158778}
+{"utc": "2026-10-04T13:08:41Z", "stage": "events_8k", "pass_": "main", "rows": 236754, "ASSIGNED_CONSISTENT": 230247, "AMBIGUOUS": 6792, "NO_VALID_TICKER": 17909, "DISAGREE": 1460, "NO_BAR_ANY": 10752}
+{"utc": "2026-10-04T13:08:41Z", "stage": "events_form4", "pass_": "main", "rows": 102874, "MATCH": 105150, "DISAGREE": 2408, "AMBIGUOUS": 2118, "NO_VALID_TICKER": 6587, "CIK_NOT_IN_UNIVERSE": 42515}
+{"utc": "2026-10-04T13:09:06Z", "stage": "events_gaps", "pass_": "main", "rows": 778720}
+{"utc": "2026-10-04T13:09:19Z", "stage": "events_attached", "pass_": "main", "rows": 248693}
+{"utc": "2026-10-04T13:09:25Z", "stage": "no_event_control", "events_total": 395519}
+{"utc": "2026-10-04T13:09:50Z", "stage": "outcomes", "events_done": 200000, "events_total": 395519, "rows": 997705}
+{"utc": "2026-10-04T13:10:06Z", "stage": "outcomes", "events_done": 395519, "events_total": 395519, "rows": 1973564}
+{"utc": "2026-10-04T13:10:31Z", "stage": "d0_coverage"}
+{"utc": "2026-10-04T13:11:13Z", "stage": "evaluate", "cells_done": 30, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:11:44Z", "stage": "evaluate", "cells_done": 60, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:12:04Z", "stage": "evaluate", "cells_done": 90, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:12:44Z", "stage": "evaluate", "cells_done": 120, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:13:12Z", "stage": "evaluate", "cells_done": 150, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:13:29Z", "stage": "evaluate", "cells_done": 180, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:13:58Z", "stage": "evaluate", "cells_done": 210, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:14:26Z", "stage": "evaluate", "cells_done": 240, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:14:58Z", "stage": "evaluate", "cells_done": 270, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:15:32Z", "stage": "evaluate", "cells_done": 300, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:16:05Z", "stage": "evaluate", "cells_done": 330, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:16:18Z", "stage": "evaluate", "cells_done": 360, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:17:47Z", "stage": "evaluate", "cells_done": 390, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:17:47Z", "stage": "evaluate", "cells_done": 390, "cells_total": 390, "workers": 4}
+{"utc": "2026-10-04T13:17:47Z", "stage": "classified"}
+{"utc": "2026-10-04T13:21:10Z", "stage": "events_8k", "pass_": "survivorship", "rows": 56, "ASSIGNED_CONSISTENT": 56, "AMBIGUOUS": 6792, "NO_VALID_TICKER": 17909, "DISAGREE": 0, "NO_BAR_ANY": 242403}
+{"utc": "2026-10-04T13:21:11Z", "stage": "events_form4", "pass_": "survivorship", "rows": 687, "MATCH": 105150, "DISAGREE": 2408, "AMBIGUOUS": 2118, "NO_VALID_TICKER": 6587, "CIK_NOT_IN_UNIVERSE": 42515}
+{"utc": "2026-10-04T13:21:12Z", "stage": "events_gaps", "pass_": "survivorship", "rows": 104287}
+{"utc": "2026-10-04T13:21:12Z", "stage": "events_attached", "pass_": "survivorship", "rows": 1222}
+{"utc": "2026-10-04T13:21:13Z", "stage": "outcomes", "events_done": 1222, "events_total": 1222, "rows": 6109}
+{"utc": "2026-10-04T13:22:22Z", "stage": "survivorship_diagnostic"}
+{"utc": "2026-10-04T13:22:22Z", "stage": "outputs_written"}
