@@ -72,6 +72,28 @@ Set the policy explicitly in the supervisor environment; a respawn inherits it. 
 
 The same view appears on the `:8787` **Opportunity Engine** tab and on `/ping`.
 
+### Restart semantics (since the 2026-10-04 P0 runtime hardening)
+
+- **Ownership and liveness = the OS lock.** Each component holds an exclusive OS lock on
+  `results/opportunity/locks/<component>.lock` (msvcrt byte-range lock on Windows) for its whole lifetime. A component
+  is running if and only if that lock is held. The OS releases it when the process exits for any reason.
+- **The PID file is display only.** `locks/<component>.pid` shows the current owner's PID. It is never used to decide
+  liveness, so a reused PID after a reboot can neither block a start nor be force-killed (force-kill also requires the
+  process command line to be that component).
+- **`restart <component>` routes via the supervisor.** While a supervisor (`up --supervise`) has a fresh heartbeat
+  (< 60 s), the CLI only writes `control/<component>.restart`, and the supervisor performs the restart with its own
+  environment (`RESTART_REQUESTED` -> `SUPERVISOR_PERFORMED_RESTART`). The CLI spawns directly only when no supervisor is
+  alive.
+- **A failed stop never spawns.** A restart spawns only after the old owner's lock is confirmed released; otherwise it is
+  recorded as `RESTART_ABORTED_STOP_FAILED` and the CLI exits non-zero.
+- **One supervisor.** The supervisor holds its own lock (`locks/supervisor.lock`); a second `up --supervise` is refused.
+- **A second instance is refused.** `up` reports `ALREADY_RUNNING` for a running component, and `component <c>` exits with
+  `AlreadyRunning`.
+
+**Retired:** the interim directive "stop `up --supervise` before running `restart`" is **retired** as of this deploy.
+It existed only because a CLI restart and the supervisor could both spawn the same component. Run `restart` with the
+supervisor running; that is now the intended path.
+
 ## Live hot-fix procedure (deployment boundaries)
 
 1. Change the code or config on a branch and review it.
