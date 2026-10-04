@@ -16,7 +16,8 @@
 #     (which exists only to keep live-shared Alpaca/SEC traffic off trading days) in this mode only;
 #   * NO automatic crash re-run: this run IS the one re-execution; a crash is logged (CRASH + ABORT), owner decides.
 # The runner never pushes to git and never touches the live worktree.
-param([switch]$PreflightOnly, [switch]$ScoringOnly)
+param([switch]$PreflightOnly, [switch]$ScoringOnly, [int]$StageTimeoutMinutes = 170, [int]$DownloadTimeoutMinutes = 120)
+# Runner's own scoring timeout 170 min fires before Task Scheduler's 180 min limit, so TIMEOUT_KILLED is always logged.
 $ErrorActionPreference = 'Stop'
 $WT   = 'C:\workspace\TalonX-erm'
 $PY   = 'C:\workspace\TalonX\.venv\Scripts\python.exe'
@@ -45,13 +46,22 @@ function Py([string]$code) {
     $r = Native { & $PY -c $code }
     return @{ rc = $r.rc; out = (($r.lines | Where-Object { $_ -notmatch '^OFFLINE_GUARD_ACTIVE' }) -join ' ').Trim() }
 }
+. (Join-Path $WT 'research\event_response_map_v1\tools\jobrun.ps1')       # Invoke-InJob (Job Object, KILL_ON_JOB_CLOSE)
 function RunStage([string]$stage) {
+    # ORPHAN FIX (2026-10-04): the stage runs inside a Job Object with KILL_ON_JOB_CLOSE, created suspended and
+    # assigned before it executes -> if THIS runner dies (e.g. Task Scheduler's limit) the OS kills the whole tree;
+    # the runner also enforces its own timeout (TerminateJobObject on the whole tree) and logs TIMEOUT_KILLED.
     $so = Join-Path $OUT "phase_d_$stage.out.log"; $se = Join-Path $OUT "phase_d_$stage.err.log"
     if ($ScoringOnly) { $env:PYTHONPATH = $OFFLINE } else { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
-    $p = Start-Process -FilePath $PY -WorkingDirectory $WT -NoNewWindow -Wait -PassThru `
-         -ArgumentList @('-u', '-m', 'research.event_response_map_v1.phase_d', '--go', '--eligibility-raw-approved', '--stage', $stage) `
-         -RedirectStandardOutput $so -RedirectStandardError $se
-    return $p.ExitCode
+    $limit = $(if ($stage -eq 'run') { $StageTimeoutMinutes } else { $DownloadTimeoutMinutes })
+    $cmd = "`"$env:SystemRoot\System32\cmd.exe`" /S /C `"`"$PY`" -u -m research.event_response_map_v1.phase_d --go --eligibility-raw-approved --stage $stage > `"$so`" 2> `"$se`"`""
+    $r = Invoke-InJob -CommandLine $cmd -WorkingDirectory $WT -TimeoutSeconds ($limit * 60)
+    if ($r.TimedOut) {
+        Log @{ event = 'TIMEOUT_KILLED'; stage = $stage; limit_minutes = $limit; job_active_processes_after = $r.ActiveProcessesAfter;
+               no_survivor = ($r.ActiveProcessesAfter -eq 0); pid = $r.Pid }
+        return 124
+    }
+    return $r.ExitCode
 }
 function MoveAside([string[]]$paths, [string]$tag) {
     $dst = Join-Path $OUT ("_{0}_{1}" -f $tag, (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'))

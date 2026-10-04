@@ -1,6 +1,6 @@
 """LOCK REV 3.2 differential test: revision 3.1 code (53eb2da) vs the current code, the REAL phase_d.stage_run on the
 same deterministic fixture store -> identical events, outcomes, d0_coverage.json, cells.csv, report.md, trial_ledger
-.json (and screen.csv, which neither revision produces). 3.2 runs with 2 parallel evaluate workers, 3.1 sequentially.
+.json (and screen.csv, which neither revision produces). 3.2 runs with 4 parallel evaluate workers (production), 3.1 sequentially.
 Offline: the fixture SEC archive is complete and the driver refuses any socket connect."""
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def test_rev31_vs_rev32_identical_on_fixture(tmp_path):
     _rev31(a)
     _current(b)
     _run(a, tmp_path / "dump31", workers=1)
-    _run(b, tmp_path / "dump32", workers=2)
+    _run(b, tmp_path / "dump32", workers=4)                  # production setting
     names = sorted(p.name for p in (tmp_path / "dump31").iterdir())
     assert names == sorted(p.name for p in (tmp_path / "dump32").iterdir())
     for must in ("events_1.csv", "outcomes_1.csv", "events_2.csv", "outcomes_2.csv", "cells.csv", "report.md",
