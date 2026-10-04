@@ -58,7 +58,8 @@ def seconds_to_next_boundary(now: datetime, interval: int) -> float:
 
 class Discovery:
     def __init__(self, *, root=None, cfg: ContinuousResearchConfig = CONTINUOUS_RESEARCH_V1, sec=None,
-                 ledger_path: str | None = None, v2_scope: set[str] | None = None, clock=None, state_reader=None):
+                 ledger_path: str | None = None, v2_scope: set[str] | None = None, clock=None, state_reader=None,
+                 admission_reader=None):
         self.root, self.cfg = root, cfg
         self.store = OpportunityStore(root)
         self.sec = sec
@@ -68,7 +69,23 @@ class Discovery:
         self.state_reader = state_reader or (lambda wid: read_state(root, wid))
         from talonx_opportunity import universe_tiers as U
         self.dtu_mode = U.mode()
+        self.dtu_policy = U.policy_from_env()
+        self.admission_reader = admission_reader or (lambda wid: U.read_admission(root, wid, self.dtu_policy))
+        self._admission: tuple[str, set[str]] | None = None      # (window_id, qualifying set): immutable per snapshot
         self.last_summary: dict = {}
+
+    def _admissible(self, wid: str) -> set[str] | None:
+        """Live-floor admission set of this window (None = no live floor: V1 behaviour). Fails CLOSED (empty set)
+        while the window has no snapshot of the running policy."""
+        from talonx_opportunity import universe_tiers as U
+        if self.dtu_mode != U.ACTIVE or not U.has_live_floor(self.dtu_policy):
+            return None
+        if self._admission is None or self._admission[0] != wid:
+            got = self.admission_reader(wid)
+            if got is None:
+                return set()
+            self._admission = (wid, set(got))
+        return self._admission[1]
 
     # -- catalyst (identical to V1 Engine._catalyst, parameterised by the window) --------------------------------
     def _catalyst(self, member: dict, sym: str, decision: datetime, w) -> CatalystEvidence:
@@ -132,6 +149,10 @@ class Discovery:
                 dtu_info.update(applied=True, active=len(act["symbols"]), cycle_utc=act["cycle_utc"])
             else:                                       # fail safe: full universe, visible in the funnel
                 dtu_info.update(applied=False, fallback=(act or {}).get("fallback") or "NO_ACTIVE_SET")
+        admissible = self._admissible(w.window_id)
+        if admissible is not None:                      # live floor: NEW identities only from the qualifying set
+            dtu_info.update(policy=self.dtu_policy.version, admissible=len(admissible),
+                            admission="FAIL_CLOSED_NO_SNAPSHOT" if not admissible else "SNAPSHOT")
         funnel = {"UNIVERSE": len(st["members"]), "ELIGIBLE": len(members), "DTU": dtu_info, "DATA_READY": 0,
                   "HARD_REJECTED": 0,
                   "NOT_DATA_READY": 0, "PROVIDER_INCOMPLETE": 0, "SCORED": 0, "WATCH": 0, "BULLISH_SETUP": 0,
@@ -182,7 +203,7 @@ class Discovery:
                 "adjustment": cap.adjustment, "data_as_of_utc": as_of.isoformat(), "phase": phase,
                 "ingestion_cycle_utc": ing["cycle_utc"], "provider_complete": not incomplete,
                 "incomplete_symbols": len(incomplete)}
-        n_ev = self._apply_lifecycle(now, as_of, phase, w, obs, members, funnel, prov)
+        n_ev = self._apply_lifecycle(now, as_of, phase, w, obs, members, funnel, prov, admissible=admissible)
         funnel["EVENTS"] = n_ev
         funnel["ACTIVE_CANDIDATES"] = len(self.store.active_candidates())
         self._scan_row(now, w, phase, "SCANNED", cap.as_dict(), funnel, as_of, time.monotonic() - t0)
@@ -194,7 +215,7 @@ class Discovery:
         return seconds_to_next_boundary(self.clock(), cadence_s(phase, now, self.cfg))
 
     # -- lifecycle -------------------------------------------------------------------------------------------------
-    def _apply_lifecycle(self, now, as_of, phase, w, obs, members, funnel, prov) -> int:
+    def _apply_lifecycle(self, now, as_of, phase, w, obs, members, funnel, prov, admissible=None) -> int:
         n = 0
         active = {}
         for c in self.store.active_candidates():
@@ -219,6 +240,10 @@ class Discovery:
                     n += 1
             else:
                 if o.gap_pct is None or o.classification not in ACTIVE:
+                    continue
+                if admissible is not None and sym not in admissible:
+                    # outside the live universe (fetched only to manage existing work): never a NEW identity
+                    funnel["ADMISSION_BLOCKED_LIVE_FLOOR"] = funnel.get("ADMISSION_BLOCKED_LIVE_FLOOR", 0) + 1
                     continue
                 cid = A.candidate_id(w.window_id, sym, A.family_of(o.gap_pct))
                 if self.store.candidate(cid) is not None:
@@ -336,6 +361,6 @@ def main(argv=None) -> int:
             sec_refresh.OBSERVABILITY_ONLY else "BACKGROUND_REFRESH_V1+CAPACITY_REMEDIATION_V1"
     from talonx_opportunity import universe_tiers as U
     if disc.dtu_mode == U.ACTIVE:                       # key only when ACTIVE: OFF keeps today's fingerprints (rollback)
-        fps["DTU"] = U.DTU_V1.fingerprint()
+        fps["DTU"] = disc.dtu_policy.fingerprint()
     run_component("discovery", tick=disc.tick, root=root, detail=disc.detail, config_fps=fps)
     return 0

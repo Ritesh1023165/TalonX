@@ -65,6 +65,20 @@ def ro(p):
     return c
 
 
+def universe_segment(wid: str, live: Path = LIVE) -> str:
+    """The Opportunity Engine universe policy that produced this window's Signals. Windows of different policies are
+    separate segments of this tracker and are never pooled as one unchanged experiment (2026-10-04 live floor)."""
+    try:
+        r = ro(live / "market.db").execute("SELECT policy_fp FROM dtu_snapshots WHERE window_id=?", (wid,)).fetchone()
+    except sqlite3.Error:
+        r = None
+    if r is None:
+        return "UNKNOWN_NO_DTU_SNAPSHOT"
+    from talonx_opportunity import universe_tiers as U
+    return {p.fingerprint(): n for n, p in U.POLICIES.items()}.get(r[0], f"UNKNOWN_POLICY_{r[0]}")
+
+
+
 def trade_id(promotion_id: str, mode: str) -> str:
     return hashlib.sha256(f"{V.VR_PAPER_VERSION}|{promotion_id}|{mode}".encode()).hexdigest()[:16]
 
@@ -191,6 +205,10 @@ class VRLive:
         now = self.now_fn()
         T = now - SIP_DELAY                                   # the virtual market clock
         n_new = self.ingest(wid)
+        if n_new and self.con.execute("SELECT 1 FROM meta WHERE k=?", (f"universe_segment:{wid}",)).fetchone() is None:
+            with self.con:                                    # recorded once per window (segmentation, never pooled)
+                self.con.execute("INSERT OR IGNORE INTO meta VALUES (?,?)",
+                                 (f"universe_segment:{wid}", universe_segment(wid, self.live)))
         live = [dict(r) for r in self.con.execute(
             "SELECT * FROM trades WHERE window_id=? AND state IN ('PAPER_ENTRY_PENDING','OPEN') ORDER BY "
             "signal_market_time, trade_id", (wid,))]
@@ -324,7 +342,8 @@ def eod(wid: str) -> dict:
     con = sqlite3.connect(OUT / "vr_live.db")
     con.row_factory = sqlite3.Row
     rows = [dict(r) for r in con.execute("SELECT * FROM trades WHERE window_id=?", (wid,))]
-    res = {"window_id": wid, "version": V.VR_PAPER_VERSION, "fingerprint": V.policy_fingerprint()}
+    res = {"window_id": wid, "version": V.VR_PAPER_VERSION, "fingerprint": V.policy_fingerprint(),
+           "oe_universe_segment": universe_segment(wid)}
     for mode in MODES:
         ex = [r for r in rows if r["paper_mode"] == mode and r["state"] == "EXITED"]
         m = V.metrics([{"gross": r["gross_return"], "net": r["net_return"], "mfe": r["mfe"], "mae": r["mae"]} for r in ex])

@@ -14,6 +14,9 @@ python -m talonx_opportunity <command>
   deployments [--window D]                    deployment / change boundaries
   report [--window D]                         write the boundary-aware session report
   capabilities                                provider capability per phase
+  universe-report [--window D] [--preview DIR]   the live-universe (DTU) report of a window: from the live market.db
+                                              snapshot (read-only), or --preview: build the window's inputs +
+                                              snapshot in a scratch DIR (operational fetch; never the live stores)
 
 Lab delivery is double opt-in: `up --deliver` AND TALONX_NOTIFY_RESEARCH_ENABLED=1 in THIS process environment only
 (never in the V2 window). Research only: never trades, never emits a V2 TRADE_EVENT.
@@ -92,6 +95,74 @@ def _print_status(as_json: bool) -> int:
     return 0
 
 
+def _universe_report(wid: str | None, preview: str | None) -> int:
+    """Live-universe report. Default: the window's snapshot in the live market.db (read-only) -> the local report
+    files. --preview DIR: the same ingestion code path (members, V1 daily, as-traded live daily, snapshot, report) in
+    a scratch root; reads the live stores only read-only and never saves the shared universe.json."""
+    import sqlite3
+    import time
+    from datetime import date
+    from pathlib import Path
+    from talonx_opportunity import universe_tiers as U
+    from talonx_opportunity.db import REPO_ROOT, root_dir, unj, utcnow
+    from talonx_opportunity.phases import trading_window
+    policy = U.policy_from_env()
+    if preview:
+        from talonx_opportunity.ingestion import UNIVERSE_MAX_AGE_H, Ingestion
+        from talonx_ops.operator_control.gates import effective_symbols
+        from talonx_premarket import __main__ as M
+        M._env()
+        w = trading_window(date.fromisoformat(wid))
+
+        def load_no_save():
+            from talonx_premarket.universe import build_universe, load
+            p = REPO_ROOT / "results" / "premarket_research" / "universe.json"
+            if p.exists() and (time.time() - p.stat().st_mtime) < UNIVERSE_MAX_AGE_H * 3600:
+                return [m.__dict__ for m in load(p)], f"{p.name} (preview, read-only)"
+            ct = Path.home() / ".talonx" / "intelligence" / "company_tickers.json"
+            return [m.__dict__ for m in build_universe(ing.data.assets(), json.loads(ct.read_text(
+                encoding="utf-8")))], "rebuilt from Alpaca assets x SEC company_tickers (preview, NOT saved)"
+        ing = Ingestion(root=preview, universe_loader=load_no_save, dtu_mode=U.ACTIVE)
+        now = utcnow()
+        ing._ensure_window(w)
+        symbols = effective_symbols(ing.eligible(w.window_id))
+        ing._ensure_daily(w, symbols, now)
+        ing._dtu_init(w)
+        ing._dtu.root = None                         # protection readers: the LIVE stores (read-only)
+        ing._dtu_prepare(w, symbols, now)
+        print(json.dumps({"preview_root": preview, "requests": ing.data.requests, "prep": ing.dtu_prep}, indent=1,
+                         default=str))
+        out = U.report_dir(preview, w.window_id) / f"universe_{w.window_id}_summary.txt"
+        if out.exists():
+            print(out.read_text(encoding="utf-8"))
+        return 0 if out.exists() else 1
+    p = root_dir(_root()) / "market.db"
+    con = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=10)
+    if wid is None:
+        r = con.execute("SELECT window_id FROM dtu_snapshots ORDER BY window_id DESC LIMIT 1").fetchone()
+        wid = r[0] if r else None
+    if wid is None:
+        print("no DTU snapshot in market.db")
+        return 2
+    w = trading_window(date.fromisoformat(wid))
+    row = con.execute("SELECT members_json FROM universe WHERE window_id=?", (wid,)).fetchone()
+    members = unj(row[0], []) if row else []
+    daily = {r[0]: unj(r[1], []) for r in con.execute("SELECT symbol, bars_json FROM daily WHERE window_id=?", (wid,))}
+    d = U.DTU.__new__(U.DTU)                         # read-only use: no schema, no writer handle
+    d.con, d.root, d.policy, d.readers, d.clock = con, _root(), policy, {}, utcnow
+    from talonx_premarket import __main__ as M
+    M._env()
+    rep = d.report(w, members, daily, v2_scope=set(M._v2_scope(None)))
+    if rep["meta"]["snapshot_policy_fp"] != policy.fingerprint():
+        print(f"WARNING: the {wid} snapshot was built under policy {rep['meta']['snapshot_policy_fp']}, not "
+              f"{policy.version} ({policy.fingerprint()})")
+    paths = U.write_report(rep, U.report_dir(_root(), wid))
+    print(json.dumps({"paths": paths, "counts": rep["counts"], "reconciled": rep["reconciled"]}, indent=1,
+                     default=str))
+    print(U.summary_text(rep))
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m talonx_opportunity")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -119,7 +190,12 @@ def main(argv=None) -> int:
     rp = sub.add_parser("report")
     rp.add_argument("--window", default=None)
     sub.add_parser("capabilities")
+    ur = sub.add_parser("universe-report")
+    ur.add_argument("--window", default=None)
+    ur.add_argument("--preview", default=None)
     a = ap.parse_args(argv)
+    if a.cmd == "universe-report":
+        return _universe_report(a.window, a.preview)
 
     from talonx_opportunity import supervise as SV
     root = _root()

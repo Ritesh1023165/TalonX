@@ -51,7 +51,8 @@ class Ingestion:
                  clock=None, universe_loader=None, dtu_mode: str | None = None, dtu=None):
         from talonx_opportunity import universe_tiers as U
         self.dtu_mode = dtu_mode or U.mode()
-        self._dtu, self.dtu_last = dtu, None
+        self.dtu_policy = dtu.policy if dtu is not None else U.policy_from_env()
+        self._dtu, self.dtu_last, self.dtu_prep = dtu, None, None
         self._dtu_cache: tuple[str, list[dict], dict] | None = None
         self.root = root
         self.con = connect(market_db(root), schema=SCHEMA)
@@ -163,11 +164,13 @@ class Ingestion:
         from talonx_ops.operator_control.gates import effective_symbols     # identity unless ACTIVE (operator control)
         symbols = effective_symbols(self.eligible(w.window_id))
         self._ensure_daily(w, symbols, now)
+        from talonx_opportunity import universe_tiers as U
+        if self.dtu_mode == U.ACTIVE and U.has_live_floor(self.dtu_policy):
+            self._dtu_prepare(w, symbols, now)          # D-1 inputs + snapshot + report at window start (any phase)
         if not cap.usable_for_discovery:
             self.last_note = f"{phase}: {cap.availability} ({cap.evidence[:80]})"
             self._write_cycle(w, phase, None, 0, 0, None, t0, self.last_note)
             return 300.0
-        from talonx_opportunity import universe_tiers as U
         if self.dtu_mode == U.ACTIVE:                   # DTU: the effective active set, BEFORE any fetch batch is built
             symbols = self._dtu_symbols(w, symbols, now)
         as_of = data_as_of(now)
@@ -210,19 +213,48 @@ class Ingestion:
         self._write_cycle(w, phase, end, len(changed), nbars, (len(failed), agg_stats), t0, self.last_note)
         return self.cycle_s
 
-    def _dtu_symbols(self, w, symbols: list[str], now: datetime) -> list[str]:
+    def _dtu_init(self, w) -> None:
         from talonx_opportunity import universe_tiers as U
-        from talonx_ops.operator_control.gates import _state
         if self._dtu is None:
             from talonx_premarket import __main__ as M
             M._env()
-            self._dtu = U.DTU(self.con, root=self.root, headers=dict(self.data._headers), sec_ua=M._sec()._ua,
-                              clock=self.clock)
+            self._dtu = U.DTU(self.con, root=self.root, policy=self.dtu_policy, headers=dict(self.data._headers),
+                              sec_ua=M._sec()._ua, clock=self.clock, limiter=getattr(self.data, "limiter", None))
         if self._dtu_cache is None or self._dtu_cache[0] != w.window_id:
             row = self.con.execute("SELECT members_json FROM universe WHERE window_id=?", (w.window_id,)).fetchone()
             daily = {r["symbol"]: unj(r["bars_json"], []) for r in
                      self.con.execute("SELECT symbol, bars_json FROM daily WHERE window_id=?", (w.window_id,))}
             self._dtu_cache = (w.window_id, unj(row["members_json"], []) if row else [], daily)
+
+    def _dtu_prepare(self, w, symbols: list[str], now: datetime) -> None:
+        """Live-floor policy: as-traded D-1 inputs, the window snapshot and its local report as soon as the window
+        opens (before PREMARKET). Builds only once the inputs are complete; the per-cycle resolution builds anyway
+        (explicit LIVE_DATA_FETCH_FAILED reasons) if a fetch is still failing then. Errors never stop ingestion."""
+        from talonx_opportunity import universe_tiers as U
+        try:
+            st = self.con.execute("SELECT 1 FROM daily_state WHERE window_id=? AND failed_json='[]'",
+                                  (w.window_id,)).fetchone()
+            if st is None:
+                return                                   # V1 reference data first (same window, same members)
+            self._dtu_init(w)
+            live = self._dtu.ensure_live_daily(w, symbols, now)
+            if not live.get("complete"):
+                self.dtu_prep = {"window_id": w.window_id, "live_daily": live}
+                return
+            self._dtu.ensure_snapshot(w, self._dtu_cache[1], self._dtu_cache[2])
+            out = U.report_dir(self.root, w.window_id)
+            if not (out / f"universe_{w.window_id}.json").exists():
+                from talonx_premarket import __main__ as M
+                rep = self._dtu.report(w, self._dtu_cache[1], self._dtu_cache[2], v2_scope=set(M._v2_scope(None)))
+                self.dtu_prep = {"window_id": w.window_id, "report": U.write_report(rep, out),
+                                 "counts": {k: rep["counts"][k] for k in ("qualifying", "core", "removed")},
+                                 "reconciled": rep["reconciled"]}
+        except Exception as exc:  # noqa: BLE001 -- recorded; the per-cycle resolution keeps its own fail-safe
+            self.dtu_prep = {"window_id": w.window_id, "error": f"{type(exc).__name__}: {str(exc)[:200]}"}
+
+    def _dtu_symbols(self, w, symbols: list[str], now: datetime) -> list[str]:
+        from talonx_ops.operator_control.gates import _state
+        self._dtu_init(w)
         st = _state()                                   # operator overrides apply only in mutation mode ACTIVE
         added, removed, excluded = st if st is not None else (set(), set(), set())
         try:
@@ -255,7 +287,8 @@ class Ingestion:
     def detail(self) -> dict:
         return {"window_id": self._window_id, "note": self.last_note,
                 "requests": getattr(self._data, "requests", 0) if self._data else 0,
-                "dtu_mode": self.dtu_mode, "dtu": self.dtu_last}
+                "dtu_mode": self.dtu_mode, "dtu_policy": self.dtu_policy.version, "dtu": self.dtu_last,
+                "dtu_prep": self.dtu_prep}
 
 
 # -- read-only accessors used by other components -------------------------------------------------------------
@@ -283,6 +316,6 @@ def main(argv=None) -> int:
     root = os.environ.get("TALONX_OPP_ROOT")
     ing = Ingestion(root=root)
     from talonx_opportunity import universe_tiers as U
-    fps = {} if ing.dtu_mode == U.OFF else {"DTU": U.DTU_V1.fingerprint()}   # OFF keeps today's fingerprints
+    fps = {} if ing.dtu_mode == U.OFF else {"DTU": ing.dtu_policy.fingerprint()}   # OFF keeps today's fingerprints
     run_component("ingestion", tick=ing.tick, config_fps=fps, root=root, detail=ing.detail)
     return 0

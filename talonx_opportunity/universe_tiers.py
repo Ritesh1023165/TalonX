@@ -26,11 +26,26 @@ V1 45-min stale gate; TTL = rest of window) and SEC_8K (EDGAR current-events fee
 Relative-volume and Form 4 triggers are NOT implemented (no study evidence / no purchase codes universe-wide).
 Fail-safe: DTU ACTIVE with a missing / stale / corrupt snapshot (or any resolution error) -> FULL eligible universe,
 recorded as a fallback with its reason (never a silent partial universe).
+
+DTU_V2 LIVE FLOOR (owner decision 2026-10-04; tradability / workload, NOT evidence of profitability). DTU_V1 plus two
+inclusive floors every symbol must meet to be ADMISSIBLE as a new opportunity (Core / event tier):
+  * as-traded close of the reference session D-1 (the previous completed XNYS regular session) >= USD 5;
+  * ADV20 >= USD 20M, ADV20 = mean over the 20 completed XNYS sessions ending at D-1 of (close x volume) per session.
+Data: Alpaca SIP ``1Day`` bars with ``adjustment=raw`` (as-traded; never mixed with the split-adjusted ``daily`` table),
+fetched once per window by DATA_INGESTION into ``dtu_live_daily`` (end = session D 00:00 UTC - 1 s: no bar of D, no
+partial session, no lookahead). Bar ``c`` = official consolidated regular-session close, ``v`` = Alpaca's consolidated
+daily volume. All 20 sessions must have a valid bar (c > 0, v >= 0); otherwise an explicit LIVE_DATA_* reason. A failing
+symbol is AUTO_EXCLUDED with its reason (data quality first, then price / liquidity / both). Management is unchanged:
+V2 positions / intents, V2 execution scope, operator adds and open-candidate protections keep the symbol FETCHED, but
+discovery never creates a NEW identity for a symbol outside the window's qualifying set (fail closed without a
+snapshot of the active policy). ``TALONX_DTU_POLICY=DTU_V1`` is the rollback (bit-identical V1 fingerprint).
 """
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -75,6 +90,88 @@ class DTUPolicy:
 DTU_V1 = DTUPolicy()
 
 
+@dataclass(frozen=True)
+class LiveFloorPolicy(DTUPolicy):
+    """DTU_V1 + the owner's live-universe floors (both inclusive). A subclass, so DTU_V1's fingerprint is unchanged."""
+    version: str = "DTU_V2_LIVE_FLOOR"
+    live_min_close_usd: float = 5.0
+    live_min_adv20_usd: float = 20_000_000.0
+    live_sessions: int = 20
+    live_basis: str = ("Alpaca SIP 1Day adjustment=raw: as-traded official close of D-1; ADV20 = mean(close x volume) "
+                       "over the 20 completed XNYS sessions ending at D-1, all 20 required; floors inclusive")
+
+
+DTU_V2 = LiveFloorPolicy()
+POLICY_ENV = "TALONX_DTU_POLICY"
+POLICIES = {"DTU_V1": DTU_V1, "DTU_V2": DTU_V2}
+DEFAULT_POLICY = "DTU_V2"
+
+# live-floor reason codes (mutually exclusive; data quality is decided first, then the two thresholds)
+L_PRICE, L_LIQ, L_BOTH = "LIVE_BELOW_CLOSE_5", "LIVE_BELOW_ADV20_20M", "LIVE_BELOW_CLOSE_5_AND_ADV20_20M"
+D_FETCH, D_NONE, D_STALE, D_INSUFF, D_INVALID = ("LIVE_DATA_FETCH_FAILED", "LIVE_DATA_NO_HISTORY",
+                                                 "LIVE_DATA_STALE_NO_D1_BAR", "LIVE_DATA_INSUFFICIENT",
+                                                 "LIVE_DATA_INVALID_BAR")
+
+
+def policy_from_env(env=None) -> DTUPolicy:
+    name = str((env if env is not None else os.environ).get(POLICY_ENV, DEFAULT_POLICY)).strip().upper() \
+        or DEFAULT_POLICY
+    if name not in POLICIES:
+        raise SystemExit(f"{POLICY_ENV}={name!r}: allowed {' | '.join(POLICIES)}")
+    return POLICIES[name]
+
+
+def has_live_floor(policy: DTUPolicy) -> bool:
+    return isinstance(policy, LiveFloorPolicy)
+
+
+def completed_sessions(reference_session: str, n: int) -> list[str]:
+    """The ``n`` completed XNYS sessions ending at (and including) ``reference_session`` (early closes included)."""
+    from talonx_premarket.session import _xnys
+    return [d.date().isoformat() for d in _xnys().sessions_window(reference_session, -n)]
+
+
+def live_eligibility(bars: list[dict] | None, sessions: list[str], policy: LiveFloorPolicy
+                     ) -> tuple[float | None, float | None, int, str]:
+    """(as-traded D-1 close, ADV20, valid observations, reason) -- reason '' = passes both floors. ``sessions`` are the
+    required completed sessions (oldest .. D-1); a bar dated outside them (a later / partial / non-session bar) is
+    ignored, so nothing after D-1 can leak in."""
+    want = set(sessions)
+    by = {str(b.get("t", ""))[:10]: b for b in (bars or []) if str(b.get("t", ""))[:10] in want}
+    if not by:
+        return None, None, 0, D_NONE
+    dv: dict[str, float] = {}
+    for d, b in by.items():
+        try:
+            c, v = float(b["c"]), float(b["v"])
+        except (KeyError, TypeError, ValueError):
+            return None, None, 0, f"{D_INVALID}:{d}"
+        if not (math.isfinite(c) and math.isfinite(v) and c > 0 and v >= 0):
+            return None, None, 0, f"{D_INVALID}:{d}"
+        dv[d] = c * v
+    ref = sessions[-1]
+    if ref not in dv:
+        return None, None, len(dv), D_STALE
+    close = float(by[ref]["c"])
+    if len(dv) < policy.live_sessions:
+        return close, None, len(dv), f"{D_INSUFF}_{len(dv)}_OF_{policy.live_sessions}"
+    adv = sum(dv.values()) / len(dv)
+    low_p, low_l = close < policy.live_min_close_usd, adv < policy.live_min_adv20_usd
+    return close, adv, len(dv), (L_BOTH if low_p and low_l else L_PRICE if low_p else L_LIQ if low_l else "")
+
+
+def floor_category(state: str, reason: str) -> str:
+    """Mutually exclusive report bucket of one snapshot row."""
+    if state in (CORE, EVENT_ELIGIBLE):
+        return "QUALIFYING"
+    if state == STRUCTURAL:
+        return "STRUCTURAL"
+    r = reason or ""
+    if r.startswith("LIVE_DATA_"):
+        return "DATA_QUALITY"
+    return {L_PRICE: "PRICE_ONLY", L_LIQ: "LIQUIDITY_ONLY", L_BOTH: "PRICE_AND_LIQUIDITY"}.get(r, "RETAINED_V1_RULE")
+
+
 def mode(env=None) -> str:
     m = str((env if env is not None else os.environ).get(MODE_ENV, OFF)).strip().upper() or OFF
     if m not in (OFF, ACTIVE):
@@ -99,6 +196,9 @@ CREATE TABLE IF NOT EXISTS dtu_sweeps (id INTEGER PRIMARY KEY AUTOINCREMENT, win
     sec8k_promotions INTEGER, errors TEXT);
 CREATE TABLE IF NOT EXISTS dtu_edgar (accession TEXT PRIMARY KEY, cik TEXT, symbol TEXT, updated_utc TEXT,
     seen_utc TEXT);
+CREATE TABLE IF NOT EXISTS dtu_live_daily (window_id TEXT, symbol TEXT, bars_json TEXT, PRIMARY KEY (window_id, symbol));
+CREATE TABLE IF NOT EXISTS dtu_live_daily_state (window_id TEXT PRIMARY KEY, fetched_utc TEXT, sessions_json TEXT,
+    start_utc TEXT, end_utc TEXT, failed_json TEXT, requests INTEGER, source TEXT);
 """
 
 
@@ -112,9 +212,16 @@ def ts(s: str) -> datetime:
 
 # ============================================================================================================ pure
 def classify_members(members: list[dict], daily: dict[str, list[dict]], reference_session: str,
-                     policy: DTUPolicy = DTU_V1) -> list[dict]:
+                     policy: DTUPolicy = DTU_V1, *, live: dict[str, list[dict]] | None = None,
+                     live_failed: set[str] | frozenset = frozenset(), sessions: list[str] | None = None) -> list[dict]:
     """D-1 snapshot rows (deterministic): structural bucket, V1 floors, ADV20 rank, Core. Uses only daily bars dated
-    <= the reference session (causal)."""
+    <= the reference session (causal). A live-floor policy additionally needs ``live`` (as-traded raw daily bars),
+    ``live_failed`` (symbols whose raw fetch failed) and ``sessions`` (the required completed sessions ending at D-1);
+    its rows carry price / adv20 = the as-traded live values (prev_close stays the V1 reference close: gap basis)."""
+    floor = has_live_floor(policy)
+    if floor and (live is None or not sessions or len(sessions) != policy.live_sessions
+                  or sessions[-1] != reference_session):
+        raise ValueError("live-floor policy needs live bars and the completed sessions ending at the reference session")
     rows = []
     for m in members:
         s = m["symbol"]
@@ -123,8 +230,17 @@ def classify_members(members: list[dict], daily: dict[str, list[dict]], referenc
         prev_close = float(bars[-1]["c"]) if bars and str(bars[-1]["t"])[:10] == reference_session else None
         price = float(bars[-1]["c"]) if bars else None
         adv = sum(float(b["v"]) * float(b["c"]) for b in last20) / len(last20) if last20 else None
+        lprice = ladv = None
+        lreason = ""
+        if floor and m.get("status") == "ELIGIBLE":
+            if s in live_failed:
+                lreason = D_FETCH
+            else:
+                lprice, ladv, _, lreason = live_eligibility(live.get(s), sessions, policy)
         if m.get("status") != "ELIGIBLE":
             st, why = STRUCTURAL, f"STRUCTURAL:{m.get('reason') or 'EXCLUDED'}"
+        elif lreason:                                  # live floor: data quality, then price / liquidity / both
+            st, why, price, adv = AUTO_EXCLUDED, lreason, lprice, ladv
         elif price is None or adv is None:
             st, why = AUTO_EXCLUDED, "NO_D1_DAILY_HISTORY"
         elif price < policy.v1_min_price:
@@ -133,6 +249,8 @@ def classify_members(members: list[dict], daily: dict[str, list[dict]], referenc
             st, why = AUTO_EXCLUDED, "BELOW_V1_ADV20_FLOOR"
         else:
             st, why = EVENT_ELIGIBLE, ""
+            if floor:                                  # rank / display on the as-traded live values
+                price, adv = lprice, ladv
         rows.append({"symbol": s, "state": st, "reason": why, "price": price, "prev_close": prev_close, "adv20": adv,
                      "cik": m.get("cik"), "core_rank": None})
     ranked = sorted((r for r in rows if r["state"] == EVENT_ELIGIBLE), key=lambda r: (-r["adv20"], r["symbol"]))
@@ -149,8 +267,9 @@ def resolve(snapshot: dict[str, dict], *, now: str, promotions: list[dict], oper
             operator_excluded: set[str], v2_forced: set[str], positions: set[str], protections: dict[str, str]
             ) -> tuple[list[str], dict[str, tuple[str, str]]]:
     """Effective active set (sorted, deterministic) + state/reason for EVERY snapshot symbol.
-    Precedence: position/intent safety > OPERATOR_EXCLUDED > OPERATOR_ADDED / V2 scope > structural / floors >
-    CORE > live promotion > lifecycle protection > EVENT_ELIGIBLE."""
+    Precedence: position/intent safety > OPERATOR_EXCLUDED > OPERATOR_ADDED / V2 scope > structural > lifecycle
+    protection of an AUTO_EXCLUDED symbol (keeps it FETCHED for management; admission is decided by discovery) >
+    floors > CORE > live promotion > lifecycle protection > EVENT_ELIGIBLE."""
     live = {}
     for p in promotions:
         if p["started_utc"] <= now and (p["expires_utc"] is None or now < p["expires_utc"]):
@@ -164,6 +283,8 @@ def resolve(snapshot: dict[str, dict], *, now: str, promotions: list[dict], oper
             out[s] = (OPERATOR_EXCLUDED, "OPERATOR_EXCLUDED")
         elif s in operator_added or s in v2_forced:
             out[s] = (OPERATOR_ADDED, "OPERATOR_ADDED" if s in operator_added else "V2_EXECUTION_SCOPE")
+        elif r["state"] == AUTO_EXCLUDED and s in protections:
+            out[s] = (EVENT_PROMOTED, protections[s])  # open identity keeps its data; admission is decided upstream
         elif r["state"] in (STRUCTURAL, AUTO_EXCLUDED):
             out[s] = (r["state"], r["reason"])
         elif r["state"] == CORE:
@@ -196,23 +317,87 @@ class DTU:
     """Owned by DATA_INGESTION. ``con`` is ingestion's market.db connection (single writer)."""
 
     def __init__(self, con: sqlite3.Connection, *, root=None, policy: DTUPolicy = DTU_V1, headers=None, sec_ua=None,
-                 snapshot_fetch=None, edgar_fetch=None, clock=None, readers=None):
+                 snapshot_fetch=None, edgar_fetch=None, clock=None, readers=None, live_fetch=None, limiter=None):
         self.con, self.root, self.policy = con, root, policy
         self.con.executescript(SCHEMA)
         self.headers, self.sec_ua = headers, sec_ua
         self._snapshot_fetch, self._edgar_fetch = snapshot_fetch, edgar_fetch
+        self._live_fetch, self._limiter = live_fetch, limiter
         self.clock = clock or (lambda: datetime.now(UTC))
         self.readers = readers or {}
         self._last_sweep = self._last_edgar = 0.0
         self._last_fetch: list[str] | None = None
         self.last: dict = {}
 
+    # -- live-floor inputs (as-traded daily bars; DTU_V2) -------------------------------------------------------
+    def ensure_live_daily(self, w, symbols: list[str], now: datetime) -> dict:
+        """Once per window: as-traded (adjustment=raw) SIP 1Day bars of the required completed sessions for
+        ``symbols``; a failed batch is retried on the next call (its symbols stay pending). Never a bar of D."""
+        wid = w.window_id
+        st = self.con.execute("SELECT failed_json FROM dtu_live_daily_state WHERE window_id=?", (wid,)).fetchone()
+        pending = set(json.loads(st[0] or "[]")) if st else set(symbols)
+        if st is not None and not pending:
+            return {"complete": True, "fetched": 0}
+        sessions = completed_sessions(w.reference_session.isoformat(), self.policy.live_sessions)
+        start = datetime.fromisoformat(sessions[0]).replace(tzinfo=UTC)
+        from talonx_premarket.alpaca_data import data_as_of
+        end = min(datetime.combine(w.session, datetime.min.time(), UTC), data_as_of(now)) - timedelta(seconds=1)
+        bars, failed, nreq, src = self._fetch_live(sorted(pending), start, end)
+        with self.con:
+            for s in sorted(pending - failed):
+                self.con.execute("INSERT OR REPLACE INTO dtu_live_daily VALUES (?,?,?)",
+                                 (wid, s, json.dumps(bars.get(s, []))))
+            prev = self.con.execute("SELECT requests FROM dtu_live_daily_state WHERE window_id=?", (wid,)).fetchone()
+            self.con.execute("INSERT OR REPLACE INTO dtu_live_daily_state VALUES (?,?,?,?,?,?,?,?)",
+                             (wid, iso(self.clock()), json.dumps(sessions), iso(start), iso(end),
+                              json.dumps(sorted(failed)), (prev[0] if prev else 0) + nreq, src))
+        return {"complete": not failed, "fetched": len(pending - failed), "failed": len(failed), "requests": nreq}
+
+    def _fetch_live(self, symbols: list[str], start: datetime, end: datetime) -> tuple[dict, set, int, str]:
+        if self._live_fetch is not None:
+            return self._live_fetch(symbols, start, end)
+        import dataclasses
+        from talonx_premarket.alpaca_data import AlpacaData, RateLimiter
+        from talonx_premarket.config import PREMARKET_RESEARCH_V1
+        cfg = dataclasses.replace(PREMARKET_RESEARCH_V1, adjustment="raw")     # as-traded; feed stays SIP
+        data = AlpacaData(key_id=(self.headers or {}).get("APCA-API-KEY-ID", ""),
+                          secret=(self.headers or {}).get("APCA-API-SECRET-KEY", ""), cfg=cfg,
+                          limiter=self._limiter or RateLimiter(40))
+        res = data.bars_ex(symbols, timeframe="1Day", start=start, end=end)
+        return res.bars, set(res.failed), data.requests, f"alpaca {cfg.feed} 1Day adjustment={cfg.adjustment}"
+
+    def live_inputs(self, wid: str) -> tuple[dict[str, list[dict]], set[str], list[str]] | None:
+        st = self.con.execute("SELECT sessions_json, failed_json FROM dtu_live_daily_state WHERE window_id=?",
+                              (wid,)).fetchone()
+        if st is None:
+            return None
+        live = {r[0]: json.loads(r[1]) for r in self.con.execute(
+            "SELECT symbol, bars_json FROM dtu_live_daily WHERE window_id=?", (wid,))}
+        return live, set(json.loads(st[1] or "[]")), json.loads(st[0])
+
     # -- snapshot -----------------------------------------------------------------------------------------------
     def ensure_snapshot(self, w, members: list[dict], daily: dict[str, list[dict]]) -> dict[str, dict]:
         wid = w.window_id
-        if self.con.execute("SELECT 1 FROM dtu_snapshots WHERE window_id=?", (wid,)).fetchone() is None:
+        have = self.con.execute("SELECT policy_fp, snapshot_version FROM dtu_snapshots WHERE window_id=?",
+                                (wid,)).fetchone()
+        if have is not None and have[0] != self.policy.fingerprint():
+            # policy changed inside a window (deploy / rollback): rebuild under the running policy, recorded
+            with self.con:
+                self.con.execute("DELETE FROM dtu_snapshot WHERE window_id=?", (wid,))
+                self.con.execute("DELETE FROM dtu_snapshots WHERE window_id=?", (wid,))
+                self.con.execute("INSERT INTO dtu_transitions (at_utc, window_id, symbol, from_state, to_state, "
+                                 "reason) VALUES (?,?,?,?,?,?)", (iso(self.clock()), wid, "*", have[1],
+                                                                  self.policy.version, "SNAPSHOT_REBUILT_POLICY_CHANGE"))
+            have = None
+        if have is None:
             ref = w.reference_session.isoformat()
-            rows = classify_members(members, daily, ref, self.policy)
+            kw = {}
+            if has_live_floor(self.policy):
+                inp = self.live_inputs(wid)
+                if inp is None:
+                    raise RuntimeError("LIVE_DAILY_NOT_FETCHED")
+                kw = {"live": inp[0], "live_failed": inp[1], "sessions": inp[2]}
+            rows = classify_members(members, daily, ref, self.policy, **kw)
             ver = f"{wid}@{ref}#{self.policy.fingerprint()}"
             counts = {}
             for r in rows:
@@ -365,6 +550,23 @@ class DTU:
             prot[sym] = P_SIGNAL
         return prot, set(self._reader("positions", w))
 
+    def report(self, w, members: list[dict], daily: dict[str, list[dict]], *, v2_scope: set[str],
+               operator_added: set[str] = frozenset(), previous_policy: DTUPolicy | None = DTU_V1) -> dict:
+        """The window's auditable universe report (built snapshot vs the previous policy on the same window data)."""
+        snap = self.snapshot(w.window_id)
+        prev = None
+        if previous_policy is not None and previous_policy.fingerprint() != self.policy.fingerprint():
+            prev = {r["symbol"]: r for r in classify_members(members, daily, w.reference_session.isoformat(),
+                                                             previous_policy)}
+        prot, positions = self.protections(w)
+        protected = {}
+        for s in sorted((set(prot) | positions | set(v2_scope) | set(operator_added)) - {"__V2_UNREADABLE__"}):
+            protected[s] = (P_POSITION if s in positions else "V2_EXECUTION_SCOPE" if s in v2_scope
+                            else "OPERATOR_ADDED" if s in operator_added else prot[s])
+        meta = report_meta(self.con, w, self.policy, previous_policy if prev is not None else None)
+        meta["v2_positions_readable"] = "__V2_UNREADABLE__" not in positions
+        return window_report(snap, meta, prev, protected)
+
     def _reader(self, name: str, w):
         if name in self.readers:
             return self.readers[name](w)
@@ -455,3 +657,151 @@ def latest_active(con: sqlite3.Connection, window_id: str) -> dict | None:
         return None
     return {"cycle_utc": last[0], "symbols": set(json.loads(sym[0])), "fallback": last[1],
             "counts": json.loads(last[2] or "{}")}
+
+
+# ============================================================================================================ admission
+def read_admission(root, window_id: str, policy: DTUPolicy) -> set[str] | None:
+    """Discovery's admission set for a live-floor policy: the window's qualifying symbols (Core + event tier) of a
+    snapshot built under ``policy``. None = no such snapshot (the caller fails CLOSED: no new identity)."""
+    from talonx_opportunity.db import root_dir
+    p = root_dir(root) / "market.db"
+    if not p.exists():
+        return None
+    con = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=10)
+    try:
+        r = con.execute("SELECT policy_fp FROM dtu_snapshots WHERE window_id=?", (window_id,)).fetchone()
+        if r is None or r[0] != policy.fingerprint():
+            return None
+        return {x[0] for x in con.execute("SELECT symbol FROM dtu_snapshot WHERE window_id=? AND state IN (?,?)",
+                                          (window_id, CORE, EVENT_ELIGIBLE))}
+    except sqlite3.Error:
+        return None
+    finally:
+        con.close()
+
+
+# ============================================================================================================ report
+CATEGORIES = ("QUALIFYING", "PRICE_ONLY", "LIQUIDITY_ONLY", "PRICE_AND_LIQUIDITY", "DATA_QUALITY", "RETAINED_V1_RULE",
+              "STRUCTURAL")
+REPORT_FIELDS = ["symbol", "state", "reason", "category", "change", "close_usd", "adv20_usd", "core_rank",
+                 "previous_state", "previous_reason", "protected"]
+# Subscriptions that never depend on the Opportunity Engine universe (each fetches its own data).
+INDEPENDENT_SUBSCRIPTIONS = {
+    "SPY": "DATA_INGESTION capability probe (1-min SIP; fetched directly, not from the universe)",
+    "OE outcome tracker": "fetches its own 1-min bars for every live candidate (universe-independent)",
+    "V2 companion / V2 forward tracker": "own Form 4 / price path (separate lane)",
+    "VR paper tracker": "own 1-min bars for its open paper positions (reads PAPER_SIGNALs)",
+    "DTU shadow collector": "own snapshot from market.db universe + split-adjusted daily (unchanged tables)",
+    "sector / benchmark ETFs": "never Opportunity Engine candidates (STRUCTURALLY_EXCLUDED); no OE subscription to keep"}
+
+
+def window_report(snapshot: dict[str, dict], meta: dict, previous: dict[str, dict] | None = None,
+                  protected: dict[str, str] | None = None) -> dict:
+    """Auditable universe summary. ``snapshot``/``previous``: symbol -> row (state, reason, price, adv20, core_rank);
+    ``previous`` = the previous policy on the SAME window data. Categories are mutually exclusive (floor_category);
+    every count reconciles to the per-symbol list."""
+    protected = protected or {}
+    rows, cat, chg = [], dict.fromkeys(CATEGORIES, 0), {}
+    for s in sorted(snapshot):
+        r = snapshot[s]
+        c = floor_category(r["state"], r["reason"])
+        p = (previous or {}).get(s)
+        was = p is not None and p["state"] in (CORE, EVENT_ELIGIBLE)
+        q = c == "QUALIFYING"
+        ch = "RETAINED" if was and q else "ADDED" if q else "REMOVED" if was else "EXCLUDED_BEFORE_AND_AFTER"
+        cat[c] += 1
+        chg[ch] = chg.get(ch, 0) + 1
+        rows.append({"symbol": s, "state": r["state"], "reason": r["reason"], "category": c, "change": ch,
+                     "close_usd": r.get("price"), "adv20_usd": r.get("adv20"), "core_rank": r.get("core_rank"),
+                     "previous_state": p["state"] if p else None, "previous_reason": p["reason"] if p else None,
+                     "protected": protected.get(s, "")})
+    removed = [x for x in rows if x["change"] == "REMOVED"]
+    rem_cat = {k: sum(1 for x in removed if x["category"] == k) for k in CATEGORIES if k != "QUALIFYING"}
+    prev_pool = sum(1 for p in (previous or {}).values() if p["state"] in (CORE, EVENT_ELIGIBLE)) if previous else None
+    counts = {"universe_members": len(rows), "categories": cat, "qualifying": cat["QUALIFYING"],
+              "core": sum(1 for x in rows if x["state"] == CORE),
+              "event_eligible": sum(1 for x in rows if x["state"] == EVENT_ELIGIBLE),
+              "previous_pool": prev_pool,
+              "previous_core": sum(1 for p in (previous or {}).values() if p["state"] == CORE) if previous else None,
+              "retained": chg.get("RETAINED", 0), "added": chg.get("ADDED", 0), "removed": chg.get("REMOVED", 0),
+              "removed_by_category": rem_cat,
+              "excluded_by_category": {k: v for k, v in cat.items() if k not in ("QUALIFYING", "STRUCTURAL")},
+              "protected_not_qualifying": sum(1 for s in protected
+                                              if floor_category(snapshot.get(s, {}).get("state", ""),
+                                                                snapshot.get(s, {}).get("reason", "")) != "QUALIFYING"),
+              "protected_total": len(protected)}
+    recon = {"categories_sum_to_members": sum(cat.values()) == len(rows),
+             "qualifying_eq_core_plus_event": cat["QUALIFYING"] == counts["core"] + counts["event_eligible"],
+             "qualifying_eq_retained_plus_added": previous is None or cat["QUALIFYING"] == counts["retained"] +
+             counts["added"],
+             "previous_eq_retained_plus_removed": previous is None or prev_pool == counts["retained"] +
+             counts["removed"],
+             "removed_by_category_sums": sum(rem_cat.values()) == counts["removed"]}
+    return {"meta": meta, "counts": counts, "reconciliation": recon, "reconciled": all(recon.values()),
+            "protected": dict(sorted(protected.items())), "independent_subscriptions": INDEPENDENT_SUBSCRIPTIONS,
+            "rows": rows}
+
+
+def summary_text(rep: dict, head: str = "⚙️ TALONX SENTINEL") -> str:
+    """Concise daily universe summary (the Sentinel /universe summary head and style). Proposed text only."""
+    m, c = rep["meta"], rep["counts"]
+    e = c["excluded_by_category"]
+    lines = [f"{head} — UNIVERSE ({m['window_id']})",
+             f"Live floors {m['policy_version']}: close ≥ ${m['min_close_usd']:g} · ADV20 ≥ "
+             f"${m['min_adv20_usd'] / 1e6:g}M (as of {m['reference_session']} close, {m['sessions_required']} "
+             f"sessions)",
+             f"Qualifying: {c['qualifying']} (Core {c['core']} · event-eligible {c['event_eligible']})"]
+    if c["previous_pool"] is not None:
+        lines.append(f"Previous ({m.get('previous_policy_version') or 'DTU_V1'}): {c['previous_pool']} · retained "
+                     f"{c['retained']} · added {c['added']} · removed {c['removed']}")
+    lines += [f"Excluded: price {e['PRICE_ONLY']} · liquidity {e['LIQUIDITY_ONLY']} · both "
+              f"{e['PRICE_AND_LIQUIDITY']} · data {e['DATA_QUALITY']}"
+              + (f" · V1 rule {e['RETAINED_V1_RULE']}" if e["RETAINED_V1_RULE"] else ""),
+              f"Protected (fetched, not admissible): {c['protected_not_qualifying']}",
+              f"Snapshot: {m['snapshot_version']}",
+              "Tradability/workload filter only — not a profitability claim.",
+              "Full list: /universe excluded file"]
+    return "\n".join(lines)
+
+
+def write_report(rep: dict, out_dir: Path) -> dict[str, str]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wid = rep["meta"]["window_id"]
+    paths = {"json": out_dir / f"universe_{wid}.json", "csv": out_dir / f"universe_{wid}_members.csv",
+             "summary": out_dir / f"universe_{wid}_summary.txt"}
+    paths["json"].write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
+    with paths["csv"].open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=REPORT_FIELDS)
+        w.writeheader()
+        w.writerows(rep["rows"])
+    paths["summary"].write_text(summary_text(rep) + "\n", encoding="utf-8")
+    return {k: str(v) for k, v in paths.items()}
+
+
+def report_meta(con: sqlite3.Connection, w, policy: DTUPolicy, previous_policy: DTUPolicy | None) -> dict:
+    snap = con.execute("SELECT snapshot_version, reference_session, created_utc, policy_fp FROM dtu_snapshots WHERE "
+                       "window_id=?", (w.window_id,)).fetchone()
+    live = con.execute("SELECT fetched_utc, sessions_json, start_utc, end_utc, failed_json, requests, source FROM "
+                       "dtu_live_daily_state WHERE window_id=?", (w.window_id,)).fetchone()
+    return {"window_id": w.window_id, "reference_session": w.reference_session.isoformat(),
+            "snapshot_version": snap[0] if snap else None, "snapshot_built_utc": snap[2] if snap else None,
+            "snapshot_policy_fp": snap[3] if snap else None,
+            "policy_version": policy.version, "policy_fp": policy.fingerprint(),
+            "min_close_usd": getattr(policy, "live_min_close_usd", policy.v1_min_price),
+            "min_adv20_usd": getattr(policy, "live_min_adv20_usd", policy.v1_min_adv20_usd),
+            "sessions_required": getattr(policy, "live_sessions", 20),
+            "sessions": json.loads(live[1]) if live else [],
+            "basis": getattr(policy, "live_basis", policy.snapshot_basis),
+            "data_source": live[6] if live else None, "data_fetched_utc": live[0] if live else None,
+            "data_request_window_utc": [live[2], live[3]] if live else None,
+            "data_as_of": f"{w.reference_session.isoformat()} regular-session close (D-1)",
+            "fetch_failed_symbols": len(json.loads(live[4] or "[]")) if live else None,
+            "data_requests": live[5] if live else None,
+            "effective_from_utc": iso(w.start_utc), "effective_window": w.window_id,
+            "previous_policy_version": previous_policy.version if previous_policy else None,
+            "previous_policy_fp": previous_policy.fingerprint() if previous_policy else None}
+
+
+def report_dir(root, window_id: str) -> Path:
+    from talonx_opportunity.db import root_dir
+    return root_dir(root) / "universe_reports" / window_id

@@ -173,9 +173,10 @@ def test_mode_off_is_identity_and_keeps_fingerprints():
     with pytest.raises(SystemExit):
         U.mode({U.MODE_ENV: "canary"})
     src = open("talonx_opportunity/ingestion.py", encoding="utf-8").read()
-    assert 'fps = {} if ing.dtu_mode == U.OFF else {"DTU": U.DTU_V1.fingerprint()}' in src
+    assert 'fps = {} if ing.dtu_mode == U.OFF else {"DTU": ing.dtu_policy.fingerprint()}' in src
     d = open("talonx_opportunity/discovery.py", encoding="utf-8").read()
-    assert 'if disc.dtu_mode == U.ACTIVE:' in d and 'fps["DTU"] = U.DTU_V1.fingerprint()' in d
+    assert 'if disc.dtu_mode == U.ACTIVE:' in d and 'fps["DTU"] = disc.dtu_policy.fingerprint()' in d
+    assert U.policy_from_env({U.POLICY_ENV: "DTU_V1"}).fingerprint() == "da27de22a3bb839a"   # rollback = live V1 fp
 
 
 def test_ingestion_applies_the_active_set_before_fetch_batches(tmp_path, monkeypatch):
@@ -228,6 +229,7 @@ def test_discovery_evaluates_only_the_active_set_and_falls_back_safely(tmp_path,
                           "cycle_utc": now.isoformat()}, "members": members, "daily": {}, "aggs": {},
                 "probes": {"REGULAR": {"ok": True}}, "dtu": dtu}
     monkeypatch.setenv(U.MODE_ENV, "ACTIVE")
+    monkeypatch.setenv(U.POLICY_ENV, "DTU_V1")                                 # V1 semantics (no live-floor gate)
     d = D.Discovery(root=tmp_path, clock=lambda: now, state_reader=lambda wid: state(
         {"symbols": {"A", "C"}, "fallback": None, "cycle_utc": "t", "counts": {}}))
     monkeypatch.setattr(D.C, "effective_capability", lambda phase, probe: type("Cap", (), {
@@ -284,6 +286,7 @@ def _run_sequence(tmp_path, monkeypatch, active_by_scan):
     """Discovery over successive scans where X keeps gapping +8 %; X's DTU membership follows ``active_by_scan``."""
     from talonx_opportunity import discovery as D
     monkeypatch.setenv(U.MODE_ENV, "ACTIVE")
+    monkeypatch.setenv(U.POLICY_ENV, "DTU_V1")                                 # V1 semantics (no live-floor gate)
     t0 = datetime(2026, 9, 29, 14, 0, tzinfo=UTC)
     clock = {"t": t0}
     monkeypatch.setattr(D, "features_from_aggregate", lambda sym, *a, **k: (_feat(sym, clock["t"]), ""))
