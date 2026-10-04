@@ -54,6 +54,12 @@ $env:TALONX_NOTIFY_RESEARCH_ENABLED = "1"          # never in .env, never in the
 
 `up --deliver` prints `LAB DELIVERY: deliver_flag=true research_destination_enabled=<bool>`. If it says `False`, alerts are enqueued but never sent.
 
+**Live universe (DTU).** `TALONX_DTU_MODE=ACTIVE` applies the Dynamic Tradable Universe. `TALONX_DTU_POLICY` selects its policy:
+- `DTU_V2` (the default since 2026-10-04) adds the owner's live floor: as-traded D-1 close ≥ $5 and ADV20 ≥ $20M, both inclusive, over 20 completed sessions.
+- `DTU_V1` is the rollback.
+
+Set the policy explicitly in the supervisor environment; a respawn inherits it. Each window's membership report is written at window start to `results/opportunity/universe_reports/<window>/`. To rebuild it read-only, run `python -m talonx_opportunity universe-report --window <D>`. Definitions, deployment classes and the rollback steps are in `docs/research/evidence/2026-10-04_live_universe_floor/README.md`.
+
 ## Operate
 
 ```powershell
