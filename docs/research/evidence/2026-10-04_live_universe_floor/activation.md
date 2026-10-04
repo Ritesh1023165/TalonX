@@ -1,4 +1,11 @@
-# DTU_V2 activation status: DEPLOYED, awaiting the scheduled build (2026-10-04 22:10Z)
+# DTU_V2 activation status: DEPLOYED, awaiting the scheduled build
+
+> **Timestamp correction (2026-10-04 22:35Z).** This file's first version was headed "2026-10-04 22:10Z" and the matching report said "23:10 BST". Both were future-dated by about 12 minutes. Its commit `6b18f88` is dated 22:59:41 BST = **21:59:41Z**, and the system clock was verified correct at 22:06Z (GMT Standard Time, DST active). The state described below was observed at about **21:58Z (22:58 BST)**.
+>
+> **Superseded items.**
+> - P0 has since been integrated and deployed (`ad62e9f`, 22:25Z), so the engine versions below changed; DTU_V2 is unchanged (`65f3285f8181c552`).
+> - The verifier was upgraded to v2 (morning task added).
+> - See `docs/research/evidence/2026-10-04_overnight_campaign.md`.
 
 | Stage | Status | Evidence |
 |---|---|---|
