@@ -138,3 +138,71 @@ V2 forward, VR and DTU each show their own state: `NOT_YET_DUE`, `OBSERVED`, `MI
 - **Tracker.** Stop the `tracker_v2_forward_v2.sh` chain: verify by command line and terminate by PID; only do this outside a running cycle (check `forward_runs/<day>.json` is not RUNNING). Then start `results/ops_restore_20261004/tracker_v2_forward.sh` (sleep to the slot, then `forward_daily.sh`).
 - **Code.** `git revert 51aa8b3` on the live branch (no force-push). The engine is unaffected either way.
 - **Verifier.** `results/overnight_20261005/backup/verify_universe_20261005.v2.py` → `os.replace` into place while no verifier task runs.
+
+## Addendum: EDGAR acquisition integrity and cutoff preservation (commit `0f3a603`, branch `fix/v2-forward-edgar-integrity`)
+
+### EDGAR: failure versus empty
+
+**Root cause.** `form4_edgar.Client.get` returned `None` both for HTTP 404 **and** after exhausting its retries. As a result:
+- `crawl` wrote an exhausted filing as `{"_ok": false, "tx": []}`, then marked the day `.done`. A transport failure became a permanent empty filing.
+- An exhausted daily index looked exactly like a 404. The day was printed `MISSING`, yet the crawl exited 0 and the cycle continued as if acquisition were complete.
+
+**Now:**
+- `get` returns `None` **only** for a 404. Its retry budget is unchanged (4 attempts, backoff 2**a, ×5 on 403/429), and nothing is nested on top of it.
+- Certificate/TLS errors and other 4xx responses are not retried. Exhaustion, or a backoff that would cross the stage deadline, raises `EdgarUnavailable`.
+- `crawl` writes a line only for a fetched (or 404) filing, and marks a day `.done` (atomically) only once every listed filing has a line. A torn final line is dropped and refetched. On failure the day stays not-done: its completed lines are kept and the next run resumes it.
+
+| Crawl status (`edgar/_crawl_status.json`, atomic, carries the run id) | Exit code |
+|---|---|
+| `COMPLETE`, with result `COMPLETE_ZERO_EVENTS` or `COMPLETE_WITH_EVENTS` | 0 |
+| `INCOMPLETE` (stopped by the stage deadline) | 2 |
+| `FAILED`, with a sanitised cause | 1 |
+
+**Pre-existing policy, kept unchanged:** a daily index answering 404 (a holiday, or not yet published) is reported `INDEX_NOT_FOUND`; the day stays not-done and a later run tries it again.
+
+**Runner.** The crawl stage succeeds only if it exits 0 **and** its manifest belongs to this run, is COMPLETE, and ends at the information cutoff. A stale manifest or `.done` file never counts, and the downstream stages never run otherwise.
+
+### Timing contract (evidence)
+
+The study's contract is **date-based**. There is **no time-of-day information cutoff** in any governing code or document: 06:00Z is a schedule, not an eligibility rule.
+
+| Element | Rule | Source |
+|---|---|---|
+| Information unit | Form 4 filing date (EDGAR daily-index date) | `talonx_paperperf/form4_edgar.py` docstring |
+| Episodes | fire on the 2nd distinct owner's FILING_DATE, causal at the end of that day | `talonx_paperperf/v2_validation.py` docstring |
+| Entry | the first NYSE session strictly after the fire | `talonx_paperperf/v2_validation.py` docstring |
+| Information window | crawl 2026-09-30 … **UTC yesterday** | `forward_daily.sh` (`datetime.utcnow()-1 day`) |
+| Prices | completed daily bars through **local** `date.today()-1` | `v2_validation.main('prices')` |
+| Observation date | **local** `date.today()` | `forward()` |
+
+**Implemented (no new rule).** The three dates are fixed **once** per run and passed identically to every stage through environment variables, and recorded in the run record (`cutoffs`):
+
+| Cutoff | Value |
+|---|---|
+| `as_of` | the study day |
+| `info_cutoff` | UTC yesterday; `episodes` excludes any crawled filing dated after it |
+| `price_end` | local yesterday, the last completed session |
+
+Enforcement:
+- If `info_cutoff` ≠ `price_end` (a run starting in the gap between the UTC and local dates), the run **FAILS** with `CUTOFF_DATE_MISMATCH` instead of mixing dates.
+- `forward()` refuses an `as_of` that is no longer the study day.
+- Unset variables (manual or historical runs) give the original behaviour.
+
+**The 90-minute limit is an execution bound only.** It changes no eligibility: every cutoff is a date, and the deadline is clamped to 23:30 local of the study day, so a retry cannot cross the date boundary. No evidence shows that the transient-retry logic violated any established rule.
+
+**Ambiguities recorded, no new rule invented:**
+1. The original contract mixes UTC (crawl end) and local (prices, `as_of`) dates. They coincide at the 06:00Z schedule; the mismatch now fails explicitly.
+2. An index 404 for "yesterday" (not yet published) and a 404 for a holiday are indistinguishable. The observation then lacks that day's filings until a later run, exactly as before. A timing proposal for review: record `days_index_not_found` in the observation metadata, and flag an observation when its own `info_cutoff` day is index-404 on a business day.
+3. One pre-fix `_ok: false` filing line remains in the historical crawl data. It cannot be told apart from a genuine 404, and it was left untouched. **Owner decision:** whether to refetch it, which would change historical inputs.
+
+### Tests
+
+- `tests/test_v2_forward_edgar_cutoff.py`: 18 new tests. They cover a successful empty crawl, a crawl with events, exhausted retries (not an empty day, nothing counted), partial acquisition then resume without duplicates, a torn line, certificate and invalid-request errors not retried, the 404 policy, a deadline-crossing backoff (INCOMPLETE), CLI exit codes 1/2/0, a failed crawl blocking all downstream stages, a stale manifest or `.done` file not counting, invariant cutoffs across stages, the UTC/local mismatch, the deadline bound, the information-cutoff filter, the price-end session, `as_of` enforcement, and today's missing run never being caught up.
+- `tests/test_v2_forward_reliability.py`: updated for consistent run clocks and the fake crawl manifest; 24 pass.
+- Affected regression (16 modules): **331 passed**. Engine component versions: unchanged.
+
+### Activation
+
+**No wrapper replacement was needed.** The sleeping wrapper (PID 3344) is only running `forward_runner sleep-to-next-slot`, whose logic is unchanged. At **2026-10-06 06:00Z** it execs `forward_daily_v2.sh` (unchanged), which starts `forward_runner run` and every stage as fresh Python processes that load `0f3a603`.
+
+The 2026-10-05 observation remains missing and is refused by the runner.
