@@ -1,0 +1,144 @@
+{
+ "run": "ERM_ACQUISITION_DEV_RECORDED_REPLAY",
+ "started_utc": "2026-10-05T17:46:02.706139+00:00",
+ "window": "DEV",
+ "transport": "RetryingTransport(ReplayTransport) -- archived development bytes only, no network",
+ "archive_manifest": {
+  "complete": true,
+  "missing": [],
+  "files": 16966,
+  "sha256": "68db99b7cabf243af575be949c070c06a5ed23b07d9ea95677f17502bf4a969a"
+ },
+ "acquisition_status": {
+  "stage": "S8_MATERIALISE",
+  "complete": true,
+  "window_id": "DEV",
+  "period": {
+   "window_id": "DEV",
+   "events_from": "2019-01-02",
+   "events_to": "2023-12-29",
+   "bars_from": "2018-11-01",
+   "corporate_actions_from": "2019-01-01",
+   "corporate_actions_to": "2023-12-31",
+   "identity_rename_ranges": "(('2024-01-01', '2024-05-31'), ('2024-09-03', '2024-10-20'), ('2024-12-21', '2024-12-31'), ('2025-01-01', '2025-12-31'), ('2026-01-01', '2026-09-30'))",
+   "identity_f345_from": "2019-01-01",
+   "evidence_f345_from": "2018-01-01",
+   "filings_from": "2019-01-02",
+   "filings_to": "2023-12-29",
+   "sp500_from": "2019-01-01",
+   "sp500_to": "2023-12-31",
+   "etf_dividends_from": "2019-01-01",
+   "etf_dividends_to": "2023-12-31"
+  },
+  "download_date": "2026-10-05",
+  "by_category": {
+   "assets_current": {
+    "RETRIEVED_USABLE": 2
+   },
+   "corporate_actions": {
+    "RETRIEVED_USABLE": 10
+   },
+   "identity_renames": {
+    "RETRIEVED_USABLE": 5
+   },
+   "sec_reference_current": {
+    "RETRIEVED_USABLE": 2
+   },
+   "form345": {
+    "RETRIEVED_USABLE": 24
+   },
+   "master_idx": {
+    "RETRIEVED_USABLE": 20
+   },
+   "sp500_pit": {
+    "RETRIEVED_USABLE": 2
+   },
+   "submissions": {
+    "RETRIEVED_USABLE": 7365
+   },
+   "filing_headers": {
+    "RETRIEVED_USABLE": 8080
+   },
+   "etf_cash_dividends": {
+    "RETRIEVED_USABLE": 5
+   }
+  },
+  "required_failures": [],
+  "optional_failures": [],
+  "legitimate_absences": [],
+  "sp500_asof": "2026-06-30",
+  "etf_cash_dividends": "USABLE",
+  "scope_counts": {
+   "candidates": 10772,
+   "kept": 7613,
+   "r1a_removed": 2769,
+   "r1b_removed": 390
+  },
+  "candidate_events": 2752
+ },
+ "guard_requests_checked": 15519,
+ "scope_parity": {
+  "candidates_mine": 10772,
+  "candidates_frozen": 10772,
+  "only_mine": [],
+  "only_frozen": [],
+  "source_diffs": [],
+  "names_equal": true,
+  "kept": {
+   "mine": 7613,
+   "frozen": 7613,
+   "equal": true,
+   "only_mine": [],
+   "only_frozen": []
+  },
+  "r1a_removed": {
+   "mine": 2769,
+   "frozen": 2769,
+   "equal": true,
+   "only_mine": [],
+   "only_frozen": []
+  },
+  "r1b_removed": {
+   "mine": 390,
+   "frozen": 390,
+   "equal": true,
+   "only_mine": [],
+   "only_frozen": []
+  },
+  "identity_cik_diffs": 0
+ },
+ "bars_parity": {
+  "KEPT": {
+   "pages": 1339,
+   "frozen_pages": 1339,
+   "aggregate_equal": true,
+   "page_sha_equal": true
+  },
+  "R1A_REMOVED": {
+   "pages": 128,
+   "frozen_pages": 128,
+   "aggregate_equal": true,
+   "page_sha_equal": true
+  }
+ },
+ "manifest_sha256": {
+  "duplicate_groups.csv": "ba05509a96ee4756137f3c8a218eb9e429b01292c1843828b0498627ca8ca222",
+  "manifest.csv": "3824fa6a857b08e355f6e346afed5e8f719b7f783cc41d7ddb4841301f52dfcb"
+ },
+ "manifest_parity": {
+  "rows_frozen": 2752,
+  "rows_plumbing": 2752,
+  "field_diffs": [],
+  "n_field_diffs": 0,
+  "duplicate_group_membership_differs": false,
+  "unresolved_duplicate_set_differs": false
+ },
+ "candidate_events": {
+  "n": 2752,
+  "manifest_rows": 2752,
+  "same_keys": true
+ },
+ "status": "REPLAY_PARITY_PASS",
+ "replay_requests_served": 16982,
+ "ended_utc": "2026-10-05T18:03:36.811602+00:00"
+}
