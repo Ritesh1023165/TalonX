@@ -41,6 +41,16 @@ from talonx_v2.liquidity import evaluate_liquidity  # noqa: E402
 
 OUT = REPO / "results" / "v2_validation"
 STAGE_DEADLINE_ENV = "TALONX_FWD_STAGE_DEADLINE_EPOCH"     # set by forward_runner: no retry may cross it
+# Forward-run cutoffs, fixed ONCE per run by forward_runner and identical for every stage (2026-10-05). Unset (manual /
+# historical runs) = the original behaviour: information = every crawled day, prices through date.today()-1,
+# as_of = date.today(). Set = the same values the 06:00Z schedule always produced, made invariant and enforced.
+INFO_CUTOFF_ENV, PRICE_END_ENV, AS_OF_ENV = "TALONX_FWD_INFO_CUTOFF", "TALONX_FWD_PRICE_END", "TALONX_FWD_AS_OF"
+
+
+def _env_date(name: str) -> date | None:
+    import os
+    v = os.environ.get(name)
+    return date.fromisoformat(v) if v else None
 
 
 def atomic_write_text(path: Path, text: str) -> None:
@@ -100,9 +110,10 @@ def all_txn_rows() -> tuple[list[dict], dict]:
             r[k] = None if v is None or (isinstance(v, float) and math.isnan(v)) else str(v)[:10]
     q2 = q2_rows()
     from talonx_paperperf import form4_edgar as E
-    crawl, cov = E.load(start="2026-07-01")
+    cut = _env_date(INFO_CUTOFF_ENV)                # forward run: no filing dated after the run's information cutoff
+    crawl, cov = E.load(start="2026-07-01", end=cut.isoformat() if cut else None)
     # a filing is sourced from exactly one period source (bulk through 06-30, crawl after)
-    crawl = [r for r in crawl if r["filing_date"] >= "2026-07-01"]
+    crawl = [r for r in crawl if r["filing_date"] >= "2026-07-01" and (cut is None or r["filing_date"] <= cut.isoformat())]
     src = {"historical_bulk_2019q1_2026q1": len(hist), "bulk_2026q2": len(q2), "edgar_crawl_from_2026_07_01": len(crawl),
            "edgar_crawl_days": len(cov["days"]), "edgar_crawl_filings": cov["filings"],
            "edgar_crawl_failed_filings": cov["failed"],
@@ -535,7 +546,10 @@ def forward() -> dict:
             "g1", "g3", "g5", "g10", "net10", "s10", "exit_session", "spy10", "n_distinct_owners",
             "aggregate_purchase_value")
     ev = [r for r in fw if r.get("g10") is not None]
-    out = {"as_of": date.today().isoformat(), "version": V2_VERSION, "freeze": FREEZE_DATE.isoformat(),
+    as_of = _env_date(AS_OF_ENV)
+    if as_of is not None and as_of != date.today():
+        raise SystemExit(f"CUTOFF_NOT_ENFORCEABLE: run as_of {as_of} but the study day is now {date.today()}")
+    out = {"as_of": (as_of or date.today()).isoformat(), "version": V2_VERSION, "freeze": FREEZE_DATE.isoformat(),
            "episodes_after_freeze": len(fw), "v2_eligible": sum(1 for r in fw if r.get("liq_reason") == "PASS"),
            "resolved_+10": len(ev), "primary_net_+10": stats([r["net10"] for r in ev]),
            "primary_gross_+10": stats([r["g10"] for r in ev]),
@@ -559,7 +573,8 @@ def main(argv):
         E = json.loads((OUT / "episodes.json").read_text(encoding="utf-8"))
         syms = sorted({e["symbol"] for e in E["episodes"]} | {"SPY"})
         recent = {e["symbol"] for e in E["episodes"] if e["eligible_entry_session"] >= "2026-08-01"} | {"SPY"}
-        fetch_prices(syms, date(2018, 11, 1), date.today() - timedelta(days=1), refresh=recent)
+        end = _env_date(PRICE_END_ENV) or date.today() - timedelta(days=1)   # last COMPLETED session date
+        fetch_prices(syms, date(2018, 11, 1), end, refresh=recent)
     elif argv[0] == "forward":
         r = forward()
         print(json.dumps({k: v for k, v in r.items() if k != "rows"}, indent=1, default=str))

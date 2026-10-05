@@ -22,6 +22,16 @@ loop). One cycle per day: a day whose record is SUCCESS or still RUNNING (live p
 day is not re-run automatically either (the loop only ever runs the CURRENT day at its scheduled slot).
 Deadline: every stage must end before ``deadline`` = min(start + 90 min, 23:30 of the study day, local date) -- so no
 retry can push the forward snapshot across the study's ``date.today()`` boundary. A stage still running is stopped.
+The deadline is an EXECUTION bound only; it is not an information cutoff.
+Cutoffs (the study's contract is DATE-based; there is no time-of-day information cutoff in it): fixed ONCE at run start
+and passed identically to every stage (TALONX_FWD_INFO_CUTOFF / _PRICE_END / _AS_OF):
+  as_of        = the study day (local date.today(), as forward() always used)
+  info_cutoff  = UTC yesterday = the crawl end forward_daily.sh always used; filings dated after it never enter
+  price_end    = local yesterday = the last completed session date prices always used (end = date.today() - 1)
+info_cutoff and price_end must be the same date; if they are not (a run started in the UTC/local-date gap), the run
+FAILS (CUTOFF_DATE_MISMATCH) rather than silently mixing dates. Recorded in the run record (``cutoffs``).
+EDGAR: the crawl stage must exit 0 AND its _crawl_status.json must carry THIS run's id, state COMPLETE and end ==
+info_cutoff; otherwise the stage fails (no stale manifest or .done file is taken as this run's acquisition).
 Exit codes: 0 SUCCESS, 2 PARTIAL, 1 FAILED, 3 refused (duplicate). usage:
   python -m talonx_paperperf.forward_runner run [--scheduled ISO] | next-slot | sleep-to-next-slot
 """
@@ -44,6 +54,7 @@ UTC = timezone.utc
 SLOT_HOUR_UTC = 6
 RUN_BUDGET_S = 90 * 60
 REQUIRED_KEYS = ("as_of", "version", "freeze", "episodes_after_freeze", "rows")
+CRAWL_STATUS = "edgar/_crawl_status.json"
 DEADLINE_ENV = "TALONX_FWD_STAGE_DEADLINE_EPOCH"
 
 
@@ -118,6 +129,24 @@ def validate_artifact(day: date, not_before: float) -> tuple[bool, list[str]]:
     return not why, why
 
 
+def _crawl_status_problem(run_id: str, crawl_end: date, stage: dict) -> str | None:
+    """None iff the EDGAR manifest was written by THIS run and reports a COMPLETE acquisition through info_cutoff."""
+    p = OUT / CRAWL_STATUS
+    try:
+        m = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "EDGAR_STATUS_MISSING"
+    stage["acquisition"] = {k: m.get(k) for k in ("state", "acquisition_result", "cause", "error", "end",
+                                                  "day_interrupted", "days_index_not_found", "tx_P_S_in_window")}
+    if m.get("run_id") != run_id:
+        return "EDGAR_STATUS_STALE"                     # a previous run's manifest never counts
+    if m.get("end") != crawl_end.isoformat():
+        return "EDGAR_STATUS_WRONG_WINDOW"
+    if m.get("state") != "COMPLETE":
+        return f"EDGAR_{m.get('state')}:{m.get('cause')}"
+    return None
+
+
 def _live(pid) -> bool:
     try:
         import psutil  # noqa: F401
@@ -142,19 +171,32 @@ def run(*, scheduled: str | None = None, py: str | None = None, stage_list=None,
                               "existing": prev.get("state")}), file=log, flush=True)
             return 3
     start = now_fn()
+    wall_start = time.time()                         # artifact mtimes are wall-clock: compare against wall time
     end_of_day = datetime.combine(day, datetime.min.time()).astimezone() + timedelta(hours=23, minutes=30)
     deadline = min(start + timedelta(seconds=budget_s), end_of_day.astimezone(UTC))
     py = py or sys.executable
     crawl_end = (start.astimezone(UTC) - timedelta(days=1)).date()  # as forward_daily.sh: UTC yesterday
+    cutoffs = {"as_of": day.isoformat(), "info_cutoff_filing_date_max": crawl_end.isoformat(),
+               "price_end_last_completed_session": (day - timedelta(days=1)).isoformat(),
+               "basis": "date-based study contract; deadline is an execution bound only"}
     st = stage_list or stages(py, crawl_end)
-    rec = {"run_id": f"{start:%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:6]}", "day": day.isoformat(),
+    rec = {"run_id": f"{start:%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:6]}", "day": day.isoformat(), "cutoffs": cutoffs,
            "scheduled_utc": scheduled, "started_utc": iso(start), "ended_utc": None, "deadline_utc": iso(deadline),
            "state": "RUNNING", "pid": os.getpid(), "heartbeat_utc": iso(start), "failed_stage": None,
            "error_class": None, "artifact": None, "runner_version": "forward_runner v1 (2026-10-05)",
            "stages": [{"name": n, "state": "PENDING"} for n, _, _ in st]}
     write_atomic(rec_path, rec)
     print(json.dumps({"forward_runner": "START", "run_id": rec["run_id"], "day": rec["day"],
-                      "deadline_utc": rec["deadline_utc"]}), file=log, flush=True)
+                      "deadline_utc": rec["deadline_utc"], "cutoffs": cutoffs}), file=log, flush=True)
+    if cutoffs["info_cutoff_filing_date_max"] != cutoffs["price_end_last_completed_session"]:
+        rec.update(state="FAILED", error_class="CUTOFF_DATE_MISMATCH", ended_utc=iso(now_fn()),
+                   failed_stage=st[0][0] if st else None)
+        for s in rec["stages"]:
+            s["state"] = "NOT_RUN"
+        write_atomic(rec_path, rec)
+        print(json.dumps({"forward_runner": "END", "run_id": rec["run_id"], "state": "FAILED",
+                          "error_class": "CUTOFF_DATE_MISMATCH"}), file=log, flush=True)
+        return 1
     completed = 0
     for i, (name, cmd, keep_stdout) in enumerate(st):
         s = rec["stages"][i]
@@ -163,7 +205,10 @@ def run(*, scheduled: str | None = None, py: str | None = None, stage_list=None,
         rec["heartbeat_utc"] = iso(t0)
         write_atomic(rec_path, rec)
         err_path = RUNS / f"{day.isoformat()}.{rec['run_id']}.{name}.stderr.log"
-        env = dict(os.environ, **{DEADLINE_ENV: str(deadline.timestamp()), "PYTHONIOENCODING": "utf-8"})
+        env = dict(os.environ, **{DEADLINE_ENV: str(deadline.timestamp()), "PYTHONIOENCODING": "utf-8",
+                                  "TALONX_FWD_RUN_ID": rec["run_id"], "TALONX_FWD_AS_OF": cutoffs["as_of"],
+                                  "TALONX_FWD_INFO_CUTOFF": cutoffs["info_cutoff_filing_date_max"],
+                                  "TALONX_FWD_PRICE_END": cutoffs["price_end_last_completed_session"]})
         remaining = (deadline - now_fn()).total_seconds()
         try:
             if remaining <= 0:
@@ -177,20 +222,24 @@ def run(*, scheduled: str | None = None, py: str | None = None, stage_list=None,
         stderr = err_path.read_text(encoding="utf-8", errors="replace") if err_path.exists() else ""
         s.update(ended_utc=iso(now_fn()), exit_code=rc, stderr_log=str(err_path.relative_to(REPO)),
                  retries=stderr.count('"outcome": "RETRY"'))
-        if rc == 0:
+        crawl_problem = None
+        if name == "edgar_crawl":
+            crawl_problem = _crawl_status_problem(rec["run_id"], crawl_end, s)
+        if rc == 0 and crawl_problem is None:
             s["state"] = "SUCCESS"
             completed += 1
             write_atomic(rec_path, rec)
             continue
         s["state"] = "TIMEOUT" if rc is None else "FAILED"
-        s["error_class"] = "STAGE_DEADLINE" if rc is None else error_class(stderr)
-        s["error"] = "stopped at the run deadline" if rc is None else sanitize(stderr)
+        s["error_class"] = "STAGE_DEADLINE" if rc is None else (crawl_problem or error_class(stderr))
+        s["error"] = "stopped at the run deadline" if rc is None else (
+            sanitize(s.get("acquisition", {}).get("error") or "") or sanitize(stderr) or crawl_problem)
         rec.update(failed_stage=name, error_class=s["error_class"])
         for later in rec["stages"][i + 1:]:
             later["state"] = "NOT_RUN"
         break
     if rec["failed_stage"] is None:
-        ok, why = validate_artifact(day, not_before=start.timestamp() - 1)
+        ok, why = validate_artifact(day, not_before=wall_start - 1)
         rec["artifact"] = {"path": f"results/v2_validation/forward/{day.isoformat()}.json", "validated": ok,
                            "problems": why}
         rec["state"] = "SUCCESS" if ok else "FAILED"

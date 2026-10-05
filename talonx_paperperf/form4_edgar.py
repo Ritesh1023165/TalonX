@@ -11,6 +11,19 @@ Source: https://www.sec.gov/Archives/edgar/daily-index/YYYY/QTRn/form.YYYYMMDD.i
 listed once per filer entity -> de-duplicated by accession), then the filing's full submission .txt.
 Throttled (default 3 requests/s, well under SEC's 10/s fair-access limit, leaving room for production SEC traffic).
 usage: python -m talonx_paperperf.form4_edgar START END [--rate 3]
+
+Acquisition integrity (2026-10-05). A transport failure is never an empty result:
+  * ``Client.get`` returns text, ``None`` ONLY for HTTP 404, and raises ``EdgarUnavailable`` when its unchanged retry
+    budget (4 attempts, 2**a backoff, x5 on 403/429) is exhausted, on a non-retryable error (certificate / TLS errors,
+    other 4xx) or when a backoff would cross the runner's stage deadline (env TALONX_FWD_STAGE_DEADLINE_EPOCH).
+  * ``crawl`` writes a filing line only for a fetched filing (or a 404, kept as the pre-existing ``_ok: false``
+    record), marks a day ``.done`` only after every listed filing has a line, and on ``EdgarUnavailable`` stops with
+    the day left NOT done (its completed lines are kept; the next run resumes it).
+  * pre-existing allowed partial-data policy, unchanged: a daily index that is 404 (holiday / not yet published) is
+    reported ``INDEX_NOT_FOUND``, the day stays not done and is re-tried by a later run.
+  * a status manifest ``edgar/_crawl_status.json`` (atomic, carries the runner's run id) reports
+    COMPLETE (acquisition_result COMPLETE_ZERO_EVENTS | COMPLETE_WITH_EVENTS), INCOMPLETE (stopped by the stage
+    deadline) or FAILED (exhausted / non-retryable) with a sanitised cause. Exit code 0 / 2 / 1.
 """
 from __future__ import annotations
 
@@ -33,6 +46,25 @@ ROW = re.compile(r"^(?P<form>4(?:/A)?)\s{2,}(?P<name>.+?)\s{2,}(?P<cik>\d{1,10})
 XML = re.compile(r"<XML>(.*?)</XML>", re.S | re.I)
 
 
+class EdgarUnavailable(RuntimeError):
+    """An EDGAR request could not be completed (never a valid empty result)."""
+
+    def __init__(self, msg: str, *, cause: str):
+        super().__init__(msg)
+        self.cause = cause
+
+
+def _stage_deadline() -> float | None:
+    v = os.environ.get("TALONX_FWD_STAGE_DEADLINE_EPOCH")
+    return None if not v else time.monotonic() + (float(v) - time.time())
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 class Client:
     def __init__(self, rate: float = 3.0):
         from talonx_premarket import __main__ as M
@@ -41,25 +73,42 @@ class Client:
         if not self.ua:
             raise SystemExit("TALONX_SEC_USER_AGENT not configured")
         self.gap, self.last, self.requests = 1.0 / rate, 0.0, 0
+        self.deadline = _stage_deadline()
+        self._urlopen, self._sleep = urllib.request.urlopen, time.sleep
 
     def get(self, url: str, attempts: int = 4) -> str | None:
+        """Text; None ONLY for HTTP 404; raises EdgarUnavailable otherwise (same retry budget as before)."""
+        from talonx_paperperf.transient_http import classify
+        path = url.split("?", 1)[0].removeprefix("https://www.sec.gov")
+        last = "UNKNOWN"
         for a in range(attempts):
             wait = self.gap - (time.monotonic() - self.last)
             if wait > 0:
-                time.sleep(wait)
+                self._sleep(wait)
             self.last = time.monotonic()
             self.requests += 1
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": self.ua, "Accept-Encoding": "identity"})
-                with urllib.request.urlopen(req, timeout=30) as r:
+                with self._urlopen(req, timeout=30) as r:
                     return r.read().decode("utf-8", errors="replace")
             except urllib.error.HTTPError as e:
                 if e.code == 404:
                     return None
-                time.sleep(2 ** a * (5 if e.code in (403, 429) else 1))
-            except Exception:  # noqa: BLE001
-                time.sleep(2 ** a)
-        return None
+                if e.code not in (403, 429) and e.code < 500:     # invalid request: never retried, never empty
+                    raise EdgarUnavailable(f"{path}: HTTP {e.code}", cause=f"HTTP_{e.code}") from None
+                last, backoff = f"HTTP_{e.code}", 2 ** a * (5 if e.code in (403, 429) else 1)
+            except Exception as exc:  # noqa: BLE001 -- classified: certificate / TLS errors are not retried
+                last, retryable, _ = classify(exc)
+                if not retryable:
+                    raise EdgarUnavailable(f"{path}: {last}", cause=last) from None
+                backoff = 2 ** a
+            if a == attempts - 1:
+                break
+            if self.deadline is not None and time.monotonic() + backoff > self.deadline:
+                raise EdgarUnavailable(f"{path}: {last}; backoff would cross the stage deadline",
+                                       cause="STAGE_DEADLINE")
+            self._sleep(backoff)
+        raise EdgarUnavailable(f"{path}: {last} after {attempts} attempts", cause=f"EXHAUSTED:{last}")
 
 
 def index_rows(c: Client, day: date) -> list[dict] | None:
@@ -135,35 +184,77 @@ def parse_filing(text: str, accession: str, filing_date: str) -> list[dict]:
     return rows
 
 
-def crawl(start: date, end: date, rate: float = 3.0) -> None:
-    """One JSONL per day (idempotent: a finished day is skipped). Filing-level progress is checkpointed."""
+def _resume_lines(f: Path) -> set[str]:
+    """Accessions already written for an unfinished day. A torn final line (a crash mid-write) is dropped atomically
+    so that filing is fetched again -- a file's existence is never taken as completion."""
+    if not f.exists():
+        return set()
+    good, seen = [], set()
+    for x in f.read_text(encoding="utf-8").splitlines():
+        if not x:
+            continue
+        try:
+            j = json.loads(x)
+        except ValueError:
+            continue
+        good.append(x)
+        seen.add(j["_acc"])
+    _atomic_write(f, "".join(g + "\n" for g in good))
+    return seen
+
+
+def crawl(start: date, end: date, rate: float = 3.0, *, client: Client | None = None) -> dict:
+    """One JSONL per day (idempotent: a finished day is skipped). Filing-level progress is checkpointed. Returns and
+    writes the acquisition status (module docstring); a transport failure never becomes an empty day."""
     OUT.mkdir(parents=True, exist_ok=True)
-    c = Client(rate)
+    st = {"run_id": os.environ.get("TALONX_FWD_RUN_ID"), "start": start.isoformat(), "end": end.isoformat(),
+          "state": "RUNNING", "acquisition_result": None, "days_completed_this_run": [], "days_already_done": [],
+          "days_index_not_found": [], "day_interrupted": None, "filings_fetched": 0, "filings_not_found": 0,
+          "tx_P_S_this_run": 0, "cause": None, "error": None}
+    c = client or Client(rate)
     d = start
-    while d <= end:
-        f = OUT / f"{d:%Y%m%d}.jsonl"
-        done = OUT / f"{d:%Y%m%d}.done"
-        if d.weekday() < 5 and not done.exists():
-            rows = index_rows(c, d)
-            if rows is None:
-                print(json.dumps({"day": d.isoformat(), "index": "MISSING"}), flush=True)
-            else:
-                seen = set()
-                if f.exists():
-                    seen = {json.loads(x)["_acc"] for x in f.read_text(encoding="utf-8").splitlines() if x}
-                n_tx = 0
-                with open(f, "a", encoding="utf-8") as fh:
-                    for r in rows:
-                        if r["accession"] in seen:
-                            continue
-                        txt = c.get(f"https://www.sec.gov/Archives/{r['file']}")
-                        tx = parse_filing(txt, r["accession"], r["date"]) if txt else []
-                        n_tx += len(tx)
-                        fh.write(json.dumps({"_acc": r["accession"], "_ok": txt is not None, "tx": tx}) + "\n")
-                done.write_text(json.dumps({"filings": len(rows), "requests": c.requests}), encoding="utf-8")
-                print(json.dumps({"day": d.isoformat(), "filings": len(rows), "tx_P_S": n_tx,
-                                  "requests_total": c.requests}), flush=True)
-        d += timedelta(days=1)
+    try:
+        while d <= end:
+            f = OUT / f"{d:%Y%m%d}.jsonl"
+            done = OUT / f"{d:%Y%m%d}.done"
+            if d.weekday() < 5 and done.exists():
+                st["days_already_done"].append(d.isoformat())
+            elif d.weekday() < 5:
+                st["day_interrupted"] = d.isoformat()
+                rows = index_rows(c, d)
+                if rows is None:                          # HTTP 404 only (pre-existing policy: re-tried by a later run)
+                    st["days_index_not_found"].append(d.isoformat())
+                    print(json.dumps({"day": d.isoformat(), "index": "MISSING"}), flush=True)
+                else:
+                    seen = _resume_lines(f)
+                    n_tx = 0
+                    with open(f, "a", encoding="utf-8") as fh:
+                        for r in rows:
+                            if r["accession"] in seen:
+                                continue
+                            txt = c.get(f"https://www.sec.gov/Archives/{r['file']}")   # raises on failure
+                            tx = parse_filing(txt, r["accession"], r["date"]) if txt else []
+                            n_tx += len(tx)
+                            st["filings_fetched" if txt is not None else "filings_not_found"] += 1
+                            fh.write(json.dumps({"_acc": r["accession"], "_ok": txt is not None, "tx": tx}) + "\n")
+                            fh.flush()
+                    _atomic_write(done, json.dumps({"filings": len(rows), "requests": c.requests}))
+                    st["days_completed_this_run"].append(d.isoformat())
+                    st["tx_P_S_this_run"] += n_tx
+                    print(json.dumps({"day": d.isoformat(), "filings": len(rows), "tx_P_S": n_tx,
+                                      "requests_total": c.requests}), flush=True)
+                st["day_interrupted"] = None
+            d += timedelta(days=1)
+        rows_in_window, _ = load(start.isoformat(), end.isoformat())
+        st.update(state="COMPLETE", acquisition_result="COMPLETE_WITH_EVENTS" if rows_in_window
+                  else "COMPLETE_ZERO_EVENTS", tx_P_S_in_window=len(rows_in_window))
+    except EdgarUnavailable as e:
+        st.update(state="INCOMPLETE" if e.cause == "STAGE_DEADLINE" else "FAILED", cause=e.cause, error=str(e)[:300])
+    st["requests"] = c.requests
+    _atomic_write(OUT / "_crawl_status.json", json.dumps(st, indent=1))
+    print(json.dumps({"edgar_crawl": st["state"], "result": st["acquisition_result"], "cause": st["cause"],
+                      "day_interrupted": st["day_interrupted"]}), flush=True)
+    return st
 
 
 def load(start: str | None = None, end: str | None = None) -> tuple[list[dict], dict]:
@@ -186,7 +277,11 @@ def load(start: str | None = None, end: str | None = None) -> tuple[list[dict], 
     return rows, cov
 
 
-if __name__ == "__main__":
-    a = sys.argv[1:]
+def main(a: list[str]) -> int:
     rate = float(a[a.index("--rate") + 1]) if "--rate" in a else 3.0
-    crawl(date.fromisoformat(a[0]), date.fromisoformat(a[1]), rate)
+    res = crawl(date.fromisoformat(a[0]), date.fromisoformat(a[1]), rate)
+    return {"COMPLETE": 0, "INCOMPLETE": 2}.get(res["state"], 1)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

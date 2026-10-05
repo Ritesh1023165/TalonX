@@ -178,6 +178,11 @@ def _stage(code: str, ok=True):
     return [sys.executable, "-c", code]
 
 
+def at(day):
+    """A run clock consistent with its study day (06:00Z slot)."""
+    return lambda: datetime(day.year, day.month, day.day, 6, 0, tzinfo=UTC)
+
+
 @pytest.fixture
 def runner_env(tmp_path, monkeypatch):
     monkeypatch.setattr(FR, "OUT", tmp_path)
@@ -185,6 +190,14 @@ def runner_env(tmp_path, monkeypatch):
     monkeypatch.setattr(FR, "REPO", tmp_path)
     (tmp_path / "forward").mkdir()
     return tmp_path
+
+
+def _ok_crawl(tmp):
+    """A fake crawl stage that writes THIS run's COMPLETE manifest (as form4_edgar does)."""
+    p = tmp / "edgar" / "_crawl_status.json"
+    return ("import json,os,pathlib; p=pathlib.Path(r'%s'); p.parent.mkdir(exist_ok=True); p.write_text(json.dumps("
+            "{'run_id':os.environ['TALONX_FWD_RUN_ID'],'state':'COMPLETE','acquisition_result':'COMPLETE_ZERO_EVENTS',"
+            "'end':os.environ['TALONX_FWD_INFO_CUTOFF'],'cause':None}))" % p)
 
 
 def _write_forward(tmp, day):
@@ -195,11 +208,11 @@ def _write_forward(tmp, day):
 
 def test_runner_failure_propagates_and_later_stages_never_run(runner_env):
     day = date(2026, 10, 6)
-    st = [("edgar_crawl", _stage("pass"), True), ("episodes", _stage("pass"), True),
+    st = [("edgar_crawl", _stage(_ok_crawl(runner_env)), True), ("episodes", _stage("pass"), True),
           ("prices", _stage("import sys; sys.stderr.write('urllib.error.URLError: <urlopen error _ssl.c:993: The "
                             "handshake operation timed out>\\n'); sys.exit(1)"), True),
           ("evaluate", _stage("raise SystemExit('must not run')"), False), ("forward", _stage(_write_forward(runner_env, day)), True)]
-    rc = FR.run(scheduled="2026-10-06T06:00:00+00:00", stage_list=st, today=day, log=open(runner_env / "log", "w"))
+    rc = FR.run(scheduled="2026-10-06T06:00:00+00:00", stage_list=st, today=day, now_fn=at(day), log=open(runner_env / "log", "w"))
     rec = json.loads((runner_env / "forward_runs" / "2026-10-06.json").read_text())
     assert rc == 2 and rec["state"] == "PARTIAL" and rec["failed_stage"] == "prices"
     assert rec["error_class"] == "TLS_HANDSHAKE_TIMEOUT" and "handshake" in rec["stages"][2]["error"]
@@ -210,15 +223,15 @@ def test_runner_failure_propagates_and_later_stages_never_run(runner_env):
 
 def test_runner_first_stage_failure_is_failed_and_success_needs_a_validated_artifact(runner_env):
     day = date(2026, 10, 7)
-    rc = FR.run(stage_list=[("edgar_crawl", _stage("import sys; sys.exit(3)"), True)], today=day,
+    rc = FR.run(stage_list=[("edgar_crawl", _stage("import sys; sys.exit(3)"), True)], today=day, now_fn=at(day),
                 log=open(runner_env / "l1", "w"))
     assert rc == 1 and json.loads((runner_env / "forward_runs" / "2026-10-07.json").read_text())["state"] == "FAILED"
     day = date(2026, 10, 8)                                     # all stages exit 0 but nothing written -> FAILED
-    rc = FR.run(stage_list=[("forward", _stage("pass"), True)], today=day, log=open(runner_env / "l2", "w"))
+    rc = FR.run(stage_list=[("forward", _stage("pass"), True)], today=day, now_fn=at(day), log=open(runner_env / "l2", "w"))
     rec = json.loads((runner_env / "forward_runs" / "2026-10-08.json").read_text())
     assert rc == 1 and rec["state"] == "FAILED" and rec["error_class"] == "ARTIFACT_INVALID"
     day = date(2026, 10, 9)
-    rc = FR.run(stage_list=[("forward", _stage(_write_forward(runner_env, "2026-10-09")), True)], today=day,
+    rc = FR.run(stage_list=[("forward", _stage(_write_forward(runner_env, "2026-10-09")), True)], today=day, now_fn=at(day),
                 log=open(runner_env / "l3", "w"))
     rec = json.loads((runner_env / "forward_runs" / "2026-10-09.json").read_text())
     assert rc == 0 and rec["state"] == "SUCCESS" and rec["artifact"]["validated"] is True
@@ -231,29 +244,29 @@ def test_preexisting_or_wrong_day_artifact_never_counts(runner_env):
     p.write_text(json.dumps({"as_of": "2026-10-10", "version": "v", "freeze": "f", "episodes_after_freeze": 1,
                              "rows": []}))
     os.utime(p, (1, 1))                                         # an old file: existence alone is no checkpoint
-    rc = FR.run(stage_list=[("forward", _stage("pass"), True)], today=day, log=open(runner_env / "l", "w"))
+    rc = FR.run(stage_list=[("forward", _stage("pass"), True)], today=day, now_fn=at(day), log=open(runner_env / "l", "w"))
     rec = json.loads((runner_env / "forward_runs" / "2026-10-10.json").read_text())
     assert rc == 1 and "NOT_WRITTEN_BY_THIS_RUN" in rec["artifact"]["problems"]
 
 
 def test_duplicate_runs_are_refused(runner_env):
     day = date(2026, 10, 9)
-    FR.run(stage_list=[("forward", _stage(_write_forward(runner_env, "2026-10-09")), True)], today=day,
+    FR.run(stage_list=[("forward", _stage(_write_forward(runner_env, "2026-10-09")), True)], today=day, now_fn=at(day),
            log=open(runner_env / "a", "w"))
     marker = runner_env / "ran"
-    rc = FR.run(stage_list=[("forward", _stage(f"open(r'{marker}','w')"), True)], today=day, log=open(runner_env / "b", "w"))
+    rc = FR.run(stage_list=[("forward", _stage(f"open(r'{marker}','w')"), True)], today=day, now_fn=at(day), log=open(runner_env / "b", "w"))
     assert rc == 3 and not marker.exists()                      # SUCCESS day: no second run, no stage executed
     (runner_env / "forward_runs").mkdir(exist_ok=True)
     (runner_env / "forward_runs" / "2026-10-05.json").write_text(json.dumps({"state": "PARTIAL",
                                                                               "reconstructed_from_log": True}))
-    rc = FR.run(stage_list=[("forward", _stage(f"open(r'{marker}','w')"), True)], today=date(2026, 10, 5),
+    rc = FR.run(stage_list=[("forward", _stage(f"open(r'{marker}','w')"), True)], today=date(2026, 10, 5), now_fn=at(date(2026, 10, 5)),
                 log=open(runner_env / "c", "w"))
     assert rc == 3 and not marker.exists()                      # today's failed day is never re-run / backfilled
 
 
 def test_stage_deadline_stops_a_hung_stage(runner_env):
     day = date(2026, 10, 11)
-    rc = FR.run(stage_list=[("prices", _stage("import time; time.sleep(30)"), True)], today=day,
+    rc = FR.run(stage_list=[("prices", _stage("import time; time.sleep(30)"), True)], today=day, now_fn=at(day),
                 log=open(runner_env / "l", "w"), budget_s=2)
     rec = json.loads((runner_env / "forward_runs" / "2026-10-11.json").read_text())
     assert rc == 1 and rec["stages"][0]["state"] == "TIMEOUT" and rec["error_class"] == "STAGE_DEADLINE"
