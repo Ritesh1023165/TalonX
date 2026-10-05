@@ -18,6 +18,7 @@ import hashlib
 import io
 import json
 import os
+import threading
 import zipfile
 from collections import defaultdict
 from contextlib import contextmanager
@@ -32,16 +33,21 @@ from research.event_response_map_v1.instrument_filter import PERIODIC_FORMS
 
 
 # ------------------------------------------------------------------------------------------------ window bounds
+_BOUNDS_LOCK = threading.RLock()
+
+
 @contextmanager
 def window_bounds(start: date, end: date):
     """[MAP->W]: the frozen gap-day / exit bound is the module constant pair events.DEV_START/DEV_END. Substitute the
-    window for the duration of the call and always restore it."""
-    old = (E.DEV_START, E.DEV_END)
-    E.DEV_START, E.DEV_END = start, end
-    try:
-        yield
-    finally:
-        E.DEV_START, E.DEV_END = old
+    window for the duration of the call and always restore it. Serialised by a process-wide lock so no two windows
+    can ever share the substituted constants (separate processes have separate module state)."""
+    with _BOUNDS_LOCK:
+        old = (E.DEV_START, E.DEV_END)
+        E.DEV_START, E.DEV_END = start, end
+        try:
+            yield
+        finally:
+            E.DEV_START, E.DEV_END = old
 
 
 def population(eq, raw, sessions, start: date, end: date, tag: str) -> list[tuple]:

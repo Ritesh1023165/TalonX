@@ -4,8 +4,8 @@
   python -m research.erm_nominee_validation.run --window A|B              (fails closed: owner decisions + guard)
 
 Validation windows: `ValidationConfig.require_decided()` rejects every pending owner decision, then the guard refuses
-every acquisition intersecting a locked range. There is NO acquisition or scoring path for A/B in this implementation:
-guard release requires a later, explicit hypothesis/window-scoped authorisation and a reviewed guard transition.
+every acquisition intersecting a locked range. A/B use release.production_guard: the always-refusing ValidationGuard
+unless a complete, hash-valid release journal exists (none exists; no code path here creates one).
 DEV: builds the V2.1 manifest from ARCHIVED development inputs only (no network, no download), compares it with the
 frozen V2.1 manifest, and recomputes the frozen cell metrics / gate estimator from the STORED corrected observations.
 """
@@ -174,8 +174,9 @@ def main(argv=None):
         rec = HERE / f"docs/research/preregistration/ERM_NOMINEE_OWNER_DECISIONS_{a.window}.json"
         dec = OwnerDecisions(**json.loads(rec.read_text())) if rec.exists() else OwnerDecisions()
         cfg = ValidationConfig(a.window, dec)
-        guard = ValidationGuard(cfg, HERE)
         from research.erm_nominee_validation import adapters as AD, workflow as W
+        from research.erm_nominee_validation.release import production_guard
+        guard = production_guard(cfg, HERE)      # ValidationGuard (refuses everything) while no release store exists
         auth_p = HERE / "results/erm_nominee_validation/GUARD_RELEASE_AUTHORISATION.json"
         auth = json.loads(auth_p.read_text()) if auth_p.exists() else None
         comps = W.Components(guard=guard, acquirer=AD.ProductionAcquirer(guard),

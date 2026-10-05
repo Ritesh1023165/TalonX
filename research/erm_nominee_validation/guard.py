@@ -38,9 +38,9 @@ class ValidationGuard:
                 and r.get("config_hash") == self.config.config_hash() and r.get("owner_go") is True)
 
     def check_acquisition(self, start: date, end: date, what: str) -> None:
-        """Before ANY request (price or metadata) covering [start, end]."""
+        """Before ANY request (price or metadata) covering [start, end] (start None = history)."""
         try:
-            self.frozen.check_range(start, end, layer="DOWNLOAD")
+            self.frozen.check_range(start or date(1993, 1, 1), end, layer="DOWNLOAD")
         except HoldoutViolation as e:
             raise GuardReleaseNotAuthorised(f"acquisition refused ({what}): {e}; release_authorised="
                                             f"{self.release_authorised()} -- guard release is disabled") from None

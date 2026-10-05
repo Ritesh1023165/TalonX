@@ -4,7 +4,7 @@ config -> owner decisions -> scoped authorisation -> ACQUIRE (archive + manifest
 -> BUILD (V2.1 manifest) -> OUTCOMES -> GATES -> DIAGNOSTICS -> REPORT -> RUN_COMPLETE.json (written LAST).
 
 Components are injected (guard, acquirer, loader). Production components: ValidationGuard (release disabled) +
-ProductionAcquirer (not implemented) + ProductionLoader. Tests inject fixture components; there is no bypass flag.
+ProductionAcquirer (acquisition/acquirer.py) + ProductionLoader. Tests inject fixture components; there is no bypass flag.
 
 Run-state rules (r9 §7 step 0, §10):
   * RUN_COMPLETE.json present                         -> refuse (never overwrite a completed run)
@@ -80,6 +80,19 @@ def _prior_state(run: Path) -> dict | None:
     return json.loads(p.read_text()) if p.exists() else None
 
 
+def build_rows(loaded, cfg: ValidationConfig) -> tuple[list, list]:
+    """BUILD stage core (network-free): population over every loaded bar group -> V2.1 manifest rows."""
+    import pandas as pd
+    pop = []
+    for tag, eq, raw in loaded.archives:
+        pop += B.population(eq, raw, loaded.sessions, cfg.start, cfg.end, tag)
+    eqs = pd.concat([a for _, a, _ in loaded.archives])
+    raws = pd.concat([r for _, _, r in loaded.archives])
+    syms = {s for _, s, _, _ in pop}
+    ser = B.series(eqs[eqs["symbol"].isin(syms)], raws[raws["symbol"].isin(syms)])
+    return B.build(pop, ser, loaded.sessions, loaded.meta, cfg.end)
+
+
 def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, run: Path) -> dict:
     # 1 owner decisions + scoped authorisation BEFORE any protected request, read or run-state change (a refused
     #   precheck writes nothing and never consumes the re-execution allowance)
@@ -140,15 +153,7 @@ def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, r
     loaded = stage("LOAD", lambda: comp.loader.load(archive, cfg))
 
     def build():
-        pop = []
-        for tag, eq, raw in loaded.archives:
-            pop += B.population(eq, raw, loaded.sessions, cfg.start, cfg.end, tag)
-        import pandas as pd
-        eqs = pd.concat([a for _, a, _ in loaded.archives])
-        raws = pd.concat([r for _, _, r in loaded.archives])
-        syms = {s for _, s, _, _ in pop}
-        ser = B.series(eqs[eqs["symbol"].isin(syms)], raws[raws["symbol"].isin(syms)])
-        rows, groups = B.build(pop, ser, loaded.sessions, loaded.meta, cfg.end)
+        rows, groups = build_rows(loaded, cfg)
         keys = [(r["symbol"], r["entry"]) for r in rows]
         if len(keys) != len(set(keys)):
             raise RuntimeError("manifest invariant violated: duplicate (symbol, entry) rows")

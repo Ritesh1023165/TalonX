@@ -6,8 +6,9 @@ Archive layout (one directory per run): `archive/` holds every acquired input pl
 
 ProductionLoader: verifies EVERY file's sha256 against ARCHIVE_MANIFEST.json before parsing, then loads bars through
 the frozen data.load with the guard's frame guard (LOAD layer), and every metadata file from local bytes only.
-ProductionAcquirer: NOT IMPLEMENTED (named remaining gap). It checks the guard first (which refuses every protected
-range today) and otherwise raises AcquisitionNotImplemented. There is no network code in this package.
+ProductionAcquirer: the staged acquirer in acquisition/acquirer.py (network only through acquisition/transport.py,
+every request guarded before it is built). Bars may be one directory (`bars/manifest.json`, legacy fixtures) or the two
+Phase D groups `bars/KEPT/` (tag MAIN) and `bars/R1A_REMOVED/` (tag DIAG).
 """
 from __future__ import annotations
 
@@ -24,6 +25,10 @@ from research.erm_nominee_validation.inventory import inventory
 
 REQUIRED = ("bars", "candidates", "form345", "renames", "submissions", "master_idx", "filing_headers", "sp500_pit",
             "etf_cash_dividends")
+
+
+# bar groups (Phase D layout): R1-kept scope + benchmarks, and the R1a-removed survivorship diagnostic
+BAR_GROUPS = (("MAIN", "KEPT"), ("DIAG", "R1A_REMOVED"))
 
 
 class AcquisitionIncomplete(RuntimeError):
@@ -82,11 +87,20 @@ class ProductionLoader:
         for f in man["files"]:
             by[f["input"]].append(archive / f["path"])
         fg = self.guard.frame_guard()
-        a_all, _ = D.load(archive / "bars", purpose="RETURNS", guard=fg)          # frozen sha256 + LOAD guard
-        a_raw, _ = D.load(archive / "bars", purpose="ELIGIBILITY_ONLY", guard=fg)
+        groups = ([("MAIN", archive / "bars")] if (archive / "bars" / "manifest.json").exists() else
+                  [(tag, archive / "bars" / g) for tag, g in BAR_GROUPS if (archive / "bars" / g / "manifest.json").exists()])
+        if not groups or groups[0][0] != "MAIN":
+            raise AcquisitionIncomplete("no main bar group in the archive")
+        frames = []
+        for tag, d in groups:
+            g_all, _ = D.load(d, purpose="RETURNS", guard=fg)                  # frozen sha256 + LOAD guard
+            g_raw, _ = D.load(d, purpose="ELIGIBILITY_ONLY", guard=fg)
+            frames.append((tag, g_all, g_raw))
+        a_all = frames[0][1]
         sessions = sorted(a_all.loc[a_all["symbol"] == "SPY", "date"].unique())
         bench = {b: a_all[a_all["symbol"] == b] for b in D.BENCHMARKS if (a_all["symbol"] == b).any()}
-        eq = a_all[~a_all["symbol"].isin(D.BENCHMARKS)]
+        archives = [(tag, g_all[~g_all["symbol"].isin(D.BENCHMARKS)], g_raw[~g_raw["symbol"].isin(D.BENCHMARKS)])
+                    for tag, g_all, g_raw in frames]
         end = cfg.end.isoformat()
         cand = json.loads(by["candidates"][0].read_text())
         from research.event_response_map_v1 import identity as I
@@ -121,25 +135,14 @@ class ProductionLoader:
                       edges=I.rename_edges(renames), f345=f345, sp_rows=sp_rows, periodic=periodic,
                       subs=B.subs_reader(sub_dirs, end), header=B.header_reader(hdr_dirs), etf_div=etf_div,
                       sic_to_etf=lambda x: E.sic_benchmark(x, mapping))
-        return Loaded(sessions=sessions, archives=[("MAIN", eq, a_raw[~a_raw["symbol"].isin(D.BENCHMARKS)])],
-                      bench=bench, meta=meta, bars_all=eq)
+        return Loaded(sessions=sessions, archives=archives, bench=bench, meta=meta,
+                      bars_all=pd.concat([a for _, a, _ in archives], ignore_index=True))
 
 
-class ProductionAcquirer:
-    """REMAINING GAP after approval: window candidate rebuild ([MAP->W] sources A-D), R1 download scope, metadata
-    acquisition (Form 3/4/5 2018Q1..window end, renames to the download date incl. the Task75 windows, submissions,
-    master.idx, per-event filing headers, S&P lists, ETF cash dividends) and bars via the frozen data.Downloader with
-    window start/end. Guard first: every protected range is refused today."""
-
-    def __init__(self, guard):
-        self.guard = guard
-
-    def acquire(self, cfg, archive: Path) -> dict:
-        for item in inventory(cfg):
-            a = item["coverage_from"]
-            b = item["coverage_to"]
-            from datetime import date
-            a_ = date.fromisoformat(a) if a[0].isdigit() else date(1993, 1, 1)
-            b_ = date.fromisoformat(b) if b[0].isdigit() else cfg.end
-            self.guard.check_acquisition(a_, b_, item["input"])
-        raise AcquisitionNotImplemented("production acquisition adapters are not implemented (r9 §10 remaining gap)")
+def ProductionAcquirer(guard, transport=None, **kw):
+    """The production acquirer (acquisition/acquirer.py). Default transport = live HttpTransport (R5 off-hours,
+    provider spacing, bounded retry). Every request is guarded BEFORE it is built: with the production guard
+    (release.production_guard -> ValidationGuard while no release exists) every validation-window request is refused."""
+    from research.erm_nominee_validation.acquisition.acquirer import ProductionAcquirer as PA
+    from research.erm_nominee_validation.acquisition.transport import HttpTransport
+    return PA(guard, transport or HttpTransport(), **kw)
