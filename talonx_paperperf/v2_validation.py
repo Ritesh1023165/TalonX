@@ -40,6 +40,22 @@ from talonx_v2.form4_source import from_rows  # noqa: E402
 from talonx_v2.liquidity import evaluate_liquidity  # noqa: E402
 
 OUT = REPO / "results" / "v2_validation"
+STAGE_DEADLINE_ENV = "TALONX_FWD_STAGE_DEADLINE_EPOCH"     # set by forward_runner: no retry may cross it
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write-then-rename: a crash or a failed stage never leaves a truncated artifact behind (2026-10-05)."""
+    import os
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _stage_deadline_monotonic() -> float | None:
+    import os
+    import time
+    v = os.environ.get(STAGE_DEADLINE_ENV)
+    return None if not v else time.monotonic() + (float(v) - time.time())
 BULK = REPO / "results" / "task107a_form4_feasibility" / "_bulk"
 HIST = REPO / "results" / "task107a_form4_feasibility" / "_build" / "form4_open_market_txn.parquet"
 CFG = V2Config()
@@ -70,7 +86,7 @@ def q2_rows() -> list[dict]:
         for k in ("filing_date", "trans_date"):
             r[k] = r[k].isoformat() if r[k] else None
     OUT.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(rows), encoding="utf-8")
+    atomic_write_text(p, json.dumps(rows))
     return rows
 
 
@@ -128,7 +144,7 @@ def build_episodes() -> dict:
         out.append(d)
     res = {"version": V2_VERSION, "sources": src, "records_code_P": len(recs), "episodes": out}
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "episodes.json").write_text(json.dumps(res, default=str), encoding="utf-8")
+    atomic_write_text(OUT / "episodes.json", json.dumps(res, default=str))
     return res
 
 
@@ -136,7 +152,11 @@ def build_episodes() -> dict:
 def fetch_prices(symbols: list[str], start: date, end: date, refresh: set[str] = frozenset()) -> None:
     """Alpaca SIP daily bars, adjustment=all, multi-symbol + paginated; cache per symbol in one JSON (resumable)."""
     from talonx_paperperf.rs_phase_a import _alpaca
+    from talonx_paperperf.transient_http import resilient_alpaca_get
     data = _alpaca(150)
+    # classified transient retries (TLS handshake timeout, resets, 429 + Retry-After, 5xx) REPLACE AlpacaData's 429-only
+    # loop; the limiter is re-acquired per retry; no retry crosses the runner's stage deadline (2026-10-05)
+    data._get = resilient_alpaca_get(limiter=data.limiter, deadline=_stage_deadline_monotonic())
     p = OUT / "daily_bars.json"
     have = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
     import re as _re
@@ -173,7 +193,7 @@ def fetch_prices(symbols: list[str], start: date, end: date, refresh: set[str] =
                 break
         have.update(got)
         if (i // 100) % 10 == 9 or i + 100 >= len(need):
-            p.write_text(json.dumps(have), encoding="utf-8")
+            atomic_write_text(p, json.dumps(have))
             print(json.dumps({"fetched": min(i + 100, len(need)), "of": len(need)}), flush=True)
 
 
@@ -497,8 +517,8 @@ def evaluate() -> dict:
         [r for r in rows if r["period"] in ("HOLDOUT_2026Q2", "POST_Q2")], bars, "ALL_UNSEEN")
     res["DTU_AND_V2_SCOPE"] = intersections(rows)
     res["EVENT_QUALITY"] = event_quality()
-    (OUT / "rows.json").write_text(json.dumps(rows, default=str), encoding="utf-8")
-    (OUT / "evaluation.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+    atomic_write_text(OUT / "rows.json", json.dumps(rows, default=str))
+    atomic_write_text(OUT / "evaluation.json", json.dumps(res, indent=1, default=str))
     return res
 
 
@@ -524,7 +544,7 @@ def forward() -> dict:
            "rows": [{k: r.get(k) for k in keep} | {"sp500_panel": r["symbol"] in panel} for r in fw]}
     d = OUT / "forward"
     d.mkdir(parents=True, exist_ok=True)
-    (d / f"{out['as_of']}.json").write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
+    atomic_write_text(d / f"{out['as_of']}.json", json.dumps(out, indent=1, default=str))
     return out
 
 
