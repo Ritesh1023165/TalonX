@@ -1,0 +1,18 @@
+{"utc": "2026-10-05T14:11:39.452289+00:00", "stage": "scope", "ok": true, "fingerprint": "12a909e795986ff3abeac9ca92906a64c3387a5e3c64734f2b72031b781cb8ad", "fingerprint_ok": true, "offline_guard": true, "manifest_sha_set": true, "guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5", "max_bar_date": "2023-12-29"}
+{"utc": "2026-10-05T14:13:18.049940+00:00", "stage": "parity", "ok": true, "metric_keys_compared": 25, "metric_diffs": [], "screen_diff": false, "n": 2695, "distinct_dates": 898, "distinct_symbols": 1370}
+{
+ "rows": 2752,
+ "pop": {
+  "A": 2711,
+  "B": 35,
+  "C": 6
+ },
+ "fetch": {},
+ "dup_link_data_status": {
+  "SAME_DATA": 114,
+  "INSUFFICIENT_OVERLAP": 4
+ }
+}
+{"utc": "2026-10-05T14:18:24.318219+00:00", "stage": "manifest", "ok": true, "sha256": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d", "match_frozen": true, "rows": 2752, "valid": 1999, "missing_exit": 2}
+{"utc": "2026-10-05T14:18:37.798223+00:00", "stage": "score", "ok": true, "verdict": "CORRECTED_DEVELOPMENT_SCREEN_PASS"}
+rc=0
