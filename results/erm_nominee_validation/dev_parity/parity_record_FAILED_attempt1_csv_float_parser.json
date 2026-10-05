@@ -1,0 +1,187 @@
+{
+ "run": "ERM_NOMINEE_VALIDATION_PLUMBING_DEV_PARITY",
+ "started_utc": "2026-10-05T14:42:32.325925+00:00",
+ "config": {
+  "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+  "spec": "ERM_NOMINEE_CORRECTION_SPEC_V2.1",
+  "rules_version": "ERM_NOMINEE_CORRECTION_V2.1",
+  "window_id": "DEV",
+  "start": "2019-01-02",
+  "end": "2023-12-29",
+  "stock_cost_bps": 30,
+  "etf_cost_sensitivities_bps": [
+   0,
+   12,
+   20
+  ],
+  "min_sample_floor": {
+   "n_valid": 100,
+   "distinct_dates": 40
+  },
+  "decisions": {
+   "window": null,
+   "task75_reserve_acknowledged": null,
+   "min_sample_floor_adopted": null,
+   "etf_cost_bps": null,
+   "procedural_amendments_approved": null,
+   "decision_record": null
+  }
+ },
+ "config_hash": "b23e302a6578f30d1d3982b404adb0306d071189015e54f05a8063b288e1ac11",
+ "guard_release_authorised": false,
+ "code_sha256": {
+  "research\\erm_nominee_validation\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "research\\erm_nominee_validation\\builder.py": "a015433b5d0936ad2c3ad68b61076933465691796987ba16b97904433801e74b",
+  "research\\erm_nominee_validation\\config.py": "f0e35c1ab1bb6d551be0a1d10b919ec0147ff2ccb2bf86a1aa6b5677e8a5c77b",
+  "research\\erm_nominee_validation\\gates.py": "838fc1cb0b44cbdbab9091a063a5dc5e6d4812f620a07d8bea7caf97e2dc56ad",
+  "research\\erm_nominee_validation\\guard.py": "85abc9341ce2acd4618b324cb462efc6b4e47b877e42ade98e412ac808bddd44",
+  "research\\erm_nominee_validation\\inventory.py": "c00d02936a3021a69bbfe7ab6ad5f9260bad5789766b7d2e4e64b5715393a1d6",
+  "research\\erm_nominee_validation\\run.py": "6679b9125c502278df90f3f7f55d21498b9d700085bcd6689fa9cd95d82ce434",
+  "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef"
+ },
+ "frozen_manifest_sha256": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d",
+ "inventory": [
+  {
+   "input": "bars_all_raw",
+   "category": "PRICE_OUTCOME",
+   "coverage_from": "2018-11-18",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "C:\\workspace\\TalonX-erm\\results\\event_response_map_v1\\_archive\\alpaca (+ alpaca_diag)",
+   "description": "Alpaca SIP 1Day ALL (returns, gaps, benchmarks) + raw (eligibility, traded flag) for the window candidate download scope (R1-kept + R1a-removed, as in development); benchmarks ALL only"
+  },
+  {
+   "input": "candidates",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "2019-01-02",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "candidates.json / candidates_r3.json (frozen development candidate universe)",
+   "description": "candidate sources A|B|C|D rebuilt with window dates [MAP->W] (asset list, renames, mergers, PIT S&P)"
+  },
+  {
+   "input": "form345",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "2018-01-01",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "_archive\\sec\\{2019..2023}q*_form345.zip.gz + results\\erm_nominee_audit\\_sec_v2\\2018q*_form345.zip.gz",
+   "description": "SEC insider data sets 2018Q1 .. quarter of the window end: dated issuer-trading-symbol observations <= D"
+  },
+  {
+   "input": "renames",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "2018-01-01",
+   "coverage_to": "bar download date",
+   "locked_ranges": [
+    "EXCLUDED_2024",
+    "FUTURE_CONFIRMATION_2025_ONWARD"
+   ],
+   "task75_reserved_overlap": true,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "_renames_2019_2023.json + _archive\\alpaca_meta_renames_post2023.json (Task75 windows not queried)",
+   "description": "provider name changes through the bar DOWNLOAD date (relabelling is resolved at download time)"
+  },
+  {
+   "input": "submissions",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "history",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "_archive\\sec\\sub_CIK*.json.gz + results\\erm_nominee_audit\\_sec_v2\\sub_CIK*.json.gz",
+   "description": "per-issuer filing history (all years) <= window end: periodic filings (R1a), 8-K 5.06 transitions, company-filing accessions for point-in-time SIC"
+  },
+  {
+   "input": "master_idx",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "history",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "_archive\\sec\\master_{2019..2023}_QTR*.idx.gz",
+   "description": "EDGAR full-index periodic filings (R1a availability) <= window end"
+  },
+  {
+   "input": "filing_headers",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "history",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "_archive\\sec\\hdr_* + results\\erm_nominee_audit\\_sec_pit\\ + _sec_v2\\ ",
+   "description": "header SIC of the latest company filing <= D (per event)"
+  },
+  {
+   "input": "sp500_pit",
+   "category": "IDENTITY_METADATA",
+   "coverage_from": "2018-01-01",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "C:\\workspace\\TalonX\\results\\task95g_broad_cross_sectional\\_fja05680_pit.csv",
+   "description": "point-in-time S&P 500 lists"
+  },
+  {
+   "input": "etf_cash_dividends",
+   "category": "DESCRIPTIVE_METADATA",
+   "coverage_from": "2019-01-02",
+   "coverage_to": "2023-12-29",
+   "locked_ranges": [],
+   "task75_reserved_overlap": false,
+   "status": "ARCHIVED_DEVELOPMENT",
+   "dev_source": "results\\erm_nominee_audit\\_alpaca_v2\\etf_cash_dividends.json (2019-2023)",
+   "description": "provider cash-dividend records of the 7 benchmark ETFs"
+  }
+ ],
+ "plumbing_manifest_sha256": {
+  "duplicate_groups.csv": "ba05509a96ee4756137f3c8a218eb9e429b01292c1843828b0498627ca8ca222",
+  "manifest.csv": "3824fa6a857b08e355f6e346afed5e8f719b7f783cc41d7ddb4841301f52dfcb"
+ },
+ "manifest_parity": {
+  "rows_frozen": 2752,
+  "rows_plumbing": 2752,
+  "field_diffs": [],
+  "n_field_diffs": 0,
+  "duplicate_group_membership_differs": false,
+  "unresolved_duplicate_set_differs": false
+ },
+ "metric_parity": {
+  "cell_metrics_diffs": [
+   "ci_high",
+   "ci_low",
+   "dispersion_sd",
+   "mean_raw",
+   "mean_sector_relative",
+   "mean_sector_relative_net",
+   "mean_without_top1",
+   "mean_without_top3",
+   "mean_without_top5",
+   "median_raw",
+   "median_sector_relative",
+   "missing_exit_bounds",
+   "per_year"
+  ],
+  "gate_estimator_equal_at_zero_cost": {
+   "mean": false,
+   "ci_low": false,
+   "ci_high": false,
+   "n": true,
+   "dates": true,
+   "missing_exit_rate": true,
+   "mean_without_top5": false
+  }
+ },
+ "status": "PARITY_FAIL",
+ "ended_utc": "2026-10-05T14:46:40.617176+00:00"
+}

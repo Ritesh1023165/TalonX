@@ -1,0 +1,56 @@
+{
+ "package": "ERM_NOMINEE_VALIDATION_DECISION_PACKAGE",
+ "status": "NOT_APPROVED_NOT_LOCKED (review only; no validation-lock marker; guard release disabled)",
+ "created_utc": "2026-10-05T14:51:45.468296+00:00",
+ "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+ "authoritative_spec": {
+  "name": "ERM_NOMINEE_CORRECTION_SPEC_V2.1",
+  "commit": "aab578e",
+  "sha256": "b805ce415fb067d6e0fad90859ddc7d35a31e3195c946cbe3460172c7a72ded2"
+ },
+ "corrected_development_result": {
+  "commit": "b91dc0a",
+  "verdict": "CORRECTED_DEVELOPMENT_SCREEN_PASS",
+  "corrected_cell_sha256": "da63533d598de23f03ebb34aabc67e526db40c3c405d0ee79ae7198ea0f5cc9e"
+ },
+ "draft_r8_sha256": "99566b582fbdec716f972dd21158a95119f838f9342415e96f9c4d3cb9270751",
+ "plumbing_code_sha256": {
+  "research/erm_nominee_validation/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "research/erm_nominee_validation/builder.py": "a015433b5d0936ad2c3ad68b61076933465691796987ba16b97904433801e74b",
+  "research/erm_nominee_validation/config.py": "f0e35c1ab1bb6d551be0a1d10b919ec0147ff2ccb2bf86a1aa6b5677e8a5c77b",
+  "research/erm_nominee_validation/gates.py": "838fc1cb0b44cbdbab9091a063a5dc5e6d4812f620a07d8bea7caf97e2dc56ad",
+  "research/erm_nominee_validation/guard.py": "85abc9341ce2acd4618b324cb462efc6b4e47b877e42ade98e412ac808bddd44",
+  "research/erm_nominee_validation/inventory.py": "c00d02936a3021a69bbfe7ab6ad5f9260bad5789766b7d2e4e64b5715393a1d6",
+  "research/erm_nominee_validation/run.py": "aa0966bbf74470c1c412d37ba032967a502346f1af60dd865ebeb4313dc00119",
+  "tests/test_erm_nominee_validation_plumbing.py": "acb476050ed76fbfb6fa6a7534892ec9f018b7080036dad117b8add34e4da4fc",
+  "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef"
+ },
+ "dev_parity": {
+  "record_sha256": "bdf5a65c0ded4fb30f22a3d6be418ff55c975b84f18470bcda9b95cb040081cc",
+  "marker_sha256": "68a21d9ca6c9703b62068af491c3082b73be00b3bfccd654d29d34c0ca0c3938",
+  "plumbing_manifest_sha256": "3824fa6a857b08e355f6e346afed5e8f719b7f783cc41d7ddb4841301f52dfcb",
+  "frozen_v2_1_manifest_sha256": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d",
+  "status": "PARITY_PASS",
+  "attempt1": "PARITY_FAIL from pandas default float parser (1-ULP); reader corrected to float_precision=round_trip; expected values unchanged"
+ },
+ "guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5",
+ "environment": {
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "numpy": "2.2.6",
+  "pandas": "3.0.5"
+ },
+ "pending_owner_decisions": [
+  "D1 window A|B (proposed B)",
+  "D2 Task75 reserve-consumption acknowledgement",
+  "D4 minimum-sample floor (proposed adopt)",
+  "D5 ETF cost 4 bps primary + 0/12/20 descriptive (proposed accept)",
+  "D6 procedural amendments (proposed approve)"
+ ],
+ "not_done": [
+  "no validation-window acquisition, counts, outcomes or scoring",
+  "no guard change",
+  "no Task75 consumption",
+  "no protocol lock"
+ ]
+}

@@ -23,3 +23,8 @@ research/erm_nominee_audit/** -text
 tests/test_erm_nominee_*.py -text
 results/erm_nominee_audit/** -text
 results/erm_nominee_corrected_run/** -text
+# ERM nominee validation plumbing + draft r8 (2026-10-05, review; NOT a lock): committed byte-exact.
+research/erm_nominee_validation/** -text
+results/erm_nominee_validation/** -text
+docs/research/preregistration/ERM_NOMINEE_PREREG_DRAFT_* -text
+tests/test_erm_nominee_validation_plumbing.py -text

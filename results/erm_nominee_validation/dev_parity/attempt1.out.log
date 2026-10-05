@@ -1,0 +1,41 @@
+{
+ "status": "PARITY_FAIL",
+ "plumbing_manifest_sha256": {
+  "duplicate_groups.csv": "ba05509a96ee4756137f3c8a218eb9e429b01292c1843828b0498627ca8ca222",
+  "manifest.csv": "3824fa6a857b08e355f6e346afed5e8f719b7f783cc41d7ddb4841301f52dfcb"
+ },
+ "manifest": {
+  "rows_frozen": 2752,
+  "rows_plumbing": 2752,
+  "n_field_diffs": 0,
+  "duplicate_group_membership_differs": false,
+  "unresolved_duplicate_set_differs": false
+ },
+ "metric": {
+  "cell_metrics_diffs": [
+   "ci_high",
+   "ci_low",
+   "dispersion_sd",
+   "mean_raw",
+   "mean_sector_relative",
+   "mean_sector_relative_net",
+   "mean_without_top1",
+   "mean_without_top3",
+   "mean_without_top5",
+   "median_raw",
+   "median_sector_relative",
+   "missing_exit_bounds",
+   "per_year"
+  ],
+  "gate_estimator_equal_at_zero_cost": {
+   "mean": false,
+   "ci_low": false,
+   "ci_high": false,
+   "n": true,
+   "dates": true,
+   "missing_exit_rate": true,
+   "mean_without_top5": false
+  }
+ }
+}
+rc=1
