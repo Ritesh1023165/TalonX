@@ -1,0 +1,79 @@
+{
+ "package": "ERM_NOMINEE_LOCK_AND_GO_DECISION_PACKAGE",
+ "status": "NOT_APPROVED_NOT_LOCKED (review only; no validation-lock or release marker; guard release disabled)",
+ "created_utc": "2026-10-05T15:45:09.766741+00:00",
+ "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+ "draft_r9_sha256": "fa59a9cac2065006d0e9d5a9b5e53f95564f58c5309610369b7f565202a3a32b",
+ "draft_r8_sha256": "99566b582fbdec716f972dd21158a95119f838f9342415e96f9c4d3cb9270751",
+ "authoritative_spec": {
+  "name": "ERM_NOMINEE_CORRECTION_SPEC_V2.1",
+  "commit": "aab578e",
+  "sha256": "b805ce415fb067d6e0fad90859ddc7d35a31e3195c946cbe3460172c7a72ded2"
+ },
+ "corrected_development_result": {
+  "commit": "b91dc0a",
+  "verdict": "CORRECTED_DEVELOPMENT_SCREEN_PASS",
+  "corrected_cell_sha256": "da63533d598de23f03ebb34aabc67e526db40c3c405d0ee79ae7198ea0f5cc9e"
+ },
+ "code_sha256": {
+  "research/erm_nominee_validation/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "research/erm_nominee_validation/adapters.py": "c4bbf08ac1e7f8f8cdd94737b4331a7ea2eb758dcd1913aa96406023f994e8b7",
+  "research/erm_nominee_validation/builder.py": "a015433b5d0936ad2c3ad68b61076933465691796987ba16b97904433801e74b",
+  "research/erm_nominee_validation/config.py": "f0e35c1ab1bb6d551be0a1d10b919ec0147ff2ccb2bf86a1aa6b5677e8a5c77b",
+  "research/erm_nominee_validation/diagnostics.py": "05104bee0437158bbaa8f7309c3491c61d390dc15606f93d2d568f9cbea0a768",
+  "research/erm_nominee_validation/gates.py": "838fc1cb0b44cbdbab9091a063a5dc5e6d4812f620a07d8bea7caf97e2dc56ad",
+  "research/erm_nominee_validation/guard.py": "08c533f95221e81ec071c098d7727e668a391f049037753c5a5d21b86e9e6936",
+  "research/erm_nominee_validation/inventory.py": "c00d02936a3021a69bbfe7ab6ad5f9260bad5789766b7d2e4e64b5715393a1d6",
+  "research/erm_nominee_validation/run.py": "7737337fe76c961558f6a28bdf7c9a9d1f3c3419cf0eb11bfb4cd8c62debc1e4",
+  "research/erm_nominee_validation/workflow.py": "a8aaccbfa419cb1db853190e3cf275a36fc4979f7a786dae0e2157e8aba0f76a",
+  "tests/test_erm_nominee_validation_workflow.py": "36ab42dfb4c68ca5333cae51709237c2599824dd801ba4c8054992dcbafffb29",
+  "tests/test_erm_nominee_validation_plumbing.py": "acb476050ed76fbfb6fa6a7534892ec9f018b7080036dad117b8add34e4da4fc",
+  "tests/test_erm_nominee_v2_rules.py": "79e178386373c9530c67f4822dd2e69411c011ff172db3d2d94fbad04f2e2a30",
+  "tests/test_erm_nominee_accounting_fixtures.py": "59919bb0495f388b5cb096a703e9dcd1706a08ddc0bdb3e8438dfb05fa2028ae",
+  "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef",
+  "research/event_response_map_v1/events.py": "701abda1482d46cc12cac08c1fb8f4821df81393f52c1d076b3a132e0d83019c",
+  "research/event_response_map_v1/metrics.py": "fd876a17f21d5c8d0ce01ff61bd30518c985d2d7ed11fa1343e28caacb2469dd",
+  "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
+  "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d"
+ },
+ "tests": {
+  "passed": 75,
+  "files": [
+   "tests/test_erm_nominee_validation_workflow.py (19 synthetic E2E)",
+   "tests/test_erm_nominee_validation_plumbing.py (20)",
+   "tests/test_erm_nominee_v2_rules.py (27)",
+   "tests/test_erm_nominee_accounting_fixtures.py (9)"
+  ]
+ },
+ "dev_parity": {
+  "status": "PARITY_PASS (751f81c; scoring-relevant code builder/gates/config/v2_rules unchanged since -> not re-run)",
+  "record_sha256": "bdf5a65c0ded4fb30f22a3d6be418ff55c975b84f18470bcda9b95cb040081cc"
+ },
+ "guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5",
+ "environment": {
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "numpy": "2.2.6",
+  "pandas": "3.0.5"
+ },
+ "pending_owner_decisions": [
+  "D1 window A|B (proposed B)",
+  "D2 Task75 reserved windows + 2025..2026-09 reserve consumption acknowledgement",
+  "D4 100-event/40-date floor (proposed adopt)",
+  "D5 ETF cost 4 bps primary + 0/12/20 descriptive (proposed accept)",
+  "D6 procedural conventions incl. PROPOSED diagnostic conventions (proposed approve)"
+ ],
+ "remaining_implementation_after_approval": [
+  "production acquisition adapters (window candidate rebuild, R1 download scope, metadata acquisition incl. S&P list refresh to 2026-09-30, bars via frozen Downloader.pass_)",
+  "reviewed guard transition + Task75 audit entry",
+  "development-dates acquisition dry run vs archived development inputs",
+  "implementation lock (fingerprint + config hash)"
+ ],
+ "not_done": [
+  "no validation-window acquisition, counts, prices or outcomes",
+  "no guard transition",
+  "no Task75 consumption",
+  "no protocol or implementation lock",
+  "no live change"
+ ]
+}

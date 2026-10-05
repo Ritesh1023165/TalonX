@@ -51,3 +51,35 @@ class ValidationGuard:
             self.frozen.check_frame(df, layer="LOAD", ts_col=ts_col)
         except HoldoutViolation as e:
             raise GuardReleaseNotAuthorised(f"load refused ({what}): {e} -- guard release is disabled") from None
+
+
+def check_authorisation_scope(auth: dict | None, config: ValidationConfig) -> None:
+    """Shared scope check (used by every guard implementation): an explicit owner GO record naming THIS hypothesis,
+    window and configuration hash. Missing / wrong-window / wrong-hypothesis / wrong-config / no GO -> refused."""
+    if not auth:
+        raise GuardReleaseNotAuthorised("no release authorisation record")
+    if auth.get("hypothesis") != HYPOTHESIS:
+        raise GuardReleaseNotAuthorised(f"authorisation is for hypothesis {auth.get('hypothesis')!r}")
+    if auth.get("window_id") != config.window_id:
+        raise GuardReleaseNotAuthorised(f"authorisation is for window {auth.get('window_id')!r}, not {config.window_id!r}")
+    if auth.get("config_hash") != config.config_hash():
+        raise GuardReleaseNotAuthorised("authorisation config hash does not match this configuration")
+    if auth.get("owner_go") is not True:
+        raise GuardReleaseNotAuthorised("authorisation lacks an explicit owner GO")
+
+
+def _authorise(self, auth: dict | None) -> None:
+    """PRODUCTION: scope must match AND a reviewed guard transition must exist. None exists in this implementation,
+    so a correctly scoped record is still refused (fail closed)."""
+    check_authorisation_scope(auth, self.config)
+    raise GuardReleaseNotAuthorised("scoped authorisation present, but no reviewed guard transition exists -- "
+                                    "guard release is disabled in this implementation")
+
+
+def _frame_guard(self):
+    """Guard passed to the frozen data.load LOAD layer: the immutable EVENT_RESPONSE_MAP_V1 LockedRangeGuard."""
+    return self.frozen
+
+
+ValidationGuard.authorise = _authorise
+ValidationGuard.frame_guard = _frame_guard

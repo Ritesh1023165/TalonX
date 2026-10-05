@@ -167,13 +167,23 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--window", required=True, choices=sorted(WINDOWS))
     ap.add_argument("--parity", action="store_true")
+    ap.add_argument("--execute", action="store_true", help="validation workflow with PRODUCTION components")
     a = ap.parse_args(argv)
+    if a.window != "DEV":
+        # owner decisions come ONLY from a committed decision record (none exists: every field stays pending)
+        rec = HERE / f"docs/research/preregistration/ERM_NOMINEE_OWNER_DECISIONS_{a.window}.json"
+        dec = OwnerDecisions(**json.loads(rec.read_text())) if rec.exists() else OwnerDecisions()
+        cfg = ValidationConfig(a.window, dec)
+        guard = ValidationGuard(cfg, HERE)
+        from research.erm_nominee_validation import adapters as AD, workflow as W
+        auth_p = HERE / "results/erm_nominee_validation/GUARD_RELEASE_AUTHORISATION.json"
+        auth = json.loads(auth_p.read_text()) if auth_p.exists() else None
+        comps = W.Components(guard=guard, acquirer=AD.ProductionAcquirer(guard),
+                             loader=AD.ProductionLoader(guard, HERE / "docs/research/preregistration/rs_sector_mapping_v1.json"))
+        W.run_validation(cfg, auth, comps, OUT / f"validation_{a.window}")   # raises: pending decisions / guard
+        return 0
     cfg = ValidationConfig(a.window, OwnerDecisions())
     guard = ValidationGuard(cfg, HERE)
-    if a.window != "DEV":
-        cfg.require_decided()                                      # raises OwnerDecisionPending
-        guard.check_acquisition(cfg.start, cfg.end, "window bars")  # unreachable today; would raise
-        raise SystemExit("no validation acquisition path exists in this implementation")
     out = OUT / "dev_parity"
     if (out / "PARITY_COMPLETE.json").exists():
         raise SystemExit("dev parity already recorded; refusing to overwrite")
