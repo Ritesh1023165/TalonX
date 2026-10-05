@@ -32,7 +32,8 @@ from pathlib import Path
 
 from research.erm_nominee_validation import builder as B
 from research.erm_nominee_validation.acquisition import states as S
-from research.erm_nominee_validation.acquisition.period import PERIODS, year_ranges
+from research.erm_nominee_validation.acquisition.period import (BROAD_ENDPOINTS, PAGE_RULE_FROZEN_DEV, PERIODS,
+                                                                RETRIEVAL_WINDOW_DAYS, year_ranges)
 from research.erm_nominee_validation.acquisition.scope import build_candidates, build_scope
 from research.erm_nominee_validation.acquisition.store import ArchiveStore
 from research.erm_nominee_validation.acquisition.transport import Request, TransportExhausted, OffHoursRefusal, req
@@ -45,6 +46,7 @@ SEC_SUB = "https://data.sec.gov/submissions/{}"
 SEC_MASTER = "https://www.sec.gov/Archives/edgar/full-index/{}/master.idx"
 SEC_HDR = "https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index-headers.html"
 SP500_LISTING = "https://api.github.com/repos/fja05680/sp500/contents"
+SP500_FILE = "S&P 500 Historical Components & Changes (Updated).csv"   # README: "historical index membership"
 MERGER_TYPES = "cash_merger,stock_merger,stock_and_cash_merger"
 
 
@@ -75,25 +77,49 @@ class GuardAdapter:
 
 
 class ProductionAcquirer:
-    def __init__(self, guard, transport, *, bars_clock=None, bars_sleep=None, download_date: date | None = None):
+    def __init__(self, guard, transport, *, bars_clock=None, bars_sleep=None, reference_date: date | None = None,
+                 download_date: date | None = None, clock=None):
+        """reference_date (alias download_date): the ONE acquisition reference date R (see period.py). Pinned in
+        acquisition/reference.json at first use; a resume must present the same R (or none), and a released guard's
+        R must equal it. clock: real time used to refuse broad requests after R + RETRIEVAL_WINDOW_DAYS."""
         self.guard, self.transport = guard, transport
         self.bars_clock, self.bars_sleep = bars_clock, bars_sleep
-        self.download_date = download_date or datetime.now(timezone.utc).date()
+        self.requested_reference = reference_date or download_date
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.download_date = self.requested_reference or self.clock().date()
         self.failures, self.absences = [], []
 
     # ------------------------------------------------------------------------------------------------ one request
     def get(self, category: str, r: Request, scope: tuple, rel_path: str, *, required: bool,
-            absent_on_404: bool = False, insufficient_on_404: bool = False, validate=None):
-        """-> bytes (USABLE) | None (LEGITIMATELY ABSENT) | MISSING (fail state, recorded)."""
+            absent_on_404: bool = False, insufficient_on_404: bool = False, validate=None, within=None,
+            malformed_on_404: str | None = None):
+        """-> bytes (USABLE) | None (LEGITIMATELY ABSENT) | MISSING (fail state, recorded).
+        within(body) -> None | str: RESPONSE-scope check against the declared envelope; a violation quarantines the
+        bytes, records the exposure and raises ScopeExceeded (RUN_INVALID) -- filtering afterwards never makes a
+        broader response unexposed."""
         if self.store.done(r.key):
             rec = self.store.latest(r.key)
             return None if rec["state"] == S.ABSENT else self.store.read(r.key)
+        if category in BROAD_ENDPOINTS:                                  # content runs to the retrieval moment
+            today = self.clock().astimezone(timezone.utc).date()
+            if today > self.download_date + timedelta(days=RETRIEVAL_WINDOW_DAYS):
+                self.store.event({"blocked": "RESUME_AFTER_REFERENCE_WINDOW", "category": category, "request": r.key,
+                                  "reference_date": str(self.download_date), "today": str(today)})
+                self._write_status("REFERENCE_WINDOW", complete=False)
+                raise S.AcquisitionBlocked(
+                    f"RESUME_AFTER_REFERENCE_WINDOW: broad endpoint {category} on {today} would return content after "
+                    f"the reference date {self.download_date} + {RETRIEVAL_WINDOW_DAYS} d; start a new acquisition "
+                    f"under a new release instead")
         self.guard.check_acquisition(scope[0], scope[1], category)       # BEFORE the request exists
         try:
             resp = self.transport.fetch(r)
         except (TransportExhausted, OffHoursRefusal, ConnectionError, TimeoutError) as e:
             self.store.record(r, category, scope, S.TRANSPORT, detail=f"{type(e).__name__}: {e}"[:300])
             return self._fail(category, r, S.TRANSPORT, required, str(e))
+        if resp.status == 404 and malformed_on_404:
+            self.store.record(r, category, scope, S.MALFORMED, http_status=404, attempts=resp.attempts,
+                              detail=malformed_on_404)
+            return self._fail(category, r, S.MALFORMED, True, malformed_on_404)
         if resp.status == 404 and absent_on_404:
             self.store.record(r, category, scope, S.ABSENT, http_status=404, attempts=resp.attempts,
                               detail="provider 404: legitimately absent")
@@ -117,6 +143,20 @@ class ProductionAcquirer:
                               body=resp.body, rel_path="acquisition/malformed/" + rel_path.replace("/", "__"),
                               detail=str(problem)[:300])
             return self._fail(category, r, S.MALFORMED, required, problem)
+        out = None
+        try:
+            out = within(resp.body) if within else None
+        except Exception as e:  # noqa: BLE001 -- an unreadable date field cannot be shown to be inside the scope
+            out = f"scope not verifiable: {type(e).__name__}: {e}"
+        if out:
+            self.store.record(r, category, scope, S.SCOPE_EXCEEDED, http_status=200, attempts=resp.attempts,
+                              body=resp.body, rel_path="acquisition/scope_exceeded/" + rel_path.replace("/", "__"),
+                              detail=str(out)[:300])
+            self.store.event({"exposure": "RESPONSE_EXCEEDS_AUTHORISED_SCOPE", "category": category,
+                              "request": r.key, "declared_scope": [str(scope[0]), str(scope[1])], "detail": str(out)})
+            self._fail(category, r, S.SCOPE_EXCEEDED, True, out)
+            self._write_status("RESPONSE_SCOPE", complete=False)
+            raise S.ScopeExceeded(f"{category}: response outside the authorised envelope {scope[0]}..{scope[1]}: {out}")
         self.store.record(r, category, scope, S.USABLE, http_status=200, attempts=resp.attempts, body=resp.body,
                           rel_path=rel_path)
         return resp.body
@@ -130,7 +170,8 @@ class ProductionAcquirer:
         bad = [f for f in self.failures if f["required"]]
         if bad:
             self._write_status(stage, complete=False)
-            raise S.AcquisitionFailure(f"{stage}: {len(bad)} required request(s) failed; first: {bad[0]}")
+            raise S.AcquisitionBlocked(f"ACQUISITION_BLOCKED at {stage}: {len(bad)} required request(s) failed; "
+                                       f"first: {bad[0]}")
 
     # ------------------------------------------------------------------------------------------------ validators
     @staticmethod
@@ -156,6 +197,89 @@ class ProductionAcquirer:
         t = body.decode("latin-1")
         return None if "CIK|Company Name|Form Type|Date Filed|Filename" in t or t.count("|") >= 4 else "not a master.idx"
 
+    # ------------------------------------------------------------------------------------------------ response scope
+    @staticmethod
+    def _iso_dates(row):
+        import re as _re
+        return {k: v[:10] for k, v in row.items() if isinstance(v, str) and _re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", v)}
+
+    def _ca_within(self, start, end):
+        """Declared corporate-action response envelope (period.CA_*): at least one primary date (process_date /
+        ex_date: the provider's range filter) inside [start, end]; the named attribute dates (payable / record /
+        effective / process / ex) at most CA_ATTRIBUTE_LAG_DAYS after end; any other date field never after end."""
+        from research.erm_nominee_validation.acquisition.period import (CA_ATTRIBUTE_DATE_FIELDS, CA_ATTRIBUTE_LAG_DAYS,
+                                                                        CA_PRIMARY_DATE_FIELDS)
+        lag_end = (date.fromisoformat(end) + timedelta(days=CA_ATTRIBUTE_LAG_DAYS)).isoformat()
+
+        def w(body):
+            for typ, rs in (json.loads(body).get("corporate_actions") or {}).items():
+                for x in rs:
+                    ds = self._iso_dates(x)
+                    prim = [ds[k] for k in CA_PRIMARY_DATE_FIELDS if k in ds]
+                    if not prim:
+                        return f"{typ} row without a primary date field"
+                    if not any(start <= v <= end for v in prim):
+                        return f"{typ} primary dates {prim} outside {start}..{end}"
+                    for k, v in ds.items():
+                        if v > (lag_end if k in CA_ATTRIBUTE_DATE_FIELDS else end):
+                            return f"{typ} {k} {v} after the declared bound"
+            return None
+        return w
+
+    @staticmethod
+    def _f345_within(lo: date, hi: date):
+        def w(body):
+            import csv as _csv
+            import zipfile
+            with zipfile.ZipFile(io.BytesIO(body)) as z:
+                n = next(x for x in z.namelist() if x.split("/")[-1].upper() == "SUBMISSION.TSV")
+                with z.open(n) as fh:
+                    for r in _csv.DictReader(io.TextIOWrapper(fh, encoding="utf-8", errors="replace"), delimiter="\t"):
+                        raw = str(r.get("FILING_DATE", "")).strip()
+                        try:
+                            fd = datetime.strptime(raw[:11], "%d-%b-%Y").date()
+                        except ValueError:
+                            fd = date.fromisoformat(raw[:10])
+                        if not (lo <= fd <= hi):
+                            return f"Form 3/4/5 filing dated {fd} outside {lo}..{hi}"
+            return None
+        return w
+
+    @staticmethod
+    def _master_within(lo: date, hi: date):
+        def w(body):
+            for line in body.decode("latin-1").splitlines():
+                q = line.split("|")
+                if len(q) == 5 and q[0].strip().isdigit() and not (lo.isoformat() <= q[3].strip() <= hi.isoformat()):
+                    return f"master.idx row dated {q[3].strip()} outside {lo}..{hi}"
+            return None
+        return w
+
+    @staticmethod
+    def _header_within(hi: date):
+        def w(body):
+            import re as _re
+            m = _re.search(r"FILED AS OF DATE:\s*(\d{8})", body.decode("latin-1"))
+            if m is None:
+                return None                                   # no date field: content is that one filing's header
+            fd = date(int(m.group(1)[:4]), int(m.group(1)[4:6]), int(m.group(1)[6:]))
+            return None if fd <= hi else f"filing header FILED AS OF {fd} after {hi}"
+        return w
+
+    def _retrieval_within(self, key):
+        """Broad JSON with dated rows: nothing may be dated after the authorised retrieval bound."""
+        bound = (self.download_date + timedelta(days=RETRIEVAL_WINDOW_DAYS)).isoformat()
+
+        def w(body):
+            j = json.loads(body)
+            blocks = [j["filings"]["recent"]] if key == "filings" else [j]
+            for b in blocks:
+                late = [d for d in b.get("filingDate", []) if d > bound]
+                if late:
+                    return f"{len(late)} filing rows after the retrieval bound {bound}"
+            return None
+        return w
+
     # ------------------------------------------------------------------------------------------------ paginated CA
     def corporate_actions(self, category, types, start, end, *, symbols=None, required=True):
         rows, token, page = [], None, 0
@@ -167,7 +291,8 @@ class ProductionAcquirer:
                 p["page_token"] = token
             tag = f"alpaca/ca_{types.replace(',', '+')}_{symbols or 'all'}_{start}_{end}_{page:03d}.json".replace(",", "+")
             body = self.get(category, req("alpaca_meta", ALPACA_CA, p), (date.fromisoformat(start), date.fromisoformat(end)),
-                            tag, required=required, validate=self._json_obj("corporate_actions"))
+                            tag, required=required, validate=self._json_obj("corporate_actions"),
+                            within=self._ca_within(start, end))
             if body is MISSING or body is None:
                 if page:                                                  # truncated pagination
                     self.failures.append({"category": category, "request": f"{types} {start}..{end} page {page}",
@@ -192,13 +317,41 @@ class ProductionAcquirer:
             return self._subs[cik]
         b = self.sec_file("submissions", SEC_SUB.format(f"CIK{cik}.json"), f"sub_CIK{cik}.json",
                           (None, self.download_date), required=True, absent_on_404=True,
-                          validate=self._json_obj("filings"))
+                          validate=self._json_obj("filings"), within=self._retrieval_within("filings"))
         self._subs[cik] = None if b is None or b is MISSING else json.loads(b)
+        for f in (self._subs[cik] or {}).get("filings", {}).get("files", []):
+            self._adv[f["name"]] = f                             # authoritative page list from THIS main
         return self._subs[cik]
 
+    @staticmethod
+    def verify_page(adv: dict, page: dict) -> str | None:
+        """A history page must match what the main JSON fetched in the same acquisition advertises:
+        row count == filingCount, first filingDate == filingFrom, last filingDate <= filingTo + 1 day (SEC's filingTo
+        lags by at most one day: all 431 development pages satisfy exactly these bounds). A same-named page whose
+        content moved (repagination between the main and the page retrieval) fails here -- never silently mixed."""
+        fd = page.get("filingDate")
+        if not isinstance(fd, list) or any(len(page.get(k, [])) != len(fd) for k in ("form", "accessionNumber")):
+            return "page columns missing or of unequal length"
+        if len(fd) != adv.get("filingCount"):
+            return f"REPAGINATION_OR_INCOMPLETE_PAGE: {len(fd)} rows, main advertises {adv.get('filingCount')}"
+        if fd and min(fd) != adv.get("filingFrom"):
+            return f"REPAGINATION_OR_INCOMPLETE_PAGE: first filing {min(fd)}, main advertises {adv.get('filingFrom')}"
+        if fd and date.fromisoformat(max(fd)) > date.fromisoformat(adv["filingTo"]) + timedelta(days=1):
+            return f"REPAGINATION_OR_INCOMPLETE_PAGE: last filing {max(fd)} after advertised {adv['filingTo']} + 1 d"
+        return None
+
     def submissions_page(self, name):
+        """A page ADVERTISED by the issuer's main: 404 = incomplete pagination (required failure, never an absence),
+        content must verify against the advertisement."""
+        adv = self._adv.get(name)
+        if adv is None:
+            self.failures.append({"category": "submissions", "request": name, "state": S.MALFORMED, "required": True,
+                                  "detail": "page requested without an advertisement in a main fetched this run"})
+            return None
         b = self.sec_file("submissions", SEC_SUB.format(name), "sub_" + name, (None, self.download_date),
-                          required=True, absent_on_404=True, validate=self._json_obj("filingDate"))
+                          required=True, malformed_on_404="advertised history page missing (incomplete pagination)",
+                          validate=lambda x: self.verify_page(adv, json.loads(x)),
+                          within=self._retrieval_within("page"))
         return None if b is None or b is MISSING else json.loads(b)
 
     def header_text(self, cik, acc, filed: str | None = None):
@@ -208,37 +361,94 @@ class ProductionAcquirer:
             return self._hdr[acc]
         url = SEC_HDR.format(int(cik), acc.replace("-", ""), acc)
         scope = (date.fromisoformat(filed), date.fromisoformat(filed)) if filed else (None, self.per.filings_to)
-        b = self.sec_file("filing_headers", url, f"hdr_{acc}.html", scope, required=True, absent_on_404=True)
+        b = self.sec_file("filing_headers", url, f"hdr_{acc}.html", scope, required=True, absent_on_404=True,
+                          within=self._header_within(scope[1]))
         self._hdr[acc] = None if b is None or b is MISSING else b.decode("latin-1")
         return self._hdr[acc]
 
     # ------------------------------------------------------------------------------------------------ S&P coverage
+    @staticmethod
+    def git_blob_sha(b: bytes) -> str:
+        import hashlib
+        return hashlib.sha1(b"blob %d\0" % len(b) + b).hexdigest()
+
     def sp500(self, per):
-        """fja05680 list. The listing names each dataset with its as-of date '(MM-DD-YYYY)'. Coverage = that as-of
-        date and must be >= the scope end; otherwise INSUFFICIENT (never assume membership unchanged)."""
-        import re
+        """S0 -- FIRST acquisition prerequisite. fja05680 publishes no as-of date in file names, README ("from 1996 til
+        MM-DD-YYYY", a placeholder), releases or tags (metadata check 2026-10-05). Coverage is therefore established
+        only from the acquired file itself, after authorisation: a membership row dated on or after the scope end must
+        exist (a row dated >= T fixes membership through T; without one, membership after the last row is unknown and
+        is NEVER assumed unchanged). Otherwise INSUFFICIENT -> ACQUISITION_BLOCKED before any other request.
+        Provenance: the listing entry (git blob sha, size) and the downloaded bytes must agree."""
         lst = self.get("sp500_pit", req("github", SP500_LISTING), (None, self.download_date), "sp500/listing.json",
                        required=True, validate=lambda b: None if isinstance(json.loads(b), list) else "listing not a list")
         if lst is MISSING:
             return MISSING, None
-        best = None
-        for it in json.loads(lst):
-            m = re.search(r"\((\d{2})-(\d{2})-(\d{4})\)\.csv$", it.get("name", ""))
-            if m and "Historical Components" in it.get("name", ""):
-                asof = date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
-                if best is None or asof > best[0]:
-                    best = (asof, it)
-        if best is None or best[0] < per.sp500_to:
+        item = next((it for it in json.loads(lst) if it.get("name") == SP500_FILE), None)
+        if item is None:
             self.failures.append({"category": "sp500_pit", "request": SP500_LISTING, "state": S.INSUFFICIENT,
-                                  "required": True, "detail": f"latest dataset as-of {best[0] if best else None} < "
-                                                              f"required coverage {per.sp500_to}"})
-            self.store.event({"sp500_coverage": "INSUFFICIENT", "asof": str(best[0]) if best else None,
-                              "required_to": str(per.sp500_to)})
-            return MISSING, best[0] if best else None
-        body = self.get("sp500_pit", req("github", best[1]["download_url"]), (None, best[0]), "sp500/raw.csv",
-                        required=True, validate=lambda b: None if b.decode("utf-8").startswith("date,tickers")
-                        else "unexpected CSV header")
-        return body, best[0]
+                                  "required": True, "detail": f"{SP500_FILE!r} not published in the listing"})
+            return MISSING, None
+
+        def valid(b):
+            if not b.decode("utf-8").startswith("date,tickers"):
+                return "unexpected CSV header"
+            if item.get("sha") and self.git_blob_sha(b) != item["sha"]:
+                return "downloaded bytes do not match the listing's git blob sha (file changed between calls)"
+            return None
+        bound = (self.download_date + timedelta(days=RETRIEVAL_WINDOW_DAYS)).isoformat()
+        body = self.get("sp500_pit", req("github", item["download_url"]), (None, self.download_date), "sp500/raw.csv",
+                        required=True, validate=valid, within=lambda b: (
+                            None if max(r["date"][:10] for r in csv.DictReader(io.StringIO(b.decode("utf-8")))) <= bound
+                            else "membership rows dated after the retrieval bound"))
+        if body is MISSING:
+            return MISSING, None
+        last = max(r["date"][:10] for r in csv.DictReader(io.StringIO(body.decode("utf-8"))))
+        cov = {"sp500_coverage_last_row": last, "required_through": str(per.sp500_to),
+               "listing_entry": {k: item.get(k) for k in ("name", "sha", "size")}}
+        if last < per.sp500_to.isoformat():
+            self.failures.append({"category": "sp500_pit", "request": item["download_url"], "state": S.INSUFFICIENT,
+                                  "required": True, "detail": f"last membership row {last} < required coverage "
+                                                              f"{per.sp500_to}: membership after {last} unknown"})
+            self.store.event({"sp500_coverage": "INSUFFICIENT", **cov})
+            return MISSING, last
+        self.store.event({"sp500_coverage": "SUFFICIENT", **cov})
+        return body, last
+
+    # ------------------------------------------------------------------------------------------------ reference date
+    def _pin_reference(self) -> None:
+        """One acquisition = one reference date R, pinned at first use. A resume never moves R: a different requested
+        R, or a released guard naming another R, blocks before any request."""
+        p = self.archive / "acquisition" / "reference.json"
+        rel = getattr(self.guard, "release", None)
+        if p.exists():
+            pinned = json.loads(p.read_text())
+            if pinned["window_id"] != self.cfg.window_id:
+                raise S.AcquisitionBlocked(f"archive pinned to window {pinned['window_id']}, not {self.cfg.window_id}")
+            if self.requested_reference and self.requested_reference.isoformat() != pinned["reference_date"]:
+                raise S.AcquisitionBlocked(f"REFERENCE_DATE_MISMATCH: archive pinned to {pinned['reference_date']}, "
+                                           f"resume asked for {self.requested_reference}")
+            self.download_date = date.fromisoformat(pinned["reference_date"])
+        else:
+            if rel is not None and rel.download_date != self.download_date.isoformat():
+                raise S.AcquisitionBlocked(f"REFERENCE_DATE_MISMATCH: release names {rel.download_date}, acquisition "
+                                           f"reference is {self.download_date}")
+            B.atomic(p, json.dumps({"reference_date": self.download_date.isoformat(), "window_id": self.cfg.window_id,
+                                    "retrieval_window_days": RETRIEVAL_WINDOW_DAYS,
+                                    "submissions_page_rule": self.per.submissions_page_rule,
+                                    "pinned_utc": self.clock().isoformat()}, indent=1))
+        if rel is not None and rel.download_date != self.download_date.isoformat():
+            raise S.AcquisitionBlocked(f"REFERENCE_DATE_MISMATCH: release names {rel.download_date}, acquisition "
+                                       f"reference is {self.download_date}")
+
+    def _exposure(self) -> dict:
+        """Requests whose declared content range reaches a locked ERM range (2024 / 2025-01-02 onward)."""
+        out = {}
+        for r in self.store._latest.values():
+            to = r.get("content_to")
+            if to and to >= "2024-01-01":
+                out.setdefault(r["category"], {}).setdefault(r["state"], 0)
+                out[r["category"]][r["state"]] += 1
+        return out
 
     # ------------------------------------------------------------------------------------------------ status
     def _write_status(self, stage, *, complete, extra=None):
@@ -247,7 +457,8 @@ class ProductionAcquirer:
               "download_date": str(self.download_date), "by_category": self.store.summary(),
               "required_failures": [f for f in self.failures if f["required"]],
               "optional_failures": [f for f in self.failures if not f["required"]],
-              "legitimate_absences": self.absences, **(extra or {})}
+              "legitimate_absences": self.absences, "protected_range_requests": self._exposure(),
+              "reference_date": str(self.download_date), **(extra or {})}
         B.atomic(self.archive / "acquisition" / "acquisition_status.json", json.dumps(st, indent=1, default=str))
 
     # ------------------------------------------------------------------------------------------------ main
@@ -256,8 +467,12 @@ class ProductionAcquirer:
         self.cfg, self.archive, self.per = cfg, Path(archive), PERIODS[cfg.window_id]
         per = self.per
         self.store = ArchiveStore(self.archive)
-        self._subs, self._hdr = {}, {}
+        self._subs, self._hdr, self._adv = {}, {}, {}
+        self._pin_reference()
         dd = self.download_date
+        # ---------------- S0 S&P coverage: the first prerequisite (stops before any other request if insufficient)
+        sp_body, sp_asof = self.sp500(per)
+        self._require("S0_SP500_COVERAGE")
         # ---------------- S1 BASE
         assets = []
         for st in ("active", "inactive"):
@@ -275,7 +490,7 @@ class ProductionAcquirer:
             mergers += [] if m_ is MISSING else m_
         ident_renames = []
         for s_, e_ in per.identity_rename_ranges:
-            e_ = dd.isoformat() if e_ == "DOWNLOAD_DATE" else e_
+            e_ = dd.isoformat() if e_ == "DOWNLOAD_DATE" else e_          # fixed reference date, never "today"
             r_ = self.corporate_actions("identity_renames", "name_change", s_, e_)
             if r_ is not MISSING:
                 ident_renames += [{"old_symbol": x.get("old_symbol"), "new_symbol": x.get("new_symbol"),
@@ -288,14 +503,16 @@ class ProductionAcquirer:
             y, qq = int(q[:4]), int(q[-1])
             qa, qb = date(y, 3 * qq - 2, 1), date(y + (qq == 4), (3 * qq) % 12 + 1, 1)
             f345[q] = self.sec_file("form345", form345_url(q), f"{q}_form345.zip", (qa, qb - timedelta(days=1)),
-                                    required=True, insufficient_on_404=True, validate=self._zip_form345)
+                                    required=True, insufficient_on_404=True, validate=self._zip_form345,
+                                    within=self._f345_within(qa, qb - timedelta(days=1)))
         masters = {}
         for q in per.master_quarters():
             y, qq = int(q[:4]), int(q[-1])
+            qlo = date(y, 3 * qq - 2, 1)
+            qend = date(y + (qq == 4), (3 * qq) % 12 + 1, 1) - timedelta(days=1)
             masters[q] = self.sec_file("master_idx", SEC_MASTER.format(q), "master_" + q.replace("/", "_") + ".idx",
-                                       (date(y, 3 * qq - 2, 1), per.filings_to), required=True,
-                                       insufficient_on_404=True, validate=self._master)
-        sp_body, sp_asof = self.sp500(per)
+                                       (qlo, per.filings_to), required=True, insufficient_on_404=True,
+                                       validate=self._master, within=self._master_within(qlo, qend))
         self._require("S1_BASE")
         # ---------------- S2 SCOPE
         sp_text = sp_body.decode("utf-8")
@@ -335,22 +552,31 @@ class ProductionAcquirer:
         return self.submissions_page(name)
 
     def issuer_evidence(self, events, per, s2_ciks):
-        """S5. Frozen two-step submissions rule:
-          SUB-1 (R3, S2): CIKs resolved for the candidate scope -> main + pages overlapping [filings_from, filings_to]
-          SUB-2 (V2.1 audit subs_v2_fetch): verified event issuers WITHOUT an S2 main -> main + every page with
-                filingFrom <= filings_to
+        """S5. History pages per the window's declared rule (period.submissions_page_rule):
+          ALL_PAGES_TO_WINDOW_END  every event issuer: main + EVERY advertised page with filingFrom <= window end,
+                                   each verified against the advertisement (complete history to D)
+          FROZEN_DEV_EVIDENCE      DEV replay only: issuers without an S2 main get main + pages <= window end; S2
+                                   issuers keep the R3 overlapping pages (the development evidence as acquired)
         then the point-in-time header of the issuer's latest company filing <= D, read through the SAME reader the
-        builder uses (builder.subs_reader over the materialised sec/ directory) so S5 and BUILD see one evidence set."""
+        builder uses (builder.subs_reader over the materialised sec/ directory) so S5 and BUILD see one evidence set.
+        A history that is complete but holds no qualifying filing is evidence (frozen V2.1 policy applies); a page that
+        is missing, malformed or repaginated is a required failure (never an exclusion)."""
         from research.event_response_map_v1 import identity as I
         fhi = per.filings_to.isoformat()
         issuers = sorted({e["issuer"] for e in events if e["issuer"]})
+        hist = {}
         for cik in issuers:
-            if cik in s2_ciks:
+            if per.submissions_page_rule == PAGE_RULE_FROZEN_DEV and cik in s2_ciks:
+                hist[cik] = {"rule": PAGE_RULE_FROZEN_DEV, "pages": "R3 overlapping pages (as acquired)"}
                 continue
             m = self.submissions_main(cik)
-            for f in (m or {}).get("filings", {}).get("files", []):
-                if f.get("filingFrom", "9999") <= fhi:
-                    self.submissions_page(f["name"])
+            req_pages = [f["name"] for f in (m or {}).get("filings", {}).get("files", [])
+                         if f.get("filingFrom", "9999") <= fhi]
+            got = [n for n in req_pages if self.submissions_page(n) is not None]
+            hist[cik] = {"rule": per.submissions_page_rule, "main": "ABSENT" if m is None else "USABLE",
+                         "pages_required": len(req_pages), "pages_verified": len(got),
+                         "complete": len(got) == len(req_pages)}
+        B.atomic(self.archive / "acquisition" / "issuer_history.json", json.dumps(hist, indent=0, sort_keys=True))
         if any(f["required"] for f in self.failures):
             return
         subs = B.subs_reader([self.archive / "sec"], per.events_to.isoformat())
@@ -410,6 +636,15 @@ class ProductionAcquirer:
         if not (d / "manifest.json").exists():
             d.mkdir(parents=True, exist_ok=True)
             dl.write_manifest()
+        import gzip as _gz
+        for f in dl.manifest["files"]:                       # response scope: every bar inside [start, end]
+            for sym, bs in (json.loads(_gz.decompress((d / f["file"]).read_bytes())).get("bars") or {}).items():
+                out = [x["t"][:10] for x in bs if not (s_ <= x["t"][:10] <= e_)]
+                if out:
+                    self.store.event({"exposure": "RESPONSE_EXCEEDS_AUTHORISED_SCOPE", "category": "bars",
+                                      "file": f["file"], "symbol": sym, "dates": out[:5], "declared": [s_, e_]})
+                    self._write_status("S3_BARS_SCOPE", complete=False)
+                    raise S.ScopeExceeded(f"bars: {sym} bars dated {out[:3]} outside {s_}..{e_} ({f['file']})")
         done.write_text(json.dumps({"group": g, "returns": len(ret_syms), "eligibility": len(elig_syms)}))
 
     def discover_events(self, per, renames_all, f345):

@@ -80,6 +80,28 @@ def _prior_state(run: Path) -> dict | None:
     return json.loads(p.read_text()) if p.exists() else None
 
 
+def failure_class(stage: str, e: BaseException, outcome_exposure: bool) -> str:
+    """Classify a failed run (recorded; the r9 re-execution rule itself is unchanged and pending D6):
+      INCOMPLETE_AFTER_OUTCOME_EXPOSURE  any failure once outcomes may exist (no retry; owner decides)
+      RUN_INVALID                        r9 step 0: archive / hash verification failed, or guard / response scope
+                                         exceeded (ScopeExceeded, HoldoutViolation at LOAD)
+      ACQUISITION_BLOCKED                a required input could not be acquired with verified, sufficient coverage
+                                         inside the authorised scope (AcquisitionBlocked / incomplete archive)
+      IMPLEMENTATION_FAILURE             anything else before outcomes (code / invariant error)
+    None of these is a statistical verdict; PASS / FAIL / INCONCLUSIVE exist only in a COMPLETE run."""
+    from research.common.locked_range_guard import HoldoutViolation
+    from research.erm_nominee_validation.acquisition import states as S
+    from research.erm_nominee_validation.adapters import AcquisitionIncomplete, InputHashMismatch
+    if outcome_exposure:
+        return S.INCOMPLETE_AFTER_OUTCOME_EXPOSURE
+    if isinstance(e, S.ScopeExceeded) or isinstance(e, InputHashMismatch) or (
+            isinstance(e, HoldoutViolation) and stage != "ACQUIRE"):
+        return S.RUN_INVALID
+    if isinstance(e, (S.AcquisitionFailure, AcquisitionIncomplete, HoldoutViolation)):
+        return S.ACQUISITION_BLOCKED
+    return S.IMPLEMENTATION_FAILURE
+
+
 def build_rows(loaded, cfg: ValidationConfig) -> tuple[list, list]:
     """BUILD stage core (network-free): population over every loaded bar group -> V2.1 manifest rows."""
     import pandas as pd
@@ -128,7 +150,8 @@ def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, r
         except BaseException as e:  # noqa: BLE001 -- classified, recorded, re-raised
             present = sorted(n for n in OUTPUTS if (run / n).exists())
             final = "ABORTED_OWNER_DECIDES" if attempt >= 2 else f"INCOMPLETE_{name}"
-            rec.update(status=final, failed_stage=name, error=f"{type(e).__name__}: {e}", ended_utc=now(),
+            rec.update(status=final, failed_stage=name, failure_class=failure_class(name, e, rec["outcome_exposure"]),
+                       error=f"{type(e).__name__}: {e}", ended_utc=now(),
                        outputs_present=present, traceback=traceback.format_exc(limit=5),
                        retry_allowed=(attempt == 1 and not rec["outcome_exposure"]),
                        partial_outputs_note="PARTIAL OUTPUTS -- NOT A RESULT; no report, no completion marker")

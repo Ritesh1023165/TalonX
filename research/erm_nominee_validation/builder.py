@@ -120,16 +120,19 @@ def subs_reader(dirs: list[Path], end: str) -> Callable:
                 q = base / ("sub_" + f["name"] + ".gz")
                 if q.exists():
                     blocks.append(json.loads(gzip.decompress(q.read_bytes())))
-            rows = []
+            seen: dict = {}                                # stable filing identity = accession number
             for b in blocks:
                 n = len(b.get("filingDate", []))
                 for i in range(n):
                     fd = b["filingDate"][i]
                     if fd > end:
                         continue
-                    rows.append((fd, b["form"][i], b["accessionNumber"][i], str((b.get("items") or [""] * n)[i] or ""),
-                                 str((b.get("reportDate") or [""] * n)[i] or "")))
-            rows.sort()
+                    row = (fd, b["form"][i], b["accessionNumber"][i], str((b.get("items") or [""] * n)[i] or ""),
+                           str((b.get("reportDate") or [""] * n)[i] or ""))
+                    if row[2] in seen and seen[row[2]] != row:
+                        raise ValueError(f"conflicting submissions rows for accession {row[2]} (CIK {cik})")
+                    seen[row[2]] = row                      # identical duplicates (e.g. repagination overlap) collapse
+            rows = sorted(seen.values())
             res = rows
         cache[cik] = res
         return res

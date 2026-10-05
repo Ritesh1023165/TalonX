@@ -1,0 +1,272 @@
+{
+ "package": "ERM_NOMINEE_ACQUISITION_FINAL_REVIEW",
+ "verdict": "READY_WITH_DECLARED_ACQUISITION_PREREQUISITE",
+ "declared_prerequisite": "window-B S&P coverage through 2026-09-30 unconfirmed by metadata; S0 is the first request after a GO; insufficient -> ACQUISITION_BLOCKED (no scoring, no FAIL, no substitute source, no window switch)",
+ "status": "NOT LOCKED, NO GO, NOT APPROVED; owner decisions D1 D2 D4 D5 D6 D6a D7 pending",
+ "start": {
+  "branch": "research/erm-nominee-validation-plumbing",
+  "head": "dc0c406",
+  "implementation_commit": "a6006b8",
+  "implementation_sha256_aggregate": "5f893f471e743462529a840fff9d2a455e38c2c9829de9197810854af2fc60df"
+ },
+ "final": {
+  "implementation_sha256_aggregate": "24a9e262b4b34971ab0bf104bf2c20c5fafe84328011442f99c7ff0212f6f81b",
+  "code_sha256": {
+   "research/erm_nominee_validation/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "research/erm_nominee_validation/acquisition/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "research/erm_nominee_validation/acquisition/acquirer.py": "f0f67d1986af7d1b97fa36ae031c0a633990327e3d1319d9fea0b97918894c58",
+   "research/erm_nominee_validation/acquisition/dev_replay.py": "a053ce602381cbac7b9690c7b2c80faf2639a732413e88978b0e0c07a6859efd",
+   "research/erm_nominee_validation/acquisition/dev_smoke.py": "f6b3a415b848a8b45236cae122a80bc6c3cd2a4ff732d909078e3073b1111edc",
+   "research/erm_nominee_validation/acquisition/guards.py": "a2edcf14e926b6520c82ba758fe675bafff4d37d1a74a063aeafe68c3ada874e",
+   "research/erm_nominee_validation/acquisition/period.py": "6f20c4ec9a5c00a196e88666a31786e3472f9f479b81f5ca77a557abc350eb72",
+   "research/erm_nominee_validation/acquisition/replay.py": "f5ba852c1361483c477d5a98c1a89b85e77c8f96d49ea0e3f0e813b9978a1bbd",
+   "research/erm_nominee_validation/acquisition/scope.py": "df16ef4dd93a63509fde7517ce90f24ef3e1bad0b3e531acd2aa9375ddcca702",
+   "research/erm_nominee_validation/acquisition/states.py": "b8538c5eadfe4678e785c84a1feefb309cd58a3218a329503cd49bb3f7c92ed2",
+   "research/erm_nominee_validation/acquisition/store.py": "1e980e8abe99babd165384e64e68a51644ee1d6d681a3e735eb78aa1c0e9ddbd",
+   "research/erm_nominee_validation/acquisition/transport.py": "ae4583a5a758f607aaabcc9d759a402bb8f91f7a5f4a37e36276832c722b5324",
+   "research/erm_nominee_validation/adapters.py": "13fda53089a5876ecb2950a0a2c4ae218674c0acf1fe0526f98b854e93d3e397",
+   "research/erm_nominee_validation/builder.py": "d30fce045c42253801a3364af713446f097bcb960326010c9bde5cdcfa105415",
+   "research/erm_nominee_validation/config.py": "f0e35c1ab1bb6d551be0a1d10b919ec0147ff2ccb2bf86a1aa6b5677e8a5c77b",
+   "research/erm_nominee_validation/diagnostics.py": "05104bee0437158bbaa8f7309c3491c61d390dc15606f93d2d568f9cbea0a768",
+   "research/erm_nominee_validation/gates.py": "838fc1cb0b44cbdbab9091a063a5dc5e6d4812f620a07d8bea7caf97e2dc56ad",
+   "research/erm_nominee_validation/guard.py": "efaa2660db9331f04e587492583b30f95f409da2c9e2e0bd4836160d8c44a7f3",
+   "research/erm_nominee_validation/inventory.py": "c00d02936a3021a69bbfe7ab6ad5f9260bad5789766b7d2e4e64b5715393a1d6",
+   "research/erm_nominee_validation/release.py": "e5319311312d67df1775cd68de75af2ebcf47e13193e3bbd00ac771e2b9fdc08",
+   "research/erm_nominee_validation/run.py": "63b534b35adde6a7c90a397de573abc1cdaefae56c5194aed11e0413449805e1",
+   "research/erm_nominee_validation/workflow.py": "8dd2519df695453e78629c3ad155fc6e1ac5f91c5322ef42aa52d823db3fdf23",
+   "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef",
+   "research/event_response_map_v1/data.py": "dc695992756703db7a13d2d0f99e38c1c96b36f8476c92157cdd99b296ab7537",
+   "research/event_response_map_v1/events.py": "701abda1482d46cc12cac08c1fb8f4821df81393f52c1d076b3a132e0d83019c",
+   "research/event_response_map_v1/identity.py": "194e9ee41ecfc6223b96f6b19682cb7dc1ea65789a99caed52a8adbc9a92574e",
+   "research/event_response_map_v1/universe.py": "b8925c6811f5643078cc6e93144e8ee5efb059e3663d97b76c60ab12f0aa7797",
+   "research/event_response_map_v1/universe_source.py": "7d064a1590f71f291eca3072d2f698ea3f68114fd54f51e2d7cf615759c5a686",
+   "research/event_response_map_v1/r3_metadata.py": "0f58f05e9be2638efbcb4941b6f5efdf13940f5c36dac203ea6c8b47f57eab53",
+   "research/event_response_map_v1/instrument_filter.py": "622df0bd9bdb34ff945583db1bf8851241dd68f31ef1f6e5acaea48d8db408d3",
+   "research/event_response_map_v1/metrics.py": "fd876a17f21d5c8d0ce01ff61bd30518c985d2d7ed11fa1343e28caacb2469dd",
+   "research/common/locked_range_guard.py": "2a70feb4b7a921294863a471ef9662cdf81ac37013d6294990d67059748306d8",
+   "research/common/research_stats.py": "79ae73bf8082c8fa70f97f8b2e3277b00e64f3a4a98fe5b165ed1ee2b78c243d"
+  }
+ },
+ "protocol": {
+  "r9_sha256": "fa59a9cac2065006d0e9d5a9b5e53f95564f58c5309610369b7f565202a3a32b",
+  "r10_sha256": "e6385dd04b3553bca958efc324aead0734bad96c731dbd58c3d382219e899929",
+  "r10_changes": "procedure only: section 4 T5, T8-T11; section 7 step 0 wording; sections 9, 10, 11 (D6a, D7), 12"
+ },
+ "review_md_sha256": "ebf13b97811601b042fd86f7df9400b72905bebe4844514d99d51a7367266b7a",
+ "issues": {
+  "submissions_page_asymmetry": {
+   "resolution": "ALL_PAGES_TO_WINDOW_END for A/B with page verification (count exact, filingFrom exact, last <= filingTo + 1 d); advertised page 404 = incomplete pagination; accession de-duplication; DEV replay keeps FROZEN_DEV_EVIDENCE",
+   "dev_measurement": {
+    "issuers": 1076,
+    "issuers_with_unfetched_pre_window_pages": 482,
+    "rows_affected": 966,
+    "decision_sensitive_rows": 0
+   },
+   "protocol_amendment": "none (acquisition correctness); procedure written as r10 T9 under D6"
+  },
+  "broad_endpoint_scope": {
+   "resolution": "content envelope guarded before sending + response-scope checks after; violation -> RESPONSE_EXCEEDS_AUTHORISED_SCOPE, quarantine, exposure event, RUN_INVALID",
+   "release_authorisation": "D7",
+   "scope_envelopes_B_if_reference_2026_10_05": {
+    "bars": [
+     [
+      "2023-11-01",
+      "2026-09-30"
+     ]
+    ],
+    "assets_current": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "corporate_actions": [
+     [
+      "2024-01-01",
+      "2026-09-30"
+     ]
+    ],
+    "identity_renames": [
+     [
+      "2026-10-01",
+      "2026-10-05"
+     ]
+    ],
+    "sec_reference_current": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "form345": [
+     [
+      "2018-01-01",
+      "2026-09-30"
+     ]
+    ],
+    "master_idx": [
+     [
+      "2024-01-01",
+      "2026-09-30"
+     ]
+    ],
+    "submissions": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "filing_headers": [
+     [
+      null,
+      "2026-09-30"
+     ]
+    ],
+    "sp500_pit": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "etf_cash_dividends": [
+     [
+      "2024-01-01",
+      "2026-09-30"
+     ]
+    ]
+   },
+   "scope_envelopes_A_if_reference_2026_10_05": {
+    "bars": [
+     [
+      "2023-11-01",
+      "2024-12-31"
+     ]
+    ],
+    "assets_current": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "corporate_actions": [
+     [
+      "2024-01-01",
+      "2024-12-31"
+     ]
+    ],
+    "identity_renames": [
+     [
+      "2025-01-01",
+      "2026-10-05"
+     ]
+    ],
+    "sec_reference_current": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "form345": [
+     [
+      "2018-01-01",
+      "2024-12-31"
+     ]
+    ],
+    "master_idx": [
+     [
+      "2024-01-01",
+      "2024-12-31"
+     ]
+    ],
+    "submissions": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "filing_headers": [
+     [
+      null,
+      "2024-12-31"
+     ]
+    ],
+    "sp500_pit": [
+     [
+      null,
+      "2026-10-06"
+     ]
+    ],
+    "etf_cash_dividends": [
+     [
+      "2024-01-01",
+      "2024-12-31"
+     ]
+    ]
+   }
+  },
+  "post_window_renames": {
+   "resolution": "ticker-on-D reconstruction only (T8); pinned reference date R; identity renames end = R; broad requests refused after R + 1 d; REFERENCE_DATE_MISMATCH on resume or vs the release"
+  },
+  "sp500_coverage": {
+   "verdict": "COVERAGE_UNCONFIRMED_UNTIL_AUTHORISED_ACQUISITION",
+   "evidence": "results/erm_nominee_validation/sp500_metadata_check/metadata_check_record.json"
+  }
+ },
+ "verification": {
+  "focused_review_tests": {
+   "file": "tests/test_erm_nominee_acquisition_review.py",
+   "passed": 32
+  },
+  "regression": {
+   "passed": 208,
+   "failed": 0
+  },
+  "dev_replay": {
+   "status": "REPLAY_PARITY_PASS",
+   "record": "results/erm_nominee_validation/dev_replay_review/replay_record.json",
+   "manifest_sha256": {
+    "duplicate_groups.csv": "ba05509a96ee4756137f3c8a218eb9e429b01292c1843828b0498627ca8ca222",
+    "manifest.csv": "3824fa6a857b08e355f6e346afed5e8f719b7f783cc41d7ddb4841301f52dfcb"
+   },
+   "archive_manifest_sha256": "00c93a4c934bf86cda5a2ccb3b9f5aba76989b2c09d56eade67d83d0e7ea3823",
+   "manifest_parity": {
+    "rows_frozen": 2752,
+    "rows_plumbing": 2752,
+    "n_field_diffs": 0,
+    "duplicate_group_membership_differs": false,
+    "unresolved_duplicate_set_differs": false
+   },
+   "bars_parity": {
+    "KEPT": {
+     "pages": 1339,
+     "frozen_pages": 1339,
+     "aggregate_equal": true,
+     "page_sha_equal": true
+    },
+    "R1A_REMOVED": {
+     "pages": 128,
+     "frozen_pages": 128,
+     "aggregate_equal": true,
+     "page_sha_equal": true
+    }
+   }
+  }
+ },
+ "release_state": {
+  "production_guard": "ValidationGuard",
+  "production_store_exists": false,
+  "protocol_lock_exists": false
+ },
+ "real_guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5",
+ "smoke_launcher": "none pending; the single smoke run completed 2026-10-05 20:33Z; not rerun",
+ "remaining_owner_decisions": [
+  "D1",
+  "D2",
+  "D4",
+  "D5",
+  "D6",
+  "D6a",
+  "D7"
+ ],
+ "approval_statement": "NOT YET GIVEN (review md section 10)"
+}

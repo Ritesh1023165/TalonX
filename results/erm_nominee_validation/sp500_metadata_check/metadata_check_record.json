@@ -1,0 +1,86 @@
+{
+ "check": "S&P 500 PIT source publication metadata (metadata only; no membership rows downloaded)",
+ "retrieved_utc": "2026-10-05T23:11Z",
+ "endpoints": [
+  "https://api.github.com/repos/fja05680/sp500/contents",
+  "https://raw.githubusercontent.com/fja05680/sp500/master/README.md",
+  "https://api.github.com/repos/fja05680/sp500/releases",
+  "https://api.github.com/repos/fja05680/sp500/tags"
+ ],
+ "listing": [
+  {
+   "name": ".gitignore",
+   "size": 816,
+   "sha": "e657f2c110b7e4fb8aa33b73e7621e372f2ee438"
+  },
+  {
+   "name": "LICENSE",
+   "size": 1100,
+   "sha": "1702a4df51e2c2a0a96ede6b10afeb880b976bbd"
+  },
+  {
+   "name": "PIT to Ticker Delta.ipynb",
+   "size": 9868,
+   "sha": "50304417f01ec3f711445c4f32ef1a53291c9598"
+  },
+  {
+   "name": "README.md",
+   "size": 4847,
+   "sha": "43072b7901eaaedbc63a523a1040ac91b5c65dbb"
+  },
+  {
+   "name": "S&P 500 Historical Components & Changes (Updated).csv",
+   "size": 5530907,
+   "sha": "656b033be9418db272f1903f4f8e79a2a8664e6a"
+  },
+  {
+   "name": "S&P 500 Historical Components & Changes.csv",
+   "size": 7791584,
+   "sha": "2559bdc806035f09b1dea7c8e8bc59296728fadb"
+  },
+  {
+   "name": "sp500.csv",
+   "size": 53646,
+   "sha": "2274fd710c67e5c15efa881fe27924ca31a247c6"
+  },
+  {
+   "name": "sp500.ipynb",
+   "size": 358651,
+   "sha": "1411d26bf7edc0979c5857f30c20e78c2d63739f"
+  },
+  {
+   "name": "sp500_by_date.ipynb",
+   "size": 17383,
+   "sha": "f1061b54ce021188ef92a77a9084033834e6f89e"
+  },
+  {
+   "name": "sp500_changes_since_2019.csv",
+   "size": 3389,
+   "sha": "229e0d574400c79b1f4820968d287b05c57881b5"
+  },
+  {
+   "name": "sp500_historical.ipynb",
+   "size": 53395,
+   "sha": "1094d5d772c20924e9445fb7ae12b3fb1b00c5f9"
+  },
+  {
+   "name": "sp500_ticker_start_end.csv",
+   "size": 28058,
+   "sha": "3ed3b0e8d9e6e63730c153ee1f13ddaf6ed281bb"
+  }
+ ],
+ "findings": [
+  "no as-of date in any file name",
+  "README coverage statement is a placeholder: from 1996 til MM-DD-YYYY",
+  "0 releases, 0 tags",
+  "commit timestamps not used as coverage evidence"
+ ],
+ "verdict": "COVERAGE_UNCONFIRMED_UNTIL_AUTHORISED_ACQUISITION",
+ "files_sha256": {
+  "sp_listing.headers": "eb6208c3f5c56d1d81e4d1b66e825e4cc2d48c113831d4b2ed06e32c42a0dd93",
+  "sp_listing.json": "3e33b93c99c8f3b7d99e35a4b4ed445f0c876db3274a47d69cc79e5731e0280d",
+  "sp_readme.md": "1b328209e11f1f02c27d1345cb078b0d147b47295fee36928cab59fef0b9df04",
+  "sp_releases.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "sp_tags.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+ }
+}

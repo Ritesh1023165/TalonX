@@ -10,6 +10,27 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
+# Broad endpoints return content up to the moment of retrieval. A release names ONE acquisition reference date R; such
+# responses are authorised up to R + RETRIEVAL_WINDOW_DAYS (one off-hours session may cross 00:00 UTC). Any broad
+# request on a later calendar date is refused BEFORE it is sent (no silent expansion on resume).
+RETRIEVAL_WINDOW_DAYS = 1
+
+# Submissions history-page rules (S5, event issuers):
+#   ALL_PAGES_TO_WINDOW_END  every page the issuer's main JSON advertises with filingFrom <= window end, for EVERY event
+#                            issuer (complete history to D, as V2.1 R1a "any year" and "latest company filing <= D"
+#                            require); used for the validation windows
+#   FROZEN_DEV_EVIDENCE      the development evidence exactly as it was acquired (R3 overlapping pages for S2 CIKs, all
+#                            pages <= window end only for issuers without an S2 main); DEV replay only. Proven not to
+#                            change any development eligibility decision (review package section 2).
+PAGE_RULE_FULL, PAGE_RULE_FROZEN_DEV = "ALL_PAGES_TO_WINDOW_END", "FROZEN_DEV_EVIDENCE"
+
+# Corporate-action response envelope (measured on 3,518 development / live rows: effective_date <= process_date + 2 d;
+# dividend payable / record dates follow ex_date). A row is inside a [start, end] request iff a PRIMARY date lies in
+# [start, end]; the named ATTRIBUTE dates may run at most CA_ATTRIBUTE_LAG_DAYS past end; any other date never past end.
+CA_PRIMARY_DATE_FIELDS = ("process_date", "ex_date")
+CA_ATTRIBUTE_DATE_FIELDS = ("process_date", "ex_date", "effective_date", "payable_date", "record_date")
+CA_ATTRIBUTE_LAG_DAYS = 60
+
 # Task75 reserved windows (frozen identity.TASK75_RESERVED): skipped for DEV identity renames, exactly as frozen
 TASK75_RESERVED = ((date(2024, 6, 1), date(2024, 9, 2)), (date(2024, 10, 21), date(2024, 12, 20)))
 FROZEN_POST2023_RENAME_RANGES = (("2024-01-01", "2024-05-31"), ("2024-09-03", "2024-10-20"),
@@ -48,6 +69,7 @@ class AcquisitionPeriod:
     etf_dividends_from: date
     etf_dividends_to: date
     notes: tuple = field(default=())
+    submissions_page_rule: str = PAGE_RULE_FULL
 
     def f345_quarters(self, frm: date) -> list[str]:
         return [f"{y}q{q}" for y, q in quarters(frm, self.events_to)]
@@ -78,7 +100,7 @@ PERIODS = {
         "DEV", date(2019, 1, 2), date(2023, 12, 29), date(2018, 11, 1), date(2019, 1, 1), date(2023, 12, 31),
         FROZEN_POST2023_RENAME_RANGES, date(2019, 1, 1), date(2018, 1, 1), date(2019, 1, 2), date(2023, 12, 29),
         date(2019, 1, 1), date(2023, 12, 31), date(2019, 1, 1), date(2023, 12, 31),
-        ("frozen development coverage (Phase D, R3, V2.1 audit)",)),
+        ("frozen development coverage (Phase D, R3, V2.1 audit)",), PAGE_RULE_FROZEN_DEV),
     "A": AcquisitionPeriod(
         "A", date(2024, 1, 2), date(2024, 12, 31), date(2023, 11, 1), date(2024, 1, 1), date(2024, 12, 31),
         (("2025-01-01", "DOWNLOAD_DATE"),), date(2024, 1, 1), date(2018, 1, 1), date(2024, 1, 2), date(2024, 12, 31),
@@ -114,16 +136,20 @@ def quarter_end(d: date) -> date:
     return (date(d.year + 1, 1, 1) if q == 4 else date(d.year, 3 * q + 1, 1)) - timedelta(days=1)
 
 
-def scope_envelopes(p: AcquisitionPeriod, download_date: date) -> dict:
+def scope_envelopes(p: AcquisitionPeriod, reference_date: date) -> dict:
     """category -> [[content_from | None, content_to]]: the EXACT acquisition scope of one window, as the acquirer
-    guards it (None = history). A release must name exactly this (no wider, no narrower, no other category)."""
-    dd = download_date.isoformat()
+    guards it (None = history). A release must name exactly this (no wider, no narrower, no other category).
+    Broad endpoints: content to the retrieval date, bounded by reference_date + RETRIEVAL_WINDOW_DAYS. Identity-only
+    renames: requested with end = reference_date exactly (explicit, reproducible)."""
+    from datetime import timedelta
+    dd = (reference_date + timedelta(days=RETRIEVAL_WINDOW_DAYS)).isoformat()
+    ref = reference_date.isoformat()
     iso = lambda d: d.isoformat()  # noqa: E731
     return {
         "bars": [[iso(p.bars_from), iso(p.events_to)]],
         "assets_current": [[None, dd]],
         "corporate_actions": [[iso(p.corporate_actions_from), iso(p.corporate_actions_to)]],
-        "identity_renames": [[a, dd if b == "DOWNLOAD_DATE" else b] for a, b in p.identity_rename_ranges],
+        "identity_renames": [[a, ref if b == "DOWNLOAD_DATE" else b] for a, b in p.identity_rename_ranges],
         "sec_reference_current": [[None, dd]],
         "form345": [[iso(quarter_start(p.evidence_f345_from)), iso(quarter_end(p.events_to))]],
         "master_idx": [[iso(quarter_start(p.filings_from)), iso(p.filings_to)]],

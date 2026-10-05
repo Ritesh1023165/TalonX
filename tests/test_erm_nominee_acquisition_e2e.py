@@ -19,6 +19,7 @@ import pytest
 
 from research.erm_nominee_validation import adapters as A, release as RL, workflow as W
 from research.erm_nominee_validation.acquisition import states as S
+from research.erm_nominee_validation.acquisition import acquirer as AQ
 from research.erm_nominee_validation.acquisition.acquirer import ProductionAcquirer
 from research.erm_nominee_validation.acquisition.guards import AcquisitionRefused, DevelopmentAcquisitionGuard
 from research.erm_nominee_validation.acquisition.period import PERIODS, scope_envelopes
@@ -94,14 +95,28 @@ def zip_tsv(rows):
     return zb.getvalue()
 
 
+def page_doc(rows):
+    """rows: [(filingDate, form, accession)] -> SEC history-page columns."""
+    return {"filingDate": [r[0] for r in rows], "form": [r[1] for r in rows], "accessionNumber": [r[2] for r in rows],
+            "items": [""] * len(rows), "reportDate": [""] * len(rows),
+            "acceptanceDateTime": [r[0] + "T16:00:00.000Z" for r in rows]}
+
+
 class FixtureProvider:
     """Answers every production request for the synthetic world. `faults`: request-key substring -> list of actions
     consumed per call ('429', '503', 'conn', 'malformed', '404', 'ok'); `bar_page` = bars per page (pagination)."""
 
-    def __init__(self, faults=None, bar_page=4000, ca_pages=2, sp_asof="09-30-2026", f345_404=()):
+    def __init__(self, faults=None, bar_page=4000, ca_pages=2, sp_last="2026-10-02", f345_404=(), mutate=None,
+                 files=None, page_overrides=None):
         self.faults = {k: list(v) for k, v in (faults or {}).items()}
-        self.bar_page, self.ca_pages, self.sp_asof, self.f345_404 = bar_page, ca_pages, sp_asof, set(f345_404)
+        self.bar_page, self.ca_pages, self.sp_last, self.f345_404 = bar_page, ca_pages, sp_last, set(f345_404)
+        self.mutate = mutate or {}                  # url substring -> fn(body) -> body (broader / repaginated responses)
+        self.files = files                          # cik -> [(name, filingFrom, filingTo, rows)] advertised history pages
+        self.page_overrides = page_overrides or {}  # page name -> rows actually served (repagination)
         self.calls = []
+
+    def sp_csv(self):
+        return f"date,tickers\n2023-12-29,SAA\n2024-01-02,SAA\n{self.sp_last},SAA\n".encode()
 
     def fault(self, key):
         for k, acts in self.faults.items():
@@ -121,6 +136,9 @@ class FixtureProvider:
         if f == "404":
             return Response(404, b"")
         body = self.body(r)
+        for k, fn in self.mutate.items():
+            if k in r.key + r.url:
+                body = fn(body)
         if f == "malformed":
             body = body[: len(body) // 2]
         return Response(200, body)
@@ -162,9 +180,17 @@ class FixtureProvider:
             m = 3 * int(qq[-1]) - 1
             return ("CIK|Company Name|Form Type|Date Filed|Filename\n" + "".join(
                 f"{int(CIK[s])}|{s} Inc|10-Q|{y}-{m:02d}-01|x\n" for s in STOCKS)).encode("latin-1")
+        if "/submissions/" in u and "-submissions-" in u:                  # an advertised history page
+            name = u.rsplit("/", 1)[-1]
+            rows = self.page_overrides.get(name)
+            if rows is None:
+                rows = next(p[3] for ps in (self.files or {}).values() for p in ps if p[0] == name)
+            return json.dumps(page_doc(rows)).encode()
         if "/submissions/" in u:
             c = u.rsplit("CIK", 1)[1].split(".")[0]
             s = next(x for x, v in CIK.items() if v == c)
+            adv = [{"name": n, "filingCount": len(rw), "filingFrom": a, "filingTo": b}
+                   for n, a, b, rw in (self.files or {}).get(c, [])]
             return json.dumps({"cik": c, "name": f"{s} Inc", "tickers": [s], "sic": "3571", "formerNames": [],
                                "filings": {"recent": {
                                    "filingDate": ["2024-05-01", "2024-02-01", "2023-08-01"],
@@ -173,14 +199,16 @@ class FixtureProvider:
                                                        f"0000000001-23-{c[-4:]}0"],
                                    "items": ["", "", ""], "reportDate": ["2024-03-31", "2023-12-31", "2023-06-30"],
                                    "acceptanceDateTime": ["2024-05-01T16:00:00.000Z"] * 3},
-                                   "files": []}}).encode()
+                                   "files": adv}}).encode()
         if u.endswith("-index-headers.html"):
             return b"<html>STANDARD INDUSTRIAL CLASSIFICATION: ELECTRONIC COMPUTERS [3571]\n</html>"
         if u.endswith("/contents"):
-            return json.dumps([{"name": f"S&P 500 Historical Components & Changes({self.sp_asof}).csv",
+            b = self.sp_csv()
+            return json.dumps([{"name": "README.md", "sha": "x", "size": 1, "download_url": "https://raw.example/r"},
+                               {"name": AQ.SP500_FILE, "sha": AQ.ProductionAcquirer.git_blob_sha(b), "size": len(b),
                                 "download_url": "https://raw.example/sp500.csv"}]).encode()
         if u == "https://raw.example/sp500.csv":
-            return b"date,tickers\n2023-12-29,SAA\n2024-01-02,SAA\n2026-09-30,SAA\n2026-10-02,SAB\n"
+            return self.sp_csv()
         raise AssertionError(f"unexpected fixture request {u}")
 
 
@@ -223,9 +251,12 @@ def auth(r, cfg=CFG, **over):
     return a
 
 
-def components(guard, provider):
+NOW = datetime(2026, 10, 5, 21, 0, tzinfo=timezone.utc)          # acquisition session on the reference date DD
+
+
+def components(guard, provider, *, clock=lambda: NOW, reference=DD):
     acq = ProductionAcquirer(guard, RetryingTransport(provider), bars_clock=lambda: OFF_HOURS,
-                             bars_sleep=lambda s: None, download_date=DD)
+                             bars_sleep=lambda s: None, reference_date=reference, clock=clock)
     return W.Components(guard=guard, acquirer=acq, loader=A.ProductionLoader(guard, MAPPING))
 
 
@@ -262,7 +293,7 @@ def test_success_through_report_and_marker_with_staging_order(tmp_path):
     man = json.loads((run / "archive/ARCHIVE_MANIFEST.json").read_text())
     assert man["complete"] and {"bars", "form345", "filing_headers", "sp500_pit"} <= {f["input"] for f in man["files"]}
     sp = (run / "archive/sp500.csv").read_text()
-    assert "2026-10-02" not in sp and "2026-09-30" in sp            # rows beyond the scope end never materialised
+    assert "2026-10-02" not in sp and "2024-01-02" in sp            # rows beyond the scope end never materialised
     assert json.loads((run / "gates.json").read_text())["gates"]["n_valid"] >= 100
 
 
@@ -330,7 +361,7 @@ def test_malformed_submissions_is_required_failure(tmp_path):
 
 def test_incomplete_sp500_coverage_rejected(tmp_path):
     g, r = released(tmp_path)
-    prov = FixtureProvider(sp_asof="06-30-2026")                       # before window B end 2026-09-30
+    prov = FixtureProvider(sp_last="2026-06-30")                       # last membership row before 2026-09-30
     with pytest.raises(W.StageFailure):
         W.run_validation(CFG, auth(r), components(g, prov), tmp_path / "run")
     st = json.loads((tmp_path / "run/archive/acquisition/acquisition_status.json").read_text())
@@ -340,7 +371,7 @@ def test_incomplete_sp500_coverage_rejected(tmp_path):
 
 def test_sp500_coverage_exactly_at_scope_end_accepted(tmp_path):
     g, r = released(tmp_path)
-    prov = FixtureProvider(sp_asof="09-30-2026")
+    prov = FixtureProvider(sp_last="2026-09-30")
     assert W.run_validation(CFG, auth(r), components(g, prov), tmp_path / "run")["status"] == "COMPLETE"
 
 

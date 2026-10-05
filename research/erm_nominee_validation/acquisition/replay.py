@@ -11,7 +11,8 @@ ReplayTransport answers provider requests from archived development bytes ONLY (
                was not archived)
   sec          by archive file name in _archive/sec, audit _sec_pit, audit _sec_v2 (authoritative-archive rule of the
                frozen phase_d.Sec)
-  github       S&P listing RECONSTRUCTED from the local point-in-time file (as-of = its last row date) + that file
+  github       S&P listing RECONSTRUCTED in the source's current format (fixed file name + git blob sha of the local
+               point-in-time file; no as-of date is published) + that file
 A request with no archived answer raises ReplayMiss (a ConnectionError): the acquirer records it as
 TRANSPORT_OR_PROVIDER_FAILURE and stops -- a miss is never an absence or an empty result.
 """
@@ -121,13 +122,6 @@ class ReplayTransport:
                 return gzip.decompress(p.read_bytes())
         raise ReplayMiss(f"no archived SEC file {name}")
 
-    def _sp_asof(self) -> str:
-        last = None
-        with open(self.pit, encoding="utf-8") as fh:
-            for r in csv.DictReader(fh):
-                last = r["date"][:10]
-        return last
-
     def fetch(self, r: Request) -> Response:
         p = dict(r.params)
         if r.provider == "alpaca_bars":
@@ -139,8 +133,9 @@ class ReplayTransport:
         elif r.provider == "sec":
             body = self._sec(r.url)
         elif r.provider == "github" and r.url.endswith("/contents"):
-            y, m, d = self._sp_asof().split("-")
-            body = json.dumps([{"name": f"S&P 500 Historical Components & Changes({m}-{d}-{y}).csv",
+            from research.erm_nominee_validation.acquisition.acquirer import SP500_FILE, ProductionAcquirer
+            b = self.pit.read_bytes()
+            body = json.dumps([{"name": SP500_FILE, "sha": ProductionAcquirer.git_blob_sha(b), "size": len(b),
                                 "download_url": "replay://sp500_pit.csv"}]).encode()
         elif r.provider == "github" and r.url == "replay://sp500_pit.csv":
             body = self.pit.read_bytes()
