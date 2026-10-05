@@ -1,0 +1,11 @@
+{
+ "source_valid": {
+  "HEADER": 2569,
+  "NO_COMPANY_FILING_BY_D": 71,
+  "NO_ISSUER": 50,
+  "HEADER_WITHOUT_SIC": 5
+ },
+ "sic6770_pit_valid": 73,
+ "sic_pit_ne_current_valid": 244,
+ "bench_pit_ne_gateD_valid": 338
+}

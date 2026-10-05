@@ -1,0 +1,62 @@
+[
+ {
+  "file": "etf_cash_dividends_2019_0.json",
+  "params": {
+   "symbols": "SPY,XLE,XBI,XLV,XLK,XLI,XLF",
+   "start": "2019-01-01",
+   "end": "2019-12-31",
+   "types": "cash_dividend",
+   "limit": 1000
+  },
+  "sha256": "8a6c16e2946dd4126768b764c08b7b26a3222dcd171a4324aea8cb4f67838076",
+  "utc": "2026-10-05T12:11:03.052294+00:00"
+ },
+ {
+  "file": "etf_cash_dividends_2020_1.json",
+  "params": {
+   "symbols": "SPY,XLE,XBI,XLV,XLK,XLI,XLF",
+   "start": "2020-01-01",
+   "end": "2020-12-31",
+   "types": "cash_dividend",
+   "limit": 1000
+  },
+  "sha256": "7007b218dcc6af0cfb20b46021e910586cfac983e7cb0081ddcea49628b1832d",
+  "utc": "2026-10-05T12:11:05.379400+00:00"
+ },
+ {
+  "file": "etf_cash_dividends_2021_2.json",
+  "params": {
+   "symbols": "SPY,XLE,XBI,XLV,XLK,XLI,XLF",
+   "start": "2021-01-01",
+   "end": "2021-12-31",
+   "types": "cash_dividend",
+   "limit": 1000
+  },
+  "sha256": "18f33e68d33b195c715d3c45992e1914c3c3e19e80e43d9e5c0346e4600597f3",
+  "utc": "2026-10-05T12:11:07.702974+00:00"
+ },
+ {
+  "file": "etf_cash_dividends_2022_3.json",
+  "params": {
+   "symbols": "SPY,XLE,XBI,XLV,XLK,XLI,XLF",
+   "start": "2022-01-01",
+   "end": "2022-12-31",
+   "types": "cash_dividend",
+   "limit": 1000
+  },
+  "sha256": "44c7a28b96526a5b3bc034860cbc1f8edd602f047562cc36210b628616229e6d",
+  "utc": "2026-10-05T12:11:10.018670+00:00"
+ },
+ {
+  "file": "etf_cash_dividends_2023_4.json",
+  "params": {
+   "symbols": "SPY,XLE,XBI,XLV,XLK,XLI,XLF",
+   "start": "2023-01-01",
+   "end": "2023-12-31",
+   "types": "cash_dividend",
+   "limit": 1000
+  },
+  "sha256": "105aa2dc8cf0b763c69ca80db459d66f903b76e2ba0dfd8ce7d85a0b86cf2fc0",
+  "utc": "2026-10-05T12:11:12.327593+00:00"
+ }
+]

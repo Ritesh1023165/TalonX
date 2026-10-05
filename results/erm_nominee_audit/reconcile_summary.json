@@ -1,0 +1,53 @@
+{
+ "original": {
+  "valid": 2695,
+  "missing_exit": 8,
+  "missing_entry": 1,
+  "beyond_dev_end": 7
+ },
+ "rule_hits_full_overlapping": {
+  "C1_NO_GAP": 14,
+  "C1_NOT_ELIGIBLE": 17,
+  "C1_MISSING_ENTRY": 2,
+  "C1_EXIT_TO_MISSING": 6,
+  "C2_DUPLICATE_DROPPED": 110,
+  "C3_REMAPPED": 51,
+  "C3_NO_ISSUER_UNNAMED": 3,
+  "C4_R1A_NOT_AVAILABLE": 3,
+  "C4_METADATA_INSUFFICIENT": 0,
+  "C5_SP_EXEMPTION_LOST": 3,
+  "C6_SIC6770_MASKED": 42
+ },
+ "first_rule_attribution_original_valid": {
+  "UNCHANGED": 2451,
+  "C2_DUPLICATE_DROPPED": 107,
+  "C3_REMAPPED": 51,
+  "C6_SIC6770_MASKED": 41,
+  "C1_NOT_ELIGIBLE": 17,
+  "C1_NO_GAP": 14,
+  "C1_EXIT_TO_MISSING": 6,
+  "C4_R1A_NOT_AVAILABLE": 3,
+  "C3_NO_ISSUER_UNNAMED": 3,
+  "C1_MISSING_ENTRY": 2
+ },
+ "first_rule_attribution_original_missing_exit": {
+  "UNCHANGED": 6,
+  "C2_DUPLICATE_DROPPED": 2
+ },
+ "after": {
+  "valid": 2502,
+  "missing_exit": 10,
+  "additions_valid_or_unknown_exit": 0
+ },
+ "additions_by_reason": {
+  "r1a_available_only": 0,
+  "sp_exempt": 0
+ },
+ "additions_symbols": [],
+ "recency365_variant": {
+  "extra_removals_among_kept": 0,
+  "additions": 0
+ },
+ "sic_pit_applied": true,
+ "benchmark_changes_valid_after": 214
+}

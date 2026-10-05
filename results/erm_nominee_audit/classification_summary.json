@@ -1,0 +1,59 @@
+{
+ "population_rows": 2711,
+ "valid_rows": 2695,
+ "mapping_all": {
+  "VERIFIED_CONTINUITY": 1919,
+  "FUTURE_ASSISTED_MAPPING": 675,
+  "VERIFIED_DIFFERENT_SECURITY": 70,
+  "UNRESOLVED": 47
+ },
+ "mapping_valid": {
+  "VERIFIED_CONTINUITY": 1908,
+  "FUTURE_ASSISTED_MAPPING": 671,
+  "VERIFIED_DIFFERENT_SECURITY": 69,
+  "UNRESOLVED": 47
+ },
+ "mapping_symbols": {
+  "FUTURE_ASSISTED_MAPPING": 331,
+  "UNRESOLVED": 24,
+  "VERIFIED_CONTINUITY": 1013,
+  "VERIFIED_DIFFERENT_SECURITY": 41
+ },
+ "different_security_reason_valid": {
+  "f345_conflict": 61,
+  "renamed_away_before_D": 10,
+  "identical_to_better_evidenced_row": 2
+ },
+ "placeholder_at_key_valid": 22,
+ "placeholder_in_elig_valid": 27,
+ "placeholder_any_valid": 39,
+ "duplicate_rows_valid": 227,
+ "crosstab_valid_mapping_x_placeholder_any": {
+  "false": {
+   "FUTURE_ASSISTED_MAPPING": 653,
+   "UNRESOLVED": 47,
+   "VERIFIED_CONTINUITY": 1890,
+   "VERIFIED_DIFFERENT_SECURITY": 66
+  },
+  "true": {
+   "FUTURE_ASSISTED_MAPPING": 18,
+   "UNRESOLVED": 0,
+   "VERIFIED_CONTINUITY": 18,
+   "VERIFIED_DIFFERENT_SECURITY": 3
+  }
+ },
+ "crosstab_valid_mapping_x_duplicate": {
+  "false": {
+   "FUTURE_ASSISTED_MAPPING": 541,
+   "UNRESOLVED": 42,
+   "VERIFIED_CONTINUITY": 1829,
+   "VERIFIED_DIFFERENT_SECURITY": 56
+  },
+  "true": {
+   "FUTURE_ASSISTED_MAPPING": 130,
+   "UNRESOLVED": 5,
+   "VERIFIED_CONTINUITY": 79,
+   "VERIFIED_DIFFERENT_SECURITY": 13
+  }
+ }
+}

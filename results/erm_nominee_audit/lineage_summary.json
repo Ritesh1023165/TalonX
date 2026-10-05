@@ -1,0 +1,21 @@
+{
+ "population": 2711,
+ "status": {
+  "VALID": 2695,
+  "DATA_MISSING_EXIT": 8,
+  "DATA_MISSING_ENTRY": 1,
+  "BEYOND_DEV_END": 7
+ },
+ "inputs_sha256": {
+  "candidates.json": "c41297936d7585b27aed4854402e907371310da79218c5c3fefba2e705bb4a17",
+  "candidates_r3.json": "a7095779e32ad0aa3530410f5a5d238dd8a1005a873ca09bd7d9350f488502ad",
+  "_renames_2019_2023.json": "7db665ed6c0f4e8528598751895391fe57dacc113292630f8afae22f1261def7",
+  "_archive\\alpaca_meta_renames_post2023.json": "b92c5f05cb5580f87be337e6f0cb2a87fe7e1a889e111eef1b420a5533e0bb89",
+  "_archive\\alpaca\\manifest.json": "6b314c9a80993ba3860b72f9f457827e7ac3bbbffa360b9293816cd3c0001f03",
+  "PIT_csv": "39a9202c9ef69a74c0ff07e2113ad41fb6da7c8c5b6cd9541f0185fb4391e717"
+ },
+ "pit_csv_span": [
+  "1996-01-02",
+  "2026-06-30"
+ ]
+}

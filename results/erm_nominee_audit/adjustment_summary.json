@@ -1,0 +1,15 @@
+{
+ "events_checked": 2703,
+ "classes": {
+  "NO_ADJUSTMENT_IN_WINDOW": 2310,
+  "SMALL_UNLISTED_FACTOR_CHANGE_<=0.2pct (dividend or raw cent-rounding noise)": 280,
+  "UNLISTED_FACTOR_CHANGE_>0.2pct (dividend/special distribution/other, not in CA metadata)": 104,
+  "NO_RAW_PAIR": 8,
+  "LISTED_FORWARD_SPLITS": 1
+ },
+ "model_test": {
+  "pairs_tested (factor<0.97, |raw move|>=2%)": 148731,
+  "ratio_stable (multiplicative)": 146972,
+  "difference_stable (subtractive)": 5615
+ }
+}

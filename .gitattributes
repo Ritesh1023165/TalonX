@@ -16,3 +16,10 @@ results/event_response_map_v1/trial_ledger.json -text
 results/event_response_map_v1/phase_d_runner.log -text
 results/event_response_map_v1/phase_d_run.out.log -text
 results/event_response_map_v1/phase_d_run.err.log -text
+# ERM nominee correction V2.1 (2026-10-05): spec, freeze record, rules/scoring code, fixtures and audit evidence are
+# committed BYTE-EXACT (their sha256 values are recorded in ERM_NOMINEE_CORRECTION_V2_1_FREEZE.json).
+docs/research/preregistration/ERM_NOMINEE_CORRECTION_* -text
+research/erm_nominee_audit/** -text
+tests/test_erm_nominee_*.py -text
+results/erm_nominee_audit/** -text
+results/erm_nominee_corrected_run/** -text

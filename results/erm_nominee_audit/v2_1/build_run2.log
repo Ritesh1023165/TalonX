@@ -1,0 +1,14 @@
+{
+ "rows": 2752,
+ "pop": {
+  "A": 2711,
+  "B": 35,
+  "C": 6
+ },
+ "fetch": {},
+ "dup_link_data_status": {
+  "SAME_DATA": 114,
+  "INSUFFICIENT_OVERLAP": 4
+ }
+}
+rc=0

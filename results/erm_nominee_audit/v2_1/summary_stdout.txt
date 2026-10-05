@@ -1,0 +1,190 @@
+{
+ "population_rows": {
+  "A": 2711,
+  "B": 35,
+  "C": 6
+ },
+ "v2_status_by_population": {
+  "A": {
+   "BEYOND_WINDOW": 7,
+   "DATA_MISSING_EXIT": 2,
+   "EXCLUDED": 705,
+   "VALID": 1997
+  },
+  "B": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 33,
+   "VALID": 2
+  },
+  "C": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 6,
+   "VALID": 0
+  }
+ },
+ "proposed_primary_sample": {
+  "valid": 1999,
+  "missing_exit": 2,
+  "missing_entry": 0,
+  "beyond_window": 7,
+  "excluded": 744,
+  "valid_symbols": 1047,
+  "valid_entry_dates": 806,
+  "valid_by_gap_year": {
+   "2019": 240,
+   "2020": 721,
+   "2021": 455,
+   "2022": 300,
+   "2023": 283
+  },
+  "valid_by_population": {
+   "A": 1997,
+   "B": 2
+  }
+ },
+ "first_reason_original_valid": {
+  "KEPT_": 1997,
+  "ID_UNRESOLVED": 562,
+  "DUP_NOT_REPRESENTATIVE": 64,
+  "INSTRUMENT_SPAC": 21,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 17,
+  "DUP_UNRESOLVED": 16,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "INSTRUMENT_UNRESOLVED": 8
+ },
+ "first_reason_all_rows": {
+  "NONE": 2001,
+  "ID_UNRESOLVED": 598,
+  "DUP_NOT_REPRESENTATIVE": 65,
+  "INSTRUMENT_SPAC": 25,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 19,
+  "DUP_UNRESOLVED": 16,
+  "INSTRUMENT_UNRESOLVED": 11,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "BEYOND_WINDOW": 7
+ },
+ "flag_hits_all_rows_overlapping": {
+  "ID_UNRESOLVED": 612,
+  "DUP_UNRESOLVED": 106,
+  "DUP_NOT_REPRESENTATIVE": 65,
+  "INSTRUMENT_SPAC": 42,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 29,
+  "INSTRUMENT_UNRESOLVED": 12,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "BEYOND_WINDOW": 7,
+  "R1A_NOT_AVAILABLE": 3
+ },
+ "identity_classes_all": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2140,
+  "UNRESOLVED_IDENTITY": 612
+ },
+ "identity_reasons_unresolved": {
+  "ABSENT:NO_DATED_TICKER_EVIDENCE": 574,
+  "CONTRADICTORY:TRADING_BREAK_AFTER_EVIDENCE": 34,
+  "CONTRADICTORY:CYCLIC_RELABEL_CHAIN": 2,
+  "CONTRADICTORY:RENAMED_AWAY_AFTER_EVIDENCE": 1,
+  "CONTRADICTORY:AMBIGUOUS_RELABEL_CHAIN": 1
+ },
+ "identity_original_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2122,
+  "UNRESOLVED_IDENTITY": 573
+ },
+ "mapping_class_original_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2045,
+  "UNRESOLVED_IDENTITY": 573,
+  "VERIFIED_DIFFERENT_SECURITY": 77
+ },
+ "mapping_class_kept_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 1937,
+  "VERIFIED_DIFFERENT_SECURITY": 62
+ },
+ "instrument_kept_valid": {
+  "OPERATING_SECTOR_KNOWN": 1999
+ },
+ "instrument_original_valid": {
+  "OPERATING_SECTOR_KNOWN": 2076,
+  "": 573,
+  "SPAC": 37,
+  "UNRESOLVED_INSTRUMENT": 9
+ },
+ "sic_source_original_valid": {
+  "ARCHIVED": 2118,
+  "NO_ISSUER": 573,
+  "HEADER_WITHOUT_SIC": 4
+ },
+ "sp_evidence_unnamed_original_valid": {
+  "NO_MEMBERSHIP_BY_D": 204,
+  "UNVERIFIED_LINK": 28,
+  "VERIFIED": 11
+ },
+ "duplicates": {
+  "rows_in_verified_groups": 130,
+  "rows_unresolved": 106,
+  "groups": 65
+ },
+ "remapped_kept_valid": 62,
+ "benchmark_changes_vs_gateD_kept_valid_A": 143,
+ "benchmark_kept_valid": {
+  "SPY": 729,
+  "XBI": 412,
+  "XLK": 284,
+  "XLI": 217,
+  "XLF": 210,
+  "XLV": 76,
+  "XLE": 71
+ },
+ "additions_from_B_or_C_valid": 2,
+ "transition_v1_to_v2_A": {
+  "BEYOND_DEV_END": {
+   "BEYOND_WINDOW": 7,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 0,
+   "VALID": 0
+  },
+  "DATA_MISSING_ENTRY": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 1,
+   "VALID": 0
+  },
+  "DATA_MISSING_EXIT": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 2,
+   "EXCLUDED": 7,
+   "VALID": 1
+  },
+  "EXCLUDED": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 180,
+   "VALID": 11
+  },
+  "VALID": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 517,
+   "VALID": 1985
+  }
+ },
+ "sensitivity_kept_valid": {
+  "IN_SUBSET": 1459,
+  "OUT_OF_SUBSET": 540
+ },
+ "sensitivity_legs_kept_valid": {
+  "stock": {
+   "NO_ADJUSTMENT": 1726,
+   "ADJUSTED": 273
+  },
+  "etf_cash_dividend": {
+   "NO_ADJUSTMENT": 1690,
+   "ADJUSTED": 309
+  }
+ },
+ "hashes": {
+  "duplicate_groups.csv": "6858b5f91a06254092303519d8eaa5652879c0e372640ed952cfeef47b17ff74",
+  "manifest.csv": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d",
+  "unresolved_manifest.csv": "de040104aa6d702f20a8c0b86629e3372ce7e26b421d716851bc9bfd923b2bbf"
+ }
+}

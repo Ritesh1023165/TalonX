@@ -1,0 +1,9 @@
+{
+ "rows": 2711,
+ "sic_header_needed_distinct": 2275,
+ "sic_header_already_archived": 21,
+ "sic_header_to_fetch": 2254,
+ "rows_without_any_company_filing_by_D": 121,
+ "diag_removed_symbols_with_bars": 764,
+ "additions_candidates": 70
+}

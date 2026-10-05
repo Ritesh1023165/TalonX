@@ -1,0 +1,202 @@
+{
+ "population_rows": {
+  "A": 2711,
+  "B": 35,
+  "C": 6
+ },
+ "v2_status_by_population": {
+  "A": {
+   "BEYOND_WINDOW": 7,
+   "DATA_MISSING_EXIT": 2,
+   "EXCLUDED": 705,
+   "VALID": 1997
+  },
+  "B": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 33,
+   "VALID": 2
+  },
+  "C": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 6,
+   "VALID": 0
+  }
+ },
+ "proposed_primary_sample": {
+  "valid": 1999,
+  "missing_exit": 2,
+  "missing_entry": 0,
+  "beyond_window": 7,
+  "excluded": 744,
+  "valid_symbols": 1047,
+  "valid_entry_dates": 806,
+  "valid_by_gap_year": {
+   "2019": 240,
+   "2020": 721,
+   "2021": 455,
+   "2022": 300,
+   "2023": 283
+  },
+  "valid_by_population": {
+   "A": 1997,
+   "B": 2
+  }
+ },
+ "first_reason_original_valid": {
+  "KEPT_": 1997,
+  "ID_UNRESOLVED": 562,
+  "DUP_NOT_REPRESENTATIVE": 64,
+  "INSTRUMENT_SPAC": 25,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 17,
+  "DUP_UNRESOLVED": 16,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "INSTRUMENT_UNRESOLVED": 4
+ },
+ "first_reason_all_rows": {
+  "NONE": 2001,
+  "ID_UNRESOLVED": 598,
+  "DUP_NOT_REPRESENTATIVE": 65,
+  "INSTRUMENT_SPAC": 32,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 19,
+  "DUP_UNRESOLVED": 16,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "BEYOND_WINDOW": 7,
+  "INSTRUMENT_UNRESOLVED": 4
+ },
+ "flag_hits_all_rows_overlapping": {
+  "ID_UNRESOLVED": 612,
+  "DUP_UNRESOLVED": 106,
+  "DUP_NOT_REPRESENTATIVE": 65,
+  "INSTRUMENT_SPAC": 50,
+  "C1_NOT_ELIGIBLE_PLACEHOLDER": 29,
+  "C1_NO_GAP_PLACEHOLDER": 10,
+  "BEYOND_WINDOW": 7,
+  "INSTRUMENT_UNRESOLVED": 4,
+  "R1A_NOT_AVAILABLE": 3
+ },
+ "identity_classes_all": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2140,
+  "UNRESOLVED_IDENTITY": 612
+ },
+ "identity_reasons_unresolved": {
+  "ABSENT:NO_DATED_TICKER_EVIDENCE": 574,
+  "CONTRADICTORY:TRADING_BREAK_AFTER_EVIDENCE": 34,
+  "CONTRADICTORY:CYCLIC_RELABEL_CHAIN": 2,
+  "CONTRADICTORY:RENAMED_AWAY_AFTER_EVIDENCE": 1,
+  "CONTRADICTORY:AMBIGUOUS_RELABEL_CHAIN": 1
+ },
+ "identity_original_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2122,
+  "UNRESOLVED_IDENTITY": 573
+ },
+ "mapping_class_original_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 2045,
+  "UNRESOLVED_IDENTITY": 573,
+  "VERIFIED_DIFFERENT_SECURITY": 77
+ },
+ "mapping_class_kept_valid": {
+  "VERIFIED_HISTORICAL_IDENTITY": 1937,
+  "VERIFIED_DIFFERENT_SECURITY": 62
+ },
+ "instrument_kept_valid": {
+  "OPERATING_SECTOR_KNOWN": 1999
+ },
+ "instrument_original_valid": {
+  "OPERATING_SECTOR_KNOWN": 2076,
+  "": 573,
+  "SPAC": 42,
+  "UNRESOLVED_INSTRUMENT": 4
+ },
+ "sic_source_original_valid": {
+  "ARCHIVED": 2118,
+  "NO_ISSUER": 573,
+  "HEADER_WITHOUT_SIC": 4
+ },
+ "sp_evidence_unnamed_original_valid": {
+  "NO_MEMBERSHIP_BY_D": 204,
+  "UNVERIFIED_LINK": 28,
+  "VERIFIED": 11
+ },
+ "duplicates": {
+  "rows_in_verified_groups": 130,
+  "rows_unresolved": 106,
+  "groups": 65
+ },
+ "remapped_kept_valid": 62,
+ "benchmark_changes_vs_gateD_kept_valid_A": 143,
+ "benchmark_kept_valid": {
+  "SPY": 729,
+  "XBI": 412,
+  "XLK": 284,
+  "XLI": 217,
+  "XLF": 210,
+  "XLV": 76,
+  "XLE": 71
+ },
+ "additions_from_B_or_C_valid": 2,
+ "additions_detail": [
+  {
+   "pop": "B",
+   "symbol": "MIC",
+   "gap_day": "2021-06-07"
+  },
+  {
+   "pop": "B",
+   "symbol": "CTIC",
+   "gap_day": "2023-05-10"
+  }
+ ],
+ "transition_v1_to_v2_A": {
+  "BEYOND_DEV_END": {
+   "BEYOND_WINDOW": 7,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 0,
+   "VALID": 0
+  },
+  "DATA_MISSING_ENTRY": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 1,
+   "VALID": 0
+  },
+  "DATA_MISSING_EXIT": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 2,
+   "EXCLUDED": 7,
+   "VALID": 1
+  },
+  "EXCLUDED": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 180,
+   "VALID": 11
+  },
+  "VALID": {
+   "BEYOND_WINDOW": 0,
+   "DATA_MISSING_EXIT": 0,
+   "EXCLUDED": 517,
+   "VALID": 1985
+  }
+ },
+ "sensitivity_kept_valid": {
+  "IN_SUBSET": 1459,
+  "OUT_OF_SUBSET": 540
+ },
+ "sensitivity_legs_kept_valid": {
+  "stock": {
+   "NO_ADJUSTMENT": 1726,
+   "ADJUSTED": 273
+  },
+  "etf": {
+   "NO_ADJUSTMENT": 1690,
+   "ADJUSTED": 309
+  }
+ },
+ "hashes": {
+  "duplicate_groups.csv": "6858b5f91a06254092303519d8eaa5652879c0e372640ed952cfeef47b17ff74",
+  "manifest.csv": "1a1fd666ed3c453197b86e87235a6356da17350b31908d7e473f2d5c1a860040",
+  "unresolved_manifest.csv": "d4350d37f7a4d64e6b79e3fb6ac52378e2fdd729b35614cf60aae408a2b3f651"
+ }
+}

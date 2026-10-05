@@ -1,0 +1,51 @@
+{
+ "freeze": "ERM_NOMINEE_CORRECTION_V2.1",
+ "frozen_utc": "2026-10-05T14:08:24.866190+00:00",
+ "cell": "GAP_UP_10|SHORT|H10|L1",
+ "owner_authorisation": "A1 adopt corrected rules incl. point-in-time benchmark; A2 accept evidence-covered population; A3 one development-only run (2026-10-05)",
+ "spec_sha256": "b805ce415fb067d6e0fad90859ddc7d35a31e3195c946cbe3460172c7a72ded2",
+ "superseded_specs_sha256": {
+  "V1": "bb97e2ff7ad31e9f99daada7e1cbf1e22e9b516633a7d9bff906ed6f3be4a4c9",
+  "V2": "fa9de47e05848f9539a341b555b2edc8af68df106d70cd7e7418a83c88073865"
+ },
+ "manifest_sha256": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d",
+ "manifest_companions_sha256": {
+  "duplicate_groups.csv": "6858b5f91a06254092303519d8eaa5652879c0e372640ed952cfeef47b17ff74",
+  "manifest.csv": "9ed45652ff1ddf4237a71ad920e7b30d506133f774ac7e3f760aa092f0e8579d",
+  "unresolved_manifest.csv": "de040104aa6d702f20a8c0b86629e3372ce7e26b421d716851bc9bfd923b2bbf"
+ },
+ "code_sha256": {
+  "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef",
+  "research/erm_nominee_audit/v2_manifest.py": "bed3c5bd7697a88d1855f667f566adf6e47ec2fa4ac7db02fc318f6e7c05bf9a",
+  "research/erm_nominee_audit/score_corrected.py": "c27bf682e5aaba102e916c6d8df59e78e548de3f309de4c1edf33ad44e447bdc",
+  "research/erm_nominee_audit/v2_summary.py": "c6d92bf425129fa9b4ed8b01f526b7e9781c71c6317fae52b927ac4632ac5137",
+  "tests/test_erm_nominee_v2_rules.py": "79e178386373c9530c67f4822dd2e69411c011ff172db3d2d94fbad04f2e2a30",
+  "tests/test_erm_nominee_accounting_fixtures.py": "59919bb0495f388b5cb096a703e9dcd1706a08ddc0bdb3e8438dfb05fa2028ae"
+ },
+ "frozen_design_lock_fingerprint": "12a909e795986ff3abeac9ca92906a64c3387a5e3c64734f2b72031b781cb8ad",
+ "inputs_sha256": {
+  "alpaca_manifest": "6b314c9a80993ba3860b72f9f457827e7ac3bbbffa360b9293816cd3c0001f03",
+  "alpaca_diag_manifest": "96979a1a148f917158ec8b09603e18e8a37ba83f5a7bf6d0914b2bb2cf7963bc",
+  "sec_manifest": "858a9d858c13ddb71d6856361d90dc09fb8c9a559fe49fdd6ceae8b3e3a5ed6f",
+  "candidates.json": "c41297936d7585b27aed4854402e907371310da79218c5c3fefba2e705bb4a17",
+  "candidates_r3.json": "a7095779e32ad0aa3530410f5a5d238dd8a1005a873ca09bd7d9350f488502ad",
+  "renames_2019_2023": "7db665ed6c0f4e8528598751895391fe57dacc113292630f8afae22f1261def7",
+  "renames_post2023": "b92c5f05cb5580f87be337e6f0cb2a87fe7e1a889e111eef1b420a5533e0bb89",
+  "gate_d_trial_ledger": "6c987f6742075a22be6f1a4b152d3228641f523aa60e6702413ea17790833997",
+  "gate_d_cells_csv": "bd8fd486cbc05733ed3f747c4c8aee438bfc112432075afb348ca0350196ebab",
+  "acquired_sec_pit_manifest": "9b8d40e1f5666b5ea642b883844d671dd049737eb7b25e5432b91621c2fe3fd4",
+  "acquired_sec_v2_manifest": "83be9d2eee2fd3471a90bd325bc8c420a591998fa0df49393453e7cff96db880",
+  "acquired_alpaca_v2_manifest": "469aabb2e2e27ac0da534736945be9510281674985e5a0c5d25c3abdad855d14",
+  "acquired_etf_cash_dividends": "89ea019793bc73c9794107d203298a6cece4eec33187e00934e6f339a06570f4",
+  "sp500_pit_csv": "39a9202c9ef69a74c0ff07e2113ad41fb6da7c8c5b6cd9541f0185fb4391e717",
+  "sector_map": "ec42c4de49195e8e4bcd854e2c2fe85aeb4c3b02ca4ad37d10ec3df85fb237e9"
+ },
+ "guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5",
+ "environment": {
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "numpy": "2.2.6",
+  "pandas": "3.0.5",
+  "pytest": "9.1.1"
+ }
+}
