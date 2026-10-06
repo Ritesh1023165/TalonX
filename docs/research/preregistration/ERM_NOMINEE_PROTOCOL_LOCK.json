@@ -1,0 +1,129 @@
+{
+ "authoritative_rules": {
+  "docs/research/preregistration/ERM_NOMINEE_CORRECTION_SPEC_V2_1.md": "b805ce415fb067d6e0fad90859ddc7d35a31e3195c946cbe3460172c7a72ded2",
+  "docs/research/preregistration/ERM_NOMINEE_CORRECTION_V2_1_FREEZE.json": "8581e3d3c37e661d3554071b2217a537d51234c8b6c1af7b38fbcc28825b31f5",
+  "research/erm_nominee_audit/v2_rules.py": "a4e3b82d3d9da1d624a9539e4636cb5945253b9785fb45fb425f3ba5730548ef"
+ },
+ "byte_representation": "committed git blob bytes, checked out verbatim (.gitattributes -text / eol=lf)",
+ "config": {
+  "decisions": {
+   "broad_metadata_scope_approved": true,
+   "decision_record": "docs/research/preregistration/ERM_NOMINEE_OWNER_DECISION_RECORD_B.md (owner instruction 2026-10-06)",
+   "etf_cost_bps": 4,
+   "min_sample_floor_adopted": true,
+   "procedural_amendments_approved": true,
+   "task75_reserve_acknowledged": true,
+   "window": "B"
+  },
+  "end": "2026-09-30",
+  "etf_cost_sensitivities_bps": [
+   0,
+   12,
+   20
+  ],
+  "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+  "min_sample_floor": {
+   "distinct_dates": 40,
+   "n_valid": 100
+  },
+  "rules_version": "ERM_NOMINEE_CORRECTION_V2.1",
+  "spec": "ERM_NOMINEE_CORRECTION_SPEC_V2.1",
+  "start": "2024-01-02",
+  "stock_cost_bps": 30,
+  "window_id": "B"
+ },
+ "config_hash": "d8ad21af7d7f646373947041b8cd86e76057889d0386e099cd0307710c8bdf90",
+ "created_utc": "2026-10-06T06:55:11.950801+00:00",
+ "decision_record": {
+  "json": {
+   "path": "docs/research/preregistration/ERM_NOMINEE_OWNER_DECISIONS_B.json",
+   "sha256": "b430eead25ae05cbf0ec6172fb4667de15274b75a6733abe78fc50a0824c09b3"
+  },
+  "md": {
+   "path": "docs/research/preregistration/ERM_NOMINEE_OWNER_DECISION_RECORD_B.md",
+   "sha256": "33095e0e0329907ae070de0c2e893f71cf3b7bfec1fdda3c98357f035d250355"
+  }
+ },
+ "digest_rules": "see research/erm_nominee_validation/lock.py docstring; this record is not part of any digest it contains",
+ "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+ "lock": "ERM_NOMINEE_PROTOCOL_LOCK",
+ "not_a_go": true,
+ "protocol": {
+  "path": "docs/research/preregistration/ERM_NOMINEE_PROTOCOL_FINAL.md",
+  "sha256": "7e71fabc9ed68e6de99981839a97d75d235792e1ca57decd98bd735194613043"
+ },
+ "release_active": false,
+ "scope_template": {
+  "assets_current": [
+   [
+    null,
+    "R+1"
+   ]
+  ],
+  "bars": [
+   [
+    "2023-11-01",
+    "2026-09-30"
+   ]
+  ],
+  "corporate_actions": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "etf_cash_dividends": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "filing_headers": [
+   [
+    null,
+    "2026-09-30"
+   ]
+  ],
+  "form345": [
+   [
+    "2018-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "identity_renames": [
+   [
+    "2026-10-01",
+    "R"
+   ]
+  ],
+  "master_idx": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "sec_reference_current": [
+   [
+    null,
+    "R+1"
+   ]
+  ],
+  "sp500_pit": [
+   [
+    null,
+    "R+1"
+   ]
+  ],
+  "submissions": [
+   [
+    null,
+    "R+1"
+   ]
+  ]
+ },
+ "superseded_drafts_preserved": {
+  "docs/research/preregistration/ERM_NOMINEE_PREREG_DRAFT_r10.md": "e6385dd04b3553bca958efc324aead0734bad96c731dbd58c3d382219e899929",
+  "docs/research/preregistration/ERM_NOMINEE_PREREG_DRAFT_r9.md": "fa59a9cac2065006d0e9d5a9b5e53f95564f58c5309610369b7f565202a3a32b"
+ },
+ "window_id": "B"
+}
