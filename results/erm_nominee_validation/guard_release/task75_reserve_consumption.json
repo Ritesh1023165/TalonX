@@ -1,0 +1,46 @@
+{
+ "consumed": [
+  {
+   "categories": [
+    "assets_current",
+    "bars",
+    "corporate_actions",
+    "etf_cash_dividends",
+    "filing_headers",
+    "form345",
+    "master_idx",
+    "sec_reference_current",
+    "sp500_pit",
+    "submissions"
+   ],
+   "reserved_window": [
+    "2024-06-01",
+    "2024-09-02"
+   ]
+  },
+  {
+   "categories": [
+    "assets_current",
+    "bars",
+    "corporate_actions",
+    "etf_cash_dividends",
+    "filing_headers",
+    "form345",
+    "master_idx",
+    "sec_reference_current",
+    "sp500_pit",
+    "submissions"
+   ],
+   "reserved_window": [
+    "2024-10-21",
+    "2024-12-20"
+   ]
+  }
+ ],
+ "hypothesis": "GAP_UP_10|SHORT|H10|L1",
+ "ledger": "TASK75_RESERVE_CONSUMPTION (ERM-owned)",
+ "note": "the original Task75 study is not modified or released",
+ "release_id": "b98689a94b459721ca53b00c0bb0719b63a9d9575a9efe83727777a384995bbc",
+ "utc": "2026-10-06T07:15:21.653252+00:00",
+ "window_id": "B"
+}

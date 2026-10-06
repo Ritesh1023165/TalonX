@@ -1,0 +1,132 @@
+{
+ "authorisation_record": {
+  "path": "results\\erm_nominee_validation\\GUARD_RELEASE_AUTHORISATION.json",
+  "sha256": "208d12277a67bbd1d533bdb960460dcc73268319808e77d59285bef5cf557bb2"
+ },
+ "erm_audit": {
+  "path": "results\\erm_nominee_validation\\guard_release\\erm_guard_release_audit.json",
+  "sha256": "98843d1777931138e000587d92290f5b6e71d206ba591bab922cb1004136eacd"
+ },
+ "frozen_guard_state_untouched_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5",
+ "go_record_sha256": "66d582c8d4e163970bc37ded969f3830b2062dbbced52e82a2804fc6e6760e20",
+ "journal": [
+  "PREPARED",
+  "ERM_AUDIT_WRITTEN",
+  "TASK75_LEDGER_WRITTEN",
+  "ACTIVE"
+ ],
+ "permitted_scope": {
+  "assets_current": [
+   [
+    null,
+    "2026-10-07"
+   ]
+  ],
+  "bars": [
+   [
+    "2023-11-01",
+    "2026-09-30"
+   ]
+  ],
+  "corporate_actions": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "etf_cash_dividends": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "filing_headers": [
+   [
+    null,
+    "2026-09-30"
+   ]
+  ],
+  "form345": [
+   [
+    "2018-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "identity_renames": [
+   [
+    "2026-10-01",
+    "2026-10-06"
+   ]
+  ],
+  "master_idx": [
+   [
+    "2024-01-01",
+    "2026-09-30"
+   ]
+  ],
+  "sec_reference_current": [
+   [
+    null,
+    "2026-10-07"
+   ]
+  ],
+  "sp500_pit": [
+   [
+    null,
+    "2026-10-07"
+   ]
+  ],
+  "submissions": [
+   [
+    null,
+    "2026-10-07"
+   ]
+  ]
+ },
+ "record": "ACTIVATION_PERMISSION_CHANGES (what the release permits; NOT data retrieved)",
+ "reference_date": "2026-10-06",
+ "release_id": "b98689a94b459721ca53b00c0bb0719b63a9d9575a9efe83727777a384995bbc",
+ "task75_ledger": {
+  "consumed": [
+   {
+    "categories": [
+     "assets_current",
+     "bars",
+     "corporate_actions",
+     "etf_cash_dividends",
+     "filing_headers",
+     "form345",
+     "master_idx",
+     "sec_reference_current",
+     "sp500_pit",
+     "submissions"
+    ],
+    "reserved_window": [
+     "2024-06-01",
+     "2024-09-02"
+    ]
+   },
+   {
+    "categories": [
+     "assets_current",
+     "bars",
+     "corporate_actions",
+     "etf_cash_dividends",
+     "filing_headers",
+     "form345",
+     "master_idx",
+     "sec_reference_current",
+     "sp500_pit",
+     "submissions"
+    ],
+    "reserved_window": [
+     "2024-10-21",
+     "2024-12-20"
+    ]
+   }
+  ],
+  "path": "results\\erm_nominee_validation\\guard_release\\task75_reserve_consumption.json",
+  "sha256": "0c8bf1c23d1be4188bf88e2c72911262c6c7765883b6e47a07f157341c61ec9e"
+ },
+ "utc": "2026-10-06T07:15:21.686307+00:00"
+}
