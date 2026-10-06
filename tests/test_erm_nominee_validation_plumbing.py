@@ -208,7 +208,7 @@ def test_unresolved_owner_decisions_are_rejected():
     with pytest.raises(OwnerDecisionPending):
         ValidationConfig("DEV").require_decided()
     d = OwnerDecisions(window="A", task75_reserve_acknowledged=True, min_sample_floor_adopted=True, etf_cost_bps=4,
-                       procedural_amendments_approved=True, decision_record="x")
+                       procedural_amendments_approved=True, broad_metadata_scope_approved=True, decision_record="x")
     with pytest.raises(OwnerDecisionPending):
         ValidationConfig("B", d).require_decided()                                   # window mismatch
     assert ValidationConfig("A", d).config_hash() != ValidationConfig("A", OwnerDecisions()).config_hash()
@@ -218,7 +218,8 @@ def test_runner_refuses_validation_windows():
     from research.erm_nominee_validation import run
     with pytest.raises(OwnerDecisionPending):
         run.main(["--window", "A"])
-    with pytest.raises(OwnerDecisionPending):
+    from research.erm_nominee_validation.guard import GuardReleaseNotAuthorised
+    with pytest.raises((OwnerDecisionPending, GuardReleaseNotAuthorised)):     # B decided (locking only): no GO
         run.main(["--window", "B"])
 
 

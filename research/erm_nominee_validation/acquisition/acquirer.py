@@ -47,6 +47,11 @@ SEC_MASTER = "https://www.sec.gov/Archives/edgar/full-index/{}/master.idx"
 SEC_HDR = "https://www.sec.gov/Archives/edgar/data/{}/{}/{}-index-headers.html"
 SP500_LISTING = "https://api.github.com/repos/fja05680/sp500/contents"
 SP500_FILE = "S&P 500 Historical Components & Changes (Updated).csv"   # README: "historical index membership"
+# Source semantics (README + the development rows 1996..2023, checked 2026-10-06): every row is a FULL membership
+# snapshot (2019-2023: 503..507 tickers; never below 487 since 1996) dated at an index change (irregular dates, median
+# gap 16 d); the file states no separate coverage horizon. A row with fewer tickers means the format is no longer
+# snapshots (e.g. change events) -> malformed, never interpreted.
+SP500_MIN_MEMBERS = 450
 MERGER_TYPES = "cash_merger,stock_merger,stock_and_cash_merger"
 
 
@@ -374,11 +379,14 @@ class ProductionAcquirer:
 
     def sp500(self, per):
         """S0 -- FIRST acquisition prerequisite. fja05680 publishes no as-of date in file names, README ("from 1996 til
-        MM-DD-YYYY", a placeholder), releases or tags (metadata check 2026-10-05). Coverage is therefore established
-        only from the acquired file itself, after authorisation: a membership row dated on or after the scope end must
-        exist (a row dated >= T fixes membership through T; without one, membership after the last row is unknown and
-        is NEVER assumed unchanged). Otherwise INSUFFICIENT -> ACQUISITION_BLOCKED before any other request.
-        Provenance: the listing entry (git blob sha, size) and the downloaded bytes must agree."""
+        MM-DD-YYYY", a placeholder), releases or tags (metadata check 2026-10-05). The file is a sequence of FULL
+        membership snapshots dated at index changes, with no separate coverage horizon. Coverage through the window end
+        T is therefore established only from the acquired file itself, after authorisation, by a full snapshot dated on
+        or after T (a snapshot at T' >= T fixes membership on every date <= T' under the source's own change record);
+        the last row's date when it is before T establishes nothing (membership after it is unknown and NEVER assumed
+        unchanged). Otherwise INSUFFICIENT -> ACQUISITION_BLOCKED before any other request. The format itself is
+        verified first (header, ISO dates strictly increasing, every row a full snapshot). Provenance: the listing entry
+        (git blob sha, size) and the downloaded bytes must agree."""
         lst = self.get("sp500_pit", req("github", SP500_LISTING), (None, self.download_date), "sp500/listing.json",
                        required=True, validate=lambda b: None if isinstance(json.loads(b), list) else "listing not a list")
         if lst is MISSING:
@@ -392,6 +400,20 @@ class ProductionAcquirer:
         def valid(b):
             if not b.decode("utf-8").startswith("date,tickers"):
                 return "unexpected CSV header"
+            prev = ""
+            for r in csv.DictReader(io.StringIO(b.decode("utf-8"))):
+                d = (r.get("date") or "")[:10]
+                try:
+                    date.fromisoformat(d)
+                except ValueError:
+                    return f"row date {d!r} is not an ISO date"
+                if d <= prev:
+                    return f"row dates not strictly increasing at {d}"
+                n = len({t.strip() for t in (r.get("tickers") or "").split(",") if t.strip()})
+                if n < SP500_MIN_MEMBERS:
+                    return (f"FORMAT_NOT_FULL_SNAPSHOTS: row {d} lists {n} tickers (< {SP500_MIN_MEMBERS}); "
+                            f"membership-event rows cannot establish coverage")
+                prev = d
             if item.get("sha") and self.git_blob_sha(b) != item["sha"]:
                 return "downloaded bytes do not match the listing's git blob sha (file changed between calls)"
             return None

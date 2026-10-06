@@ -28,3 +28,6 @@ research/erm_nominee_validation/** -text
 results/erm_nominee_validation/** -text
 docs/research/preregistration/ERM_NOMINEE_PREREG_DRAFT_* -text
 tests/test_erm_nominee_validation_plumbing.py -text
+# ERM nominee final lock (2026-10-06): every ERM nominee preregistration document (reviews, decision record, final
+# protocol, lock records) is committed and checked out BYTE-EXACT, so recorded sha256 values reproduce from any checkout.
+docs/research/preregistration/ERM_NOMINEE_* -text

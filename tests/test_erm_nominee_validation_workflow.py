@@ -26,7 +26,7 @@ from research.erm_nominee_validation.guard import (GuardReleaseNotAuthorised, Va
 ROOT = Path(__file__).resolve().parents[1]
 MAPPING = ROOT / "docs/research/preregistration/rs_sector_mapping_v1.json"
 DECIDED = OwnerDecisions(window="B", task75_reserve_acknowledged=True, min_sample_floor_adopted=True, etf_cost_bps=4,
-                         procedural_amendments_approved=True, decision_record="fixture")
+                         procedural_amendments_approved=True, broad_metadata_scope_approved=True, decision_record="fixture")
 CFG = ValidationConfig("B", DECIDED)
 N_SYM = 70
 
@@ -167,9 +167,20 @@ class FixtureAcquirer:
         return out
 
 
+LEDGER = {}
+
+
+@pytest.fixture(autouse=True)
+def _attempt_ledger(tmp_path):
+    LEDGER["path"] = tmp_path.parent / (tmp_path.name + "_ledger") / "ATTEMPT_LEDGER.jsonl"   # outside the run dir
+    yield
+
+
 def comps(**kw):
+    from research.erm_nominee_validation.attempts import AttemptLedger
     g = FixtureGuard(CFG)
-    return W.Components(guard=g, acquirer=FixtureAcquirer(g, **kw), loader=A.ProductionLoader(g, MAPPING))
+    return W.Components(guard=g, acquirer=FixtureAcquirer(g, **kw), loader=A.ProductionLoader(g, MAPPING),
+                        attempts=AttemptLedger(LEDGER["path"]))
 
 
 # ------------------------------------------------------------------------------------------------ tests
@@ -282,7 +293,7 @@ def test_one_reexecution_preserves_partial_outputs_then_abort(tmp_path):
     with pytest.raises(W.StageFailure):
         W.run_validation(CFG, auth_for(CFG), comps(corrupt="renames.json"), tmp_path)
     with pytest.raises(W.StageFailure):                                        # attempt 2 also fails -> ABORT
-        W.run_validation(CFG, auth_for(CFG), comps(corrupt="renames.json"), tmp_path)
+        W.run_validation(CFG, auth_for(CFG), comps(corrupt="renames.json"), tmp_path, retry_reason="test retry")
     prev = json.loads((tmp_path / "attempt_1/run_record.json").read_text())
     assert prev["status"] == "INCOMPLETE_LOAD" and (tmp_path / "attempt_1/archive/ARCHIVE_MANIFEST.json").exists()
     assert json.loads((tmp_path / "run_record.json").read_text())["status"] == "ABORTED_OWNER_DECIDES"
@@ -293,7 +304,7 @@ def test_one_reexecution_preserves_partial_outputs_then_abort(tmp_path):
 def test_reexecution_after_preoutcome_failure_can_complete(tmp_path):
     with pytest.raises(W.StageFailure):
         W.run_validation(CFG, auth_for(CFG), comps(omit=("renames",)), tmp_path)
-    rec = W.run_validation(CFG, auth_for(CFG), comps(), tmp_path)
+    rec = W.run_validation(CFG, auth_for(CFG), comps(), tmp_path, retry_reason="renames input restored")
     assert rec["status"] == "COMPLETE" and rec["attempt"] == 2
     assert json.loads((tmp_path / "attempt_1/run_record.json").read_text())["status"] == "INCOMPLETE_ACQUIRE"
 
@@ -319,6 +330,9 @@ def test_production_loader_refuses_protected_rows_via_frozen_guard(tmp_path):
 
 
 def test_cli_execute_propagates_refusal():
+    """B decisions are recorded (2026-10-06, locking only): the refusal now comes from the guard (no GO / release)."""
     from research.erm_nominee_validation import run
-    with pytest.raises(OwnerDecisionPending):
+    with pytest.raises((OwnerDecisionPending, GuardReleaseNotAuthorised)):
         run.main(["--window", "B", "--execute"])
+    with pytest.raises(OwnerDecisionPending):                                    # no decision record for A
+        run.main(["--window", "A", "--execute"])

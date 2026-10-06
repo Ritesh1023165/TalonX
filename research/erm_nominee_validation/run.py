@@ -168,6 +168,7 @@ def main(argv=None):
     ap.add_argument("--window", required=True, choices=sorted(WINDOWS))
     ap.add_argument("--parity", action="store_true")
     ap.add_argument("--execute", action="store_true", help="validation workflow with PRODUCTION components")
+    ap.add_argument("--retry-reason", default=None, help="D6a: the recorded reason for the single acquisition retry")
     a = ap.parse_args(argv)
     if a.window != "DEV":
         # owner decisions come ONLY from a committed decision record (none exists: every field stays pending)
@@ -179,9 +180,12 @@ def main(argv=None):
         guard = production_guard(cfg, HERE)      # ValidationGuard (refuses everything) while no release store exists
         auth_p = HERE / "results/erm_nominee_validation/GUARD_RELEASE_AUTHORISATION.json"
         auth = json.loads(auth_p.read_text()) if auth_p.exists() else None
+        from research.erm_nominee_validation.attempts import AttemptLedger
         comps = W.Components(guard=guard, acquirer=AD.ProductionAcquirer(guard),
-                             loader=AD.ProductionLoader(guard, HERE / "docs/research/preregistration/rs_sector_mapping_v1.json"))
-        W.run_validation(cfg, auth, comps, OUT / f"validation_{a.window}")   # raises: pending decisions / guard
+                             loader=AD.ProductionLoader(guard, HERE / "docs/research/preregistration/rs_sector_mapping_v1.json"),
+                             attempts=AttemptLedger(OUT / "ATTEMPT_LEDGER.jsonl"))   # ONE ledger per study (D6a)
+        W.run_validation(cfg, auth, comps, OUT / f"validation_{a.window}",
+                         retry_reason=a.retry_reason)        # raises without a separate GO / active release
         return 0
     cfg = ValidationConfig(a.window, OwnerDecisions())
     guard = ValidationGuard(cfg, HERE)

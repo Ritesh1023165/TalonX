@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAPPING = ROOT / "docs/research/preregistration/rs_sector_mapping_v1.json"
 REAL_GUARD_STATE = Path(r"C:\workspace\TalonX-erm\results\event_response_map_v1\guard_state.json")
 DECIDED = OwnerDecisions(window="B", task75_reserve_acknowledged=True, min_sample_floor_adopted=True, etf_cost_bps=4,
-                         procedural_amendments_approved=True, decision_record="fixture -- approves nothing")
+                         procedural_amendments_approved=True, broad_metadata_scope_approved=True, decision_record="fixture -- approves nothing")
 CFG = ValidationConfig("B", DECIDED)
 DD = date(2026, 10, 5)                                   # fixture download date
 OFF_HOURS = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
@@ -216,7 +216,10 @@ class FixtureProvider:
 def write_records(root: Path, cfg=CFG, **go_over):
     d = root / "docs/research/preregistration"
     d.mkdir(parents=True, exist_ok=True)
-    (d / "ERM_NOMINEE_PROTOCOL_LOCK.json").write_text(json.dumps({"fixture": "protocol lock"}))
+    (d / "ERM_NOMINEE_PROTOCOL_LOCK.json").write_text(json.dumps({"fixture": "protocol lock",
+                                                                  "config_hash": cfg.config_hash()}))
+    (d / "ERM_NOMINEE_IMPLEMENTATION_LOCK.json").write_text(json.dumps(
+        {"fixture": "implementation lock", "implementation_sha256": RL.implementation_hash()[0]}))
     (d / f"ERM_NOMINEE_OWNER_DECISIONS_{cfg.window_id}.json").write_text(json.dumps({"fixture": "decisions"}))
     cur = RL.current_hashes(cfg, root)
     r = make_request(cfg, cur)
@@ -257,7 +260,21 @@ NOW = datetime(2026, 10, 5, 21, 0, tzinfo=timezone.utc)          # acquisition s
 def components(guard, provider, *, clock=lambda: NOW, reference=DD):
     acq = ProductionAcquirer(guard, RetryingTransport(provider), bars_clock=lambda: OFF_HOURS,
                              bars_sleep=lambda s: None, reference_date=reference, clock=clock)
-    return W.Components(guard=guard, acquirer=acq, loader=A.ProductionLoader(guard, MAPPING))
+    from research.erm_nominee_validation.attempts import AttemptLedger
+    return W.Components(guard=guard, acquirer=acq, loader=A.ProductionLoader(guard, MAPPING),
+                        attempts=AttemptLedger(LEDGER["path"]), clock=clock)
+
+
+LEDGER = {}
+
+
+@pytest.fixture(autouse=True)
+def _attempt_ledger(tmp_path, monkeypatch):
+    """Per-test attempt ledger OUTSIDE every run directory; fixture S&P CSVs are single-ticker rows, so the full-
+    snapshot size floor is lowered here (the real floor is exercised in the review tests)."""
+    LEDGER["path"] = tmp_path / "_attempt_ledger" / "ATTEMPT_LEDGER.jsonl"
+    monkeypatch.setattr(AQ, "SP500_MIN_MEMBERS", 1)
+    yield
 
 
 def ledger(run):
@@ -621,15 +638,19 @@ def test_no_protected_request_before_authorisation(tmp_path):
 
 
 def test_production_guard_inactive_and_runner_refuses(tmp_path):
+    """Locks may exist (owner-authorised 2026-10-06); a GO, a release store or a release authorisation never do."""
     assert isinstance(RL.production_guard(CFG), ValidationGuard)          # no production release store exists
-    assert not (RL.HERE / RL.PRODUCTION_STORE).exists() and not (RL.HERE / RL.PROTOCOL_LOCK).exists()
+    assert not (RL.HERE / RL.PRODUCTION_STORE).exists()
+    assert not (RL.HERE / "results/erm_nominee_validation/GUARD_RELEASE_AUTHORISATION.json").exists()
     cur = RL.current_hashes(CFG)
-    assert cur["protocol_lock_sha256"] is None and cur["go_record_sha256"] is None
+    assert cur["go_record_sha256"] is None
     from research.erm_nominee_validation import run as RUN
-    with pytest.raises(OwnerDecisionPending):
+    with pytest.raises((OwnerDecisionPending, GuardReleaseNotAuthorised)):    # decisions recorded -> guard refuses
         RUN.main(["--window", "B", "--execute"])
-    with pytest.raises(OwnerDecisionPending):
+    assert not (RL.HERE / "results/erm_nominee_validation/validation_B").exists()   # nothing started
+    with pytest.raises((OwnerDecisionPending, RL.ReleaseInvalid)):          # pending decisions or no GO record
         RL.activate(RL.ReleaseStore(tmp_path / "s"), make_request(ValidationConfig("B"), cur), ValidationConfig("B"), cur)
+    assert not (tmp_path / "s/release_journal.jsonl").exists()
 
 
 def test_development_guard_refuses_protected_and_unauthorised_broad():

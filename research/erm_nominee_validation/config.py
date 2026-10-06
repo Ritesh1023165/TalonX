@@ -36,7 +36,8 @@ class OwnerDecisions:
     task75_reserve_acknowledged: bool | None = None
     min_sample_floor_adopted: bool | None = None
     etf_cost_bps: float | None = None           # proposed 4 (unmeasured assumption)
-    procedural_amendments_approved: bool | None = None
+    procedural_amendments_approved: bool | None = None   # D6 (incl. the D6a acquisition-retry rule)
+    broad_metadata_scope_approved: bool | None = None    # D7: bounded broad-metadata / post-window identity scope
     decision_record: str | None = None          # reference to the owner's written decision (commit / document)
 
     def pending(self) -> list[str]:
@@ -76,6 +77,8 @@ class ValidationConfig:
             raise OwnerDecisionPending("OWNER_DECISION_PENDING: " + ", ".join(p))
         if self.decisions.window != self.window_id:
             raise OwnerDecisionPending(f"configured window {self.window_id} != owner decision {self.decisions.window}")
+        if self.decisions.broad_metadata_scope_approved is not True:
+            raise OwnerDecisionPending("D7: the broad-metadata / post-window identity scope is not approved")
         if self.decisions.task75_reserve_acknowledged is not True:
             raise OwnerDecisionPending("Task75 reserved windows lie inside every validation window: acknowledgement required")
         if self.decisions.procedural_amendments_approved is not True:

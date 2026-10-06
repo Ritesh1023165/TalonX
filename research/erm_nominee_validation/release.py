@@ -26,7 +26,8 @@ The frozen EVENT_RESPONSE_MAP_V1 LockedRangeGuard and its guard_state.json are n
 
 INACTIVE: production uses `production_guard`, which returns the always-refusing ValidationGuard unless the production
 store PRODUCTION_STORE holds a valid ACTIVE journal. No code path creates that store: `activate` is a library function
-with no CLI, and it is refused today because no PROTOCOL_LOCK / GO record exists and owner decisions are pending.
+with no CLI, and it is refused without a separate GO record (none exists). The protocol and implementation locks
+(lock.py) are bound: a release whose implementation or config hash differs from them is refused.
 """
 from __future__ import annotations
 
@@ -44,9 +45,10 @@ from research.erm_nominee_validation.config import HYPOTHESIS, ValidationConfig
 from research.erm_nominee_validation.guard import GuardReleaseNotAuthorised, ValidationGuard, check_authorisation_scope
 
 HERE = Path(__file__).resolve().parents[2]
-PROTOCOL_LOCK = Path("docs/research/preregistration/ERM_NOMINEE_PROTOCOL_LOCK.json")          # does not exist
-GO_RECORD = Path("docs/research/preregistration/ERM_NOMINEE_VALIDATION_GO_{window}.json")      # does not exist
-DECISIONS = Path("docs/research/preregistration/ERM_NOMINEE_OWNER_DECISIONS_{window}.json")    # does not exist
+PROTOCOL_LOCK = Path("docs/research/preregistration/ERM_NOMINEE_PROTOCOL_LOCK.json")
+IMPLEMENTATION_LOCK = Path("docs/research/preregistration/ERM_NOMINEE_IMPLEMENTATION_LOCK.json")
+GO_RECORD = Path("docs/research/preregistration/ERM_NOMINEE_VALIDATION_GO_{window}.json")      # does not exist (no GO)
+DECISIONS = Path("docs/research/preregistration/ERM_NOMINEE_OWNER_DECISIONS_{window}.json")
 PRODUCTION_STORE = Path("results/erm_nominee_validation/guard_release")                       # never created here
 STATES = ("PREPARED", "ERM_AUDIT_WRITTEN", "TASK75_LEDGER_WRITTEN", "ACTIVE")
 FROZEN_IMPL = ("research/erm_nominee_audit/v2_rules.py", "research/event_response_map_v1/data.py",
@@ -100,7 +102,7 @@ def current_hashes(cfg: ValidationConfig, root: Path = HERE) -> dict:
     go = Path(str(GO_RECORD).format(window=w))
     return {"protocol_lock_sha256": get(PROTOCOL_LOCK), "implementation_sha256": implementation_hash()[0],
             "owner_decisions_sha256": get(Path(str(DECISIONS).format(window=w))), "go_record_sha256": get(go),
-            "go_path": str(root / go)}
+            "go_path": str(root / go), "root": str(root)}
 
 
 def validate_request(r: ReleaseRequest, cfg: ValidationConfig, cur: dict) -> None:
@@ -127,6 +129,14 @@ def validate_request(r: ReleaseRequest, cfg: ValidationConfig, cur: dict) -> Non
                         for a, b in r.scope[k] for x, y in v)
             raise ReleaseInvalid(f"scope for {k} {'WIDER than' if wider else 'differs from'} the window: "
                                  f"{r.scope[k]} != {v}")
+    root = Path(cur.get("root") or HERE)                            # the GO binds the LOCKED protocol / implementation
+    il, pl = root / IMPLEMENTATION_LOCK, root / PROTOCOL_LOCK
+    if not il.exists():
+        raise ReleaseInvalid("no implementation lock record")
+    if json.loads(il.read_text(encoding="utf-8")).get("implementation_sha256") != r.implementation_sha256:
+        raise ReleaseInvalid("implementation hash differs from the implementation lock")
+    if json.loads(pl.read_text(encoding="utf-8")).get("config_hash") != r.config_hash:
+        raise ReleaseInvalid("config hash differs from the protocol lock")
     go = json.loads(Path(cur["go_path"]).read_text())             # the GO is a SEPARATE record naming this scope
     if not (go.get("owner_go") is True and go.get("hypothesis") == r.hypothesis and go.get("window_id") == r.window_id
             and go.get("config_hash") == r.config_hash and go.get("protocol_lock_sha256") == r.protocol_lock_sha256

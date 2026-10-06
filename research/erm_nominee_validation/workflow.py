@@ -6,12 +6,15 @@ config -> owner decisions -> scoped authorisation -> ACQUIRE (archive + manifest
 Components are injected (guard, acquirer, loader). Production components: ValidationGuard (release disabled) +
 ProductionAcquirer (acquisition/acquirer.py) + ProductionLoader. Tests inject fixture components; there is no bypass flag.
 
-Run-state rules (r9 §7 step 0, §10):
+Run-state rules (final protocol §10, owner decision D6 / D6a -- see attempts.py for the exact D6a policy):
   * RUN_COMPLETE.json present                         -> refuse (never overwrite a completed run)
   * previous attempt failed AFTER outcomes existed    -> refuse (no retry once outcomes exist; owner decides)
-  * previous attempt failed BEFORE outcomes, 1 attempt -> one re-execution; its partial outputs are moved to
-                                                         attempt_<n>/ and preserved
-  * second failure                                    -> ABORT (status ABORTED_OWNER_DECIDES), no further attempts
+  * previous execution failed BEFORE outcomes         -> at most ONE retry, with an explicit recorded reason; its
+                                                         partial outputs are moved to attempt_<n>/ and preserved
+  * second failure                                    -> ABORT (status ABORTED_OWNER_DECIDES), owner review
+  * the budget is held in ONE attempt ledger per hypothesis and window (outside the run directory): separate
+    acquisition_attempts / scoring_attempts counters; no reset by a new run id, directory or process
+  * an execution outside the authorised reference-date envelope is refused before it starts (consumes nothing)
   * report and marker are written only after every stage succeeded; a failure leaves status INCOMPLETE_<stage>,
     lists the outputs present and states whether outcomes were exposed.
 """
@@ -26,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from research.erm_nominee_validation import builder as B, diagnostics as DG, gates as G
-from research.erm_nominee_validation.config import MIN_SAMPLE_FLOOR, ValidationConfig
+from research.erm_nominee_validation.config import HYPOTHESIS, MIN_SAMPLE_FLOOR, ValidationConfig
 
 HERE = Path(__file__).resolve().parents[2]
 OUTPUTS = ("archive", "manifest.csv", "duplicate_groups.csv", "obs.csv", "gates.json", "diagnostics.json", "report.md")
@@ -47,6 +50,8 @@ class Components:
     guard: object
     acquirer: object
     loader: object
+    attempts: object = None            # attempts.AttemptLedger (required: D6a budget outside the run directory)
+    clock: object = None               # () -> aware datetime; default: now (UTC)
 
 
 def sha(p: Path) -> str:
@@ -58,16 +63,18 @@ def now() -> str:
 
 
 def identities(cfg: ValidationConfig, auth: dict | None) -> dict:
-    pk = HERE / "research/erm_nominee_validation"
-    code = {p.relative_to(HERE).as_posix(): sha(p) for p in sorted(pk.glob("*.py"))}
-    for p in ("research/erm_nominee_audit/v2_rules.py", "research/event_response_map_v1/events.py",
-              "research/event_response_map_v1/metrics.py", "research/event_response_map_v1/universe.py",
-              "research/event_response_map_v1/data.py", "research/common/research_stats.py"):
-        code[p] = sha(HERE / p)
-    spec = {p: sha(HERE / p) for p in ("docs/research/preregistration/ERM_NOMINEE_CORRECTION_SPEC_V2_1.md",
-                                       "docs/research/preregistration/ERM_NOMINEE_PREREG_DRAFT_r9.md")
-            if (HERE / p).exists()}
-    return {"config": cfg.canonical(), "config_hash": cfg.config_hash(), "code_sha256": code, "spec_sha256": spec,
+    """Everything a run binds: config, the implementation aggregate + per-file hashes (release.implementation_hash:
+    the whole package incl. acquisition/ and the frozen modules), the authoritative rule/protocol documents and the
+    lock records when present."""
+    from research.erm_nominee_validation.release import implementation_hash
+    agg, code = implementation_hash(HERE)
+    docs = ("docs/research/preregistration/ERM_NOMINEE_CORRECTION_SPEC_V2_1.md",
+            "docs/research/preregistration/ERM_NOMINEE_PROTOCOL_FINAL.md",
+            "docs/research/preregistration/ERM_NOMINEE_PROTOCOL_LOCK.json",
+            "docs/research/preregistration/ERM_NOMINEE_IMPLEMENTATION_LOCK.json")
+    spec = {p: sha(HERE / p) for p in docs if (HERE / p).exists()}
+    return {"config": cfg.canonical(), "config_hash": cfg.config_hash(), "implementation_sha256": agg,
+            "code_sha256": code, "spec_sha256": spec,
             "authorisation_sha256": hashlib.sha256(json.dumps(auth or {}, sort_keys=True).encode()).hexdigest()}
 
 
@@ -115,31 +122,51 @@ def build_rows(loaded, cfg: ValidationConfig) -> tuple[list, list]:
     return B.build(pop, ser, loaded.sessions, loaded.meta, cfg.end)
 
 
-def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, run: Path) -> dict:
+def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, run: Path,
+                   retry_reason: str | None = None) -> dict:
     # 1 owner decisions + scoped authorisation BEFORE any protected request, read or run-state change (a refused
     #   precheck writes nothing and never consumes the re-execution allowance)
+    from datetime import date as _date
+    from research.erm_nominee_validation.acquisition.period import RETRIEVAL_WINDOW_DAYS
+    from research.erm_nominee_validation.attempts import AttemptRefused
     cfg.require_decided()
     comp.guard.authorise(auth)
+    if comp.attempts is None:
+        raise RunRefused("an attempt ledger is required (D6a: the budget lives outside the run directory)")
+    key = f"{HYPOTHESIS}|{cfg.window_id}"
+    rel = getattr(comp.guard, "release", None)
+    ref = _date.fromisoformat(rel.download_date) if rel is not None else None
+    today = (comp.clock or (lambda: datetime.now(timezone.utc)))().astimezone(timezone.utc).date()
     run.mkdir(parents=True, exist_ok=True)
     # ---------------------------------------------------------------------------------------------- run-state policy
     if (run / "RUN_COMPLETE.json").exists():
         raise RunRefused("RUN_COMPLETE.json exists: a completed run is never overwritten")
     prior = _prior_state(run)
-    attempt = 1
     if prior:
         if prior.get("outcome_exposure"):
             raise RunRefused("a previous attempt failed after outcomes existed: no retry (owner decides)")
         if prior.get("status") == "ABORTED_OWNER_DECIDES" or prior.get("attempt", 1) >= 2:
             raise RunRefused("re-execution allowance exhausted: ABORTED, owner decides")
-        attempt = prior.get("attempt", 1) + 1
+    try:                                                   # the ledger, not the directory, holds the budget
+        adm = comp.attempts.admit(key, retry_reason=retry_reason, today=today, reference_date=ref,
+                                  retrieval_window_days=RETRIEVAL_WINDOW_DAYS)
+    except AttemptRefused as e:
+        raise RunRefused(f"D6a: {e}") from None
+    attempt = adm["execution_no"]
+    if prior:
         keep = run / f"attempt_{prior.get('attempt', 1)}"
         keep.mkdir()
         for name in OUTPUTS + ("run_record.json",):
             if (run / name).exists():
                 shutil.move(str(run / name), str(keep / name))
     rec = {"run": "ERM_NOMINEE_HISTORICAL_VALIDATION", "attempt": attempt, "started_utc": now(), "status": "STARTED",
-           "precheck": "owner decisions decided; scoped authorisation accepted by the guard",
+           "precheck": "owner decisions decided; scoped authorisation accepted by the guard; D6a budget admitted",
+           "acquisition_attempt": attempt, "scoring_attempts_before": adm["scoring_attempts"],
+           "retry_reason": retry_reason, "previous_failure": adm["previous_failure"],
+           "reference_date": str(ref) if ref else None, "attempt_ledger": str(comp.attempts.path),
            "outcome_exposure": False, "stages_done": [], **identities(cfg, auth)}
+    comp.attempts.append(key, "EXECUTION_STARTED", run=str(run), execution_no=attempt, retry_reason=retry_reason,
+                         config_hash=rec["config_hash"], implementation_sha256=rec["implementation_sha256"])
     _record(run, rec)
 
     def stage(name, fn):
@@ -156,6 +183,8 @@ def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, r
                        retry_allowed=(attempt == 1 and not rec["outcome_exposure"]),
                        partial_outputs_note="PARTIAL OUTPUTS -- NOT A RESULT; no report, no completion marker")
             _record(run, rec)
+            comp.attempts.append(key, "EXECUTION_FAILED", run=str(run), execution_no=attempt, stage=name,
+                                 failure_class=rec["failure_class"], outcome_exposure=rec["outcome_exposure"])
             raise StageFailure(name, e) from e
         if name != "MARKER":                               # the marker stage finalises the record itself;
             rec["stages_done"].append(name)                # nothing is written after RUN_COMPLETE.json
@@ -199,6 +228,7 @@ def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, r
                            "event_date": [_d.fromisoformat(r["gap_day"]) for r in valid],
                            "entry_date": [_d.fromisoformat(r["entry"]) for r in valid], "bucket": "L1"})
         ev = ev.sort_values(["entry_date", "symbol"]).reset_index(drop=True)
+        comp.attempts.append(key, "SCORING_STARTED", run=str(run), execution_no=attempt)   # the one scoring run
         rec["outcome_exposure"] = True                     # from here on, outcomes may exist: no automatic retry
         _record(run, rec)
         cols = ["event_type", "symbol", "entry_date", "bucket", "horizon", "ret_raw", "ret_spy_rel", "ret_sector_rel",
@@ -292,4 +322,5 @@ def run_validation(cfg: ValidationConfig, auth: dict | None, comp: Components, r
         B.atomic(run / "RUN_COMPLETE.json", json.dumps({"utc": now(), "verdict": gres["verdict"],
                                                         "run_record_sha256": sha(run / "run_record.json")}))
     stage("MARKER", marker)
+    comp.attempts.append(key, "RUN_COMPLETE", run=str(run), execution_no=attempt, verdict=rec["verdict"])
     return rec

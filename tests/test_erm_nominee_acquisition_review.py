@@ -23,6 +23,9 @@ from research.erm_nominee_validation.acquisition import states as S
 from research.erm_nominee_validation.acquisition.acquirer import ProductionAcquirer
 from research.erm_nominee_validation.acquisition.period import (PAGE_RULE_FROZEN_DEV, PAGE_RULE_FULL, PERIODS,
                                                                 scope_envelopes)
+import tests.test_erm_nominee_acquisition_e2e as E2E
+from research.erm_nominee_validation.acquisition import acquirer as AQ
+from research.erm_nominee_validation.attempts import AttemptLedger
 from tests.test_erm_nominee_acquisition_e2e import (CFG, CIK, DD, GUARD_BEFORE, REAL_GUARD_STATE, FixtureProvider,
                                                     auth, components, ledger, make_request, released, sha,
                                                     write_records, zip_tsv)
@@ -38,7 +41,9 @@ def files(rows=OLD_ROWS, frm="2010-03-01", to="2019-05-01"):
 
 
 @pytest.fixture(autouse=True)
-def real_guard_state_untouched():
+def real_guard_state_untouched(tmp_path, monkeypatch):
+    E2E.LEDGER["path"] = tmp_path / "_attempt_ledger" / "ATTEMPT_LEDGER.jsonl"       # outside every run directory
+    monkeypatch.setattr(AQ, "SP500_MIN_MEMBERS", 1)     # fixture CSVs are single-ticker rows (real floor tested below)
     yield
     if GUARD_BEFORE:
         assert sha(REAL_GUARD_STATE) == GUARD_BEFORE, "the real ERM guard state changed"
@@ -342,7 +347,8 @@ def test_failure_classes(tmp_path, monkeypatch):
         W.run_validation(CFG, auth(r), components(g, FixtureProvider()), tmp_path / "r1")
     assert record(tmp_path / "r1")["failure_class"] == S.IMPLEMENTATION_FAILURE
     monkeypatch.setattr(B, "build", real)
-    # RUN_INVALID: archive verification fails
+    # RUN_INVALID: archive verification fails (independent scenario: its own attempt ledger)
+    E2E.LEDGER["path"] = tmp_path / "_ledger_r2" / "ATTEMPT_LEDGER.jsonl"
     comps = components(g, FixtureProvider())
     acq = comps.acquirer.acquire
 
@@ -354,7 +360,8 @@ def test_failure_classes(tmp_path, monkeypatch):
     with pytest.raises(W.StageFailure) as e:
         W.run_validation(CFG, auth(r), comps, tmp_path / "r2")
     assert isinstance(e.value.cause, A.InputHashMismatch) and record(tmp_path / "r2")["failure_class"] == S.RUN_INVALID
-    # INCOMPLETE_AFTER_OUTCOME_EXPOSURE
+    # INCOMPLETE_AFTER_OUTCOME_EXPOSURE (independent scenario: its own attempt ledger)
+    E2E.LEDGER["path"] = tmp_path / "_ledger_r3" / "ATTEMPT_LEDGER.jsonl"
     from research.erm_nominee_validation import diagnostics as DG
     monkeypatch.setattr(DG, "unit_book", boom)
     with pytest.raises(W.StageFailure):
@@ -363,14 +370,154 @@ def test_failure_classes(tmp_path, monkeypatch):
     assert rr["failure_class"] == S.INCOMPLETE_AFTER_OUTCOME_EXPOSURE and rr["retry_allowed"] is False
 
 
-def test_acquisition_blocked_keeps_r9_reexecution_rule_and_preserves_records(tmp_path):
-    """Behaviour unchanged pending D6: attempt 1 ACQUISITION_BLOCKED -> one re-execution, attempt_1/ preserved with its
-    ledger; a second block -> ABORTED_OWNER_DECIDES (r10 proposes that pre-scoring blocks not consume it)."""
+# ================================================================================================ D6a attempt budget
+def _blocked(tmp_path, g, r, run, **kw):
+    with pytest.raises(W.StageFailure):
+        W.run_validation(CFG, auth(r), components(g, FixtureProvider(sp_last="2026-06-30")), run, **kw)
+
+
+def _counters():
+    return AttemptLedger(E2E.LEDGER["path"]).counters(f"{CFG.canonical()['hypothesis']}|B")
+
+
+def test_d6a_blockage_does_not_consume_scoring_and_one_retry_completes(tmp_path):
     g, r = released(tmp_path)
     run = tmp_path / "run"
-    for _ in range(2):
-        with pytest.raises(W.StageFailure):
-            W.run_validation(CFG, auth(r), components(g, FixtureProvider(sp_last="2026-06-30")), run)
-    assert (run / "attempt_1/archive/acquisition/ledger.jsonl").exists()
-    rr = record(run)
-    assert rr["status"] == "ABORTED_OWNER_DECIDES" and rr["failure_class"] == S.ACQUISITION_BLOCKED
+    _blocked(tmp_path, g, r, run)
+    c = _counters()
+    assert c["acquisition_attempts"] == 1 and c["scoring_attempts"] == 0           # no scoring run consumed
+    assert record(run)["failure_class"] == S.ACQUISITION_BLOCKED and record(run)["retry_allowed"] is True
+    rec = W.run_validation(CFG, auth(r), components(g, FixtureProvider()), run,
+                           retry_reason="S&P source published a snapshot dated >= 2026-09-30")
+    assert rec["status"] == "COMPLETE" and rec["acquisition_attempt"] == 2 and rec["retry_reason"]
+    assert (run / "attempt_1/archive/acquisition/ledger.jsonl").exists()          # attempt 1 requests / exposure kept
+    c = _counters()
+    assert c["acquisition_attempts"] == 2 and c["scoring_attempts"] == 1 and c["completed"]
+
+
+def test_d6a_retry_requires_a_recorded_reason(tmp_path):
+    g, r = released(tmp_path)
+    run = tmp_path / "run"
+    _blocked(tmp_path, g, r, run)
+    prov = FixtureProvider()
+    with pytest.raises(W.RunRefused, match="explicit, recorded reason"):
+        W.run_validation(CFG, auth(r), components(g, prov), run)
+    assert prov.calls == [] and _counters()["acquisition_attempts"] == 1          # refusal consumed nothing
+
+
+def test_d6a_second_failure_stops_for_owner_review(tmp_path):
+    g, r = released(tmp_path)
+    run = tmp_path / "run"
+    _blocked(tmp_path, g, r, run)
+    _blocked(tmp_path, g, r, run, retry_reason="retry once")
+    assert record(run)["status"] == "ABORTED_OWNER_DECIDES"
+    prov = FixtureProvider()
+    with pytest.raises(W.RunRefused):
+        W.run_validation(CFG, auth(r), components(g, prov), run, retry_reason="third try")
+    assert prov.calls == []
+
+
+@pytest.mark.parametrize("how", ["new_run_id_directory", "renamed_directory"])
+def test_d6a_budget_cannot_be_reset_by_a_new_directory(tmp_path, how):
+    g, r = released(tmp_path)
+    _blocked(tmp_path, g, r, tmp_path / "run")
+    _blocked(tmp_path, g, r, tmp_path / "run_b", retry_reason="retry once")          # the retry, in a new directory
+    if how == "renamed_directory":
+        (tmp_path / "run").rename(tmp_path / "run_renamed")
+    prov = FixtureProvider()
+    for d in ("run_c", "run_renamed" if how == "renamed_directory" else "run_d"):
+        with pytest.raises(W.RunRefused, match="owner review|exhausted"):
+            W.run_validation(CFG, auth(r), components(g, prov), tmp_path / d, retry_reason="try again")
+    assert prov.calls == [] and _counters()["acquisition_attempts"] == 2
+
+
+def test_d6a_restarted_process_reads_the_same_ledger(tmp_path):
+    g, r = released(tmp_path)
+    _blocked(tmp_path, g, r, tmp_path / "run")
+    fresh = AttemptLedger(E2E.LEDGER["path"])                                      # a new process = a new object
+    assert fresh.counters(f"{CFG.canonical()['hypothesis']}|B")["acquisition_attempts"] == 1
+
+
+def test_d6a_no_retry_after_outcome_exposure_even_in_a_new_directory(tmp_path, monkeypatch):
+    from research.erm_nominee_validation import diagnostics as DG
+    g, r = released(tmp_path)
+
+    def boom(*a, **k):
+        raise RuntimeError("diagnostics failure")
+    monkeypatch.setattr(DG, "unit_book", boom)
+    with pytest.raises(W.StageFailure):
+        W.run_validation(CFG, auth(r), components(g, FixtureProvider()), tmp_path / "run")
+    monkeypatch.undo()
+    monkeypatch.setattr(AQ, "SP500_MIN_MEMBERS", 1)
+    assert _counters()["scoring_attempts"] == 1
+    prov = FixtureProvider()
+    with pytest.raises(W.RunRefused, match="outcomes may exist"):
+        W.run_validation(CFG, auth(r), components(g, prov), tmp_path / "elsewhere", retry_reason="try again")
+    assert prov.calls == []
+
+
+def test_d6a_retry_outside_reference_envelope_is_refused_without_consuming(tmp_path):
+    g, r = released(tmp_path)
+    _blocked(tmp_path, g, r, tmp_path / "run")
+    late = lambda: datetime(2026, 10, 9, 21, tzinfo=timezone.utc)                  # after R + 1 d
+    prov = FixtureProvider()
+    with pytest.raises(W.RunRefused, match="REFERENCE_WINDOW_EXPIRED"):
+        W.run_validation(CFG, auth(r), components(g, prov, clock=late), tmp_path / "run", retry_reason="retry")
+    assert prov.calls == [] and _counters()["acquisition_attempts"] == 1         # not consumed, R not re-pinned
+
+
+def test_transport_retries_are_not_acquisition_attempts(tmp_path):
+    g, r = released(tmp_path)
+    prov = FixtureProvider(faults={"company_tickers": ["429", "503"], '"alpaca_bars"': ["conn"]})
+    rec = W.run_validation(CFG, auth(r), components(g, prov), tmp_path / "run")
+    assert rec["status"] == "COMPLETE" and _counters()["acquisition_attempts"] == 1
+    t = [x for x in ledger(tmp_path / "run") if x["url"].endswith("company_tickers.json")]
+    assert t[-1]["attempts"] == 3                                                  # recorded per request
+
+
+def test_attempt_ledger_is_required(tmp_path):
+    g, r = released(tmp_path)
+    c = components(g, FixtureProvider())
+    c.attempts = None
+    with pytest.raises(W.RunRefused, match="attempt ledger is required"):
+        W.run_validation(CFG, auth(r), c, tmp_path / "run")
+
+
+# ================================================================================================ S&P format (real floor)
+def _sp_acquirer(tmp_path, csv_bytes):
+    from research.erm_nominee_validation.acquisition.store import ArchiveStore
+    g, r = released(tmp_path)
+
+    class P(FixtureProvider):
+        def sp_csv(self):
+            return csv_bytes
+    acq = components(g, P()).acquirer
+    acq.cfg, acq.archive, acq.per = CFG, tmp_path / "arc", PERIODS["B"]
+    acq.store = ArchiveStore(acq.archive)
+    return acq
+
+
+def _snap(day, n=500):
+    return f"{day}," + '"' + ",".join(f"T{i:03d}" for i in range(n)) + '"\n'
+
+
+@pytest.mark.parametrize("rows,ok,why", [
+    ([_snap("2026-06-30"), _snap("2026-09-30")], True, None),                 # snapshot AT the window end
+    ([_snap("2026-06-30"), _snap("2026-10-02")], True, None),                 # snapshot after it
+    ([_snap("2026-06-30"), _snap("2026-09-21")], False, "INSUFFICIENT"),      # last change before T: unknown after
+    ([_snap("2026-06-30"), _snap("2026-09-30", 3)], False, "FORMAT_NOT_FULL_SNAPSHOTS"),   # event-style rows
+    ([_snap("2026-09-30"), _snap("2026-06-30")], False, "not strictly increasing"),
+])
+def test_sp500_snapshot_semantics_with_the_real_floor(tmp_path, monkeypatch, rows, ok, why):
+    monkeypatch.setattr(AQ, "SP500_MIN_MEMBERS", 450)
+    acq = _sp_acquirer(tmp_path, ("date,tickers\n" + "".join(rows)).encode())
+    body, last = acq.sp500(PERIODS["B"])
+    if ok:
+        assert body is not AQ.MISSING
+    else:
+        assert body is AQ.MISSING and why in json.dumps(acq.failures + [x for x in ledger_rows(acq)])
+
+
+def ledger_rows(acq):
+    p = acq.archive / "acquisition/ledger.jsonl"
+    return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
