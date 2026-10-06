@@ -1,0 +1,21 @@
+{
+ "check": "fresh clone of origin/research/erm-nominee-validation-plumbing @ 8c0d7f1, core.autocrlf=true",
+ "utc": "2026-10-06",
+ "lock_verify": "PASS",
+ "protocol_lock_sha256": "55a31d24a7d1e9d2eecc03073af0e29e89bc2f8bc1530798c6b14cc6e0440829",
+ "implementation_sha256": "ce924d902d620a873d6bf693e0e590b6ac066d4ce8117deddf04ff96a942c75e",
+ "git_status_lines": 0,
+ "focused_tests_in_clone": {
+  "passed": 129,
+  "files": [
+   "tests/test_erm_nominee_acquisition_review.py",
+   "tests/test_erm_nominee_acquisition_e2e.py",
+   "tests/test_erm_nominee_validation_workflow.py",
+   "tests/test_erm_nominee_validation_plumbing.py"
+  ]
+ },
+ "regression_worktree": {
+  "passed": 222
+ },
+ "real_guard_state_sha256": "b512322de0de86829e9cb3d70464803e9ad2063802cfa6b65ab8216c6d6d30b5"
+}
