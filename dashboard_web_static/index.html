@@ -620,7 +620,8 @@ function renderV2(d){
   for(const [dest,n] of Object.entries(op.notifications||{})){
     h+=`<h4>${esc(dest)}</h4>`+kv('enabled / physically configured',String(n.enabled)+' / '+String(n.physical_destination_configured))+
       kv('credential source',esc(n.credential_source))+kv('configuration reason',esc(n.configuration_reason))+kv('shares chat with',esc(n.shares_chat_with.join(', ')||'none known'))+
-      kv('delivery counts',esc(JSON.stringify(n.counts)))+kv('last success',esc(n.last_success||'none'))+
+      kv('notification rows by state',esc(JSON.stringify(n.counts)))+
+      kv('counted sources',esc(n.counts_scope||'unknown'))+kv('last success',esc(n.last_success||'none'))+
       kv('last failure',esc(n.last_failure||'none'))+kv('real delivery validated',String(n.real_delivery_validated))+
       `<div class="muted small">${esc(n.configuration_scope)}</div>`;
   }
@@ -788,7 +789,41 @@ function renderV2Discovery(d){
   return h;
 }
 
-/* S14 Continuous Opportunity Engine -- research lane, read-only. Never a trade event. */
+/* Every Telegram lane counted from its own store; lanes that share a bot are never merged (2026-10-07). */
+function renderNotificationLanes(L){
+  if(!L||L.error||!L.lanes) return `<div class="card card-wide"><h3>Notification lanes</h3><div class="empty">${esc((L&&L.error)||'unavailable')}</div></div>`;
+  const per=L.period||{}, q=c=>c?(c.PENDING||0)+(c.RETRY||0)+(c.HELD||0):null, nh=x=>(x.notifications||{}).history, np=x=>(x.notifications||{}).period;
+  let h=`<div class="card card-wide"><h3>Notification lanes (all bots)</h3>`+
+    kv('period', esc(`${per.label||''} · ${String(per.start_utc||'').slice(0,19)}Z → ${String(per.end_utc||'').slice(0,19)}Z`))+
+    kv('timezone', esc(per.timezone||'UTC'))+`<div class="small muted">${esc(L.count_unit||'')}; ${esc(L.history_note||'')}.
+    SENT = confirmed by Telegram; AMBIGUOUS = outcome unknown (not counted as sent).</div>`+
+    boundedTable(L.lanes,[{label:'lane',get:x=>x.label},{label:'bot',get:x=>`${x.bot} (${x.destination})`},
+      {label:'mode',get:x=>x.mode||'active per producer'},
+      {label:'sent (all)',get:x=>(nh(x)||{}).SENT},{label:'sent (period)',get:x=>(np(x)||{}).SENT},
+      {label:'ambiguous',get:x=>(nh(x)||{}).AMBIGUOUS},{label:'queued now',get:x=>q(nh(x))},
+      {label:'expired (all)',get:x=>(nh(x)||{}).EXPIRED},{label:'failed (all)',get:x=>(nh(x)||{}).FAILED},
+      {label:'suppressed by pause',get:x=>(x.notifications||{}).suppressed_by_policy},
+      {label:'send attempts',get:x=>(x.notifications||{}).send_attempts_total},
+      {label:'last confirmed send',get:x=>String((x.notifications||{}).last_confirmed_send_utc||'').slice(0,19)},
+      {label:'source',get:x=>x.source}],12,x=>x.lane)+`</div>`;
+  const p=L.lanes.find(x=>x.lane==='PAPER_SIGNAL_PROMOTION');
+  if(p){
+    const rs=p.research_status||{}, pr=p.promotions||{}, cp=p.configured_pause||{};
+    h+=`<div class="card card-wide"><h3>PAPER_SIGNAL promotion lane ${pill(rs.status)}</h3>`+
+      `<div class="banner internal">${esc(rs.statement||'')}</div>`+
+      kv('Signal-bot delivery mode', esc(p.mode))+
+      kv('pause configured', cp.paused?esc(`yes · effective ${cp.effective_utc||'?'} (${cp.effective_local||''}) · ${cp.policy_id||''}`):'no')+
+      kv('promotions (all) by state', esc(JSON.stringify(pr.history||{})))+
+      kv('promotions (period) by state', esc(JSON.stringify(pr.period||{})))+
+      kv('promotions recorded while paused', num(pr.recorded_while_paused))+
+      kv('Signal-bot messages sent (all, confirmed)', num((nh(p)||{}).SENT))+
+      kv('research verdict', esc(rs.verdict))+kv('evidence', esc(rs.evidence))+kv('cost model', esc(rs.cost_model))+
+      kv('source / as of', esc(`${rs.source||''} · ${rs.as_of||''}`))+`</div>`;
+  }
+  return h;
+}
+
+/* S14 Continuous Opportunity Engine -- research lane, read-only. */
 function renderOpportunity(d){
   let h=`<h2 class="section-title">Opportunity Engine</h2>`;
   if(!d||d.available===false||!d.system){
@@ -798,8 +833,12 @@ function renderOpportunity(d){
   const sys=d.system||{}, data=d.data||{}, disc=d.discovery||{}, ls=disc.last_scan||{}, n=d.notification||{},
         rep=d.reporting||{}, cap=data.capability||{}, ing=data.ingestion||{};
   h+=`<div class="banner internal">Research lane: continuous, phase-aware discovery. Candidate detection and
-      persistence are independent of Telegram capacity. Never a V2 TRADE_EVENT; no paper orders.</div><div class="grid">`;
-  h+=`<div class="card"><h3>System ${pill(sys.overall)}</h3>`+kv('commit', esc(sys.commit))+
+      persistence are independent of Telegram capacity. No paper orders. Its PAPER_SIGNAL promotion lane DID deliver
+      to the Signal bot (TRADE_EVENT, non-V2) until the 2026-10-07 owner pause; see Notification lanes.</div><div class="grid">`;
+  const ver=sys.versions||{};
+  h+=`<div class="card"><h3>System ${pill(sys.overall)}</h3>`+kv('repo HEAD', esc(ver.repo_head||'UNKNOWN'))+
+     kv('dirty tracked files now', esc((ver.dirty_tracked_files_now||[]).join(', ')||'none'))+
+     kv('loaded commit (first component)', esc(sys.commit||'UNKNOWN'))+
      kv('latest deployment', sys.latest_deployment?esc(`${String(sys.latest_deployment.at_utc).slice(0,19)} ${sys.latest_deployment.component} ${sys.latest_deployment.classification}`):null)+
      kv('recent errors', num((sys.recent_errors||[]).length))+`</div>`;
   h+=`<div class="card"><h3>Data</h3>`+kv('phase', esc(ing.phase))+kv('as-of (UTC)', esc(String(ing.as_of_utc||'').slice(0,19)))+
@@ -813,14 +852,18 @@ function renderOpportunity(d){
   h+=`<div class="card"><h3>Notification (Lab)</h3>`+kv('policy', esc(n.policy?n.policy.policy_version:'—'))+
      Object.entries((n.lab||{}).decisions||{}).map(([k,v])=>kv(k, num(v))).join('')+
      Object.entries((n.lab||{}).delivery||{}).map(([k,v])=>kv('delivery '+k, num(v))).join('')+
-     `<div class="small muted">${esc(n.signal_sentinel||'')}</div></div>`;
+     `<div class="small muted">${esc(n.signal_bot_note||'')}</div></div>`;
+  h+=renderNotificationLanes(n.lanes);
   h+=`<div class="card"><h3>Reporting</h3>`+kv('window', esc(rep.window_id))+kv('material boundaries', num(rep.material_changes))+
      kv('ops-only restarts', num(rep.operations_only_restarts))+
      (rep.warnings||[]).map(w=>`<div class="small" style="color:var(--warn)">${esc(w)}</div>`).join('')+`</div>`;
   h+=`<div class="card card-wide"><h3>Components (independently restartable)</h3>`+
      boundedTable(d.components, [{label:'logical', get:r=>r.logical},{label:'component', get:r=>r.component},
        {label:'health', get:r=>r.health},{label:'hb age s', get:r=>r.heartbeat_age_s},{label:'restarts', get:r=>r.restarts},
-       {label:'version', get:r=>r.version}], 12, r=>r.component)+`</div>`;
+       {label:'source version', get:r=>r.version},
+       {label:'loaded commit', get:r=>((ver.components||{})[r.component]||{}).loaded_commit||'UNKNOWN'},
+       {label:'vs HEAD', get:r=>((ver.components||{})[r.component]||{}).status||'UNKNOWN'},
+       {label:'dirty at load', get:r=>((ver.components||{})[r.component]||{}).dirty_at_load||'UNKNOWN'}], 12, r=>r.component)+`</div>`;
   h+=`<div class="card"><h3>Paper (V2, read-only)</h3>`+kv('v2', esc(JSON.stringify((d.paper||{}).v2||{}).slice(0,160)))+
      kv('research paper orders', num((d.paper||{}).research_lane_paper_orders))+`</div>`;
   return h+`</div>`;

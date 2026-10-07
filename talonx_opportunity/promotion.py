@@ -22,6 +22,14 @@ NOTHING; PAPER_SIGNAL enqueues a "PAPER OPPORTUNITY" message to the TRADE_EVENT 
 
 This is NOT proven profitable and NOT BUY/SELL advice: it creates a measurable paper Signal-quality cohort.
 Paper outcomes (+15m/+30m/+1h/close/MFE/MAE, long direction) are tracked for every promotion.
+
+SIGNAL-DELIVERY PAUSE (owner decision 2026-10-07). A durable control file ``<root>/control/promotion_signal_delivery.json``
+with ``"paused": true`` overrides a PAPER_SIGNAL environment: the component runs record-only (state PROMOTED_SHADOW,
+reason_code SIGNAL_DELIVERY_PAUSED), never drains its Signal outbox, and at start retires any not-yet-sent
+PAPER_OPPORTUNITY row (PENDING / RETRY / HELD -> EXPIRED, last_error ``SUPPRESSED_POLICY_PAUSE: ...``) so nothing can
+replay later. SENT and AMBIGUOUS rows are never touched. Promotion records and paper outcomes continue unchanged. A
+malformed control file is treated as PAUSED (fail safe: no send). Resuming needs an explicit edit (``"paused": false``)
+plus a restart; rows queued while paused then expire (MODE_SWITCH_NO_CARRYOVER) instead of being sent.
 """
 from __future__ import annotations
 
@@ -38,6 +46,8 @@ from talonx_opportunity.store import OpportunityStore, opportunity_db
 
 MODE_ENV = "TALONX_OPPORTUNITY_PROMOTION_MODE"
 SHADOW, PAPER_SIGNAL = "SHADOW", "PAPER_SIGNAL"
+PAUSE_REASON = "SIGNAL_DELIVERY_PAUSED"            # promotions recorded while Signal delivery is paused
+SUPPRESS_PREFIX = "SUPPRESSED_POLICY_PAUSE"        # outbox rows retired by the pause (policy, never a transport error)
 SOURCE = "OPPORTUNITY_ENGINE"
 PRODUCER = "talonx_opportunity.promotion"
 ACTIVE_SETUP = "BULLISH_SETUP"
@@ -99,6 +109,22 @@ def signal_outbox_path(root=None) -> Path:
     return root_dir(root) / "promotion_signal_notifications.db"
 
 
+def pause_path(root=None) -> Path:
+    return root_dir(root) / "control" / "promotion_signal_delivery.json"
+
+
+def signal_delivery_pause(root=None) -> dict | None:
+    """The durable Signal-delivery pause, or None when delivery is not paused. Fail safe: unreadable -> PAUSED."""
+    f = pause_path(root)
+    if not f.exists():
+        return None
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE", "detail": type(exc).__name__}
+    return d if d.get("paused") is True else None
+
+
 def mode_from_env(env=None) -> str:
     m = str((env if env is not None else os.environ).get(MODE_ENV, SHADOW)).strip().upper() or SHADOW
     if m not in (SHADOW, PAPER_SIGNAL):
@@ -135,6 +161,10 @@ def render(p: dict) -> str:
 class Promoter:
     def __init__(self, *, root=None, policy: PromotionPolicy = PROMOTION_V1, mode: str = SHADOW, clock=None,
                  drain=None, data=None):
+        self.requested_mode = mode
+        self.pause = signal_delivery_pause(root) if mode == PAPER_SIGNAL else None
+        if self.pause:                               # durable owner pause overrides a PAPER_SIGNAL environment
+            mode = SHADOW
         self.root, self.policy, self.mode = root, policy, mode
         self.clock = clock or utcnow
         self.con = connect(promotion_db(root))
@@ -148,6 +178,25 @@ class Promoter:
         self._init_boundary()
         if mode == PAPER_SIGNAL:
             self._no_mode_carryover()
+        self.suppressed_at_start = self._suppress_pending() if self.pause else 0
+
+    def _suppress_pending(self) -> int:
+        """Retire every not-yet-sent PAPER_OPPORTUNITY row once (idempotent): EXPIRED + an explicit policy reason, so a
+        later resumption cannot replay it. SENT / AMBIGUOUS / FAILED / EXPIRED rows are left exactly as they are."""
+        f = signal_outbox_path(self.root)
+        if not f.exists():
+            return 0
+        from talonx_ops.notify.outbox import NotifyStore
+        ob = NotifyStore(str(f))
+        why = (f"{SUPPRESS_PREFIX}: promotion Signal delivery paused by owner decision "
+               f"({self.pause.get('decision', 'owner')}; effective {self.pause.get('effective_utc', 'unknown')})")
+        n = 0
+        for r in ob.all_outbox():
+            if r.get("event_type") == "PAPER_OPPORTUNITY" and r.get("state") in ("PENDING", "RETRY", "HELD"):
+                ob.update_outbox(r["event_id"], state="EXPIRED",
+                                 last_error=f"{why}; was {r['state']} after {r.get('attempts') or 0} transport attempt(s)")
+                n += 1
+        return n
 
     def _no_mode_carryover(self) -> None:
         """SHADOW -> PAPER_SIGNAL: anything still QUEUED from a SHADOW run is never sent (only newly eligible
@@ -277,7 +326,11 @@ class Promoter:
         drained = self._drain_signal()
         outc = self._outcomes(now)
         self.last = {"mode": self.mode, "cursor": self.cursor(), "evaluated": evaluated, "queued": queued,
-                     "released": released, "drain": drained, "outcomes": outc, "policy": self.policy.version}
+                     "released": released, "drain": drained, "outcomes": outc, "policy": self.policy.version,
+                     "requested_mode": self.requested_mode,
+                     "signal_delivery": "PAUSED" if self.pause else ("ACTIVE" if self.mode == PAPER_SIGNAL else "OFF"),
+                     "pause": dict(self.pause) if self.pause else None,
+                     "suppressed_pending_at_start": self.suppressed_at_start}
         return 30.0
 
     def _release(self, s: OpportunityStore, now: datetime) -> dict:
@@ -332,8 +385,9 @@ class Promoter:
                 state = "PROMOTED_SIGNAL"
             with self.con:
                 self.con.execute("UPDATE promotions SET state=?, decision_utc=?, promotion_mode=?, signal_event_id=?, "
-                                 "lifecycle_state=? WHERE promotion_id=?",
-                                 (state, iso(now), self.mode, sig, cand.get("state"), q["promotion_id"]))
+                                 "lifecycle_state=?, reason_code=COALESCE(?, reason_code) WHERE promotion_id=?",
+                                 (state, iso(now), self.mode, sig, cand.get("state"),
+                                  PAUSE_REASON if self.pause else None, q["promotion_id"]))
             used += 1
             out["promoted"] += 1
         return out
@@ -432,5 +486,6 @@ def main(argv=None) -> int:
     pr = Promoter(root=root, mode=mode)
     src = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:12]
     run_component("promotion", tick=pr.tick, root=root, detail=pr.detail,
-                  config_fps={"PROMOTION_POLICY": PROMOTION_V1.fingerprint(), "mode": mode, "promotion_src": src})
+                  config_fps={"PROMOTION_POLICY": PROMOTION_V1.fingerprint(), "mode": mode, "promotion_src": src,
+                              "signal_delivery": "PAUSED" if pr.pause else "ACTIVE"})
     return 0

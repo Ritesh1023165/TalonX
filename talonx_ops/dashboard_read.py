@@ -1251,6 +1251,17 @@ class DashboardReadModel:
         from talonx_ops.operator_read import operator_snapshot, redact_output
         operator = operator_snapshot(Path(db), now=self.now, status=svc_status,
                                      intel_path=self.home / "ingestion_ledger.db")
+        # 2026-10-07: these per-destination counts come only from the V2 alert outbox, the operations outbox and (for
+        # TRADE_EVENT) Intelligence delivery rows. Say so, so the Signal-bot number is not read as "all Signal sends":
+        # research lanes (PAPER_SIGNAL promotion, Lab, VR) are counted per lane in the Opportunity section.
+        _src = operator.get("notifications") or {}
+        for _d, _n in _src.items():
+            _parts = [k for k, v in (_n.get("sources_available") or {}).items() if v]
+            _n["counts_scope"] = ("rows from " + (", ".join(_parts) or "no") + " store(s) only"
+                                  + ("; EXCLUDES the PAPER_SIGNAL promotion lane (see Opportunity > Notification lanes)"
+                                     if _d == "TRADE_EVENT" else "")
+                                  + ("; EXCLUDES the Lab and VR research lanes (see Opportunity > Notification lanes)"
+                                     if _d == "RESEARCH" else ""))
         out["operator"] = operator
         account = operator["account"]
         out["ledger"].update(

@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,9 @@ def _mode_fields(name: str, c: dict | None, det: dict) -> dict:
         return {}
     fps = _j(c.get("config_fps_json"), {}) or {}
     if name == "promotion":
-        return {"mode": fps.get("mode"), "config_fp": fps.get("PROMOTION_POLICY")}
+        return {"mode": fps.get("mode"), "config_fp": fps.get("PROMOTION_POLICY"),
+                "signal_delivery": det.get("signal_delivery") or fps.get("signal_delivery"),
+                "requested_mode": det.get("requested_mode")}
     if name == "sentinel":
         return {"mode": "ENABLED" if det.get("enabled", fps.get("enabled") == "1") else "DISABLED",
                 "mutation_mode": det.get("mutation_mode") or fps.get("mutation_mode"), "bot": det.get("bot"),
@@ -110,6 +113,184 @@ def component_health(row: dict | None, now: datetime, *, root: Path | None = Non
     return "DEGRADED" if st == "DEGRADED" else "UP"
 
 
+# The promotion (PAPER_SIGNAL) stream's latest accepted research verdict, shown next to its delivery counts so that
+# no operator mistakes a delivery count for evidence of value. Source: committed evidence only (descriptive constant).
+PAPER_SIGNAL_VERDICT = {
+    "status": "NEGATIVE",
+    "statement": "Not a validated profitable strategy. Measured negative after costs; Signal-bot delivery paused "
+                 "2026-10-07 by owner decision (product policy, not a new strategy verdict).",
+    "verdict": "INTRADAY_PREMISE_FAILURE_SUPPORTED / NO_EDGE_OBSERVED",
+    "evidence": "VR replay 2026-09-28..29, CONTROL_VR_LIFECYCLE n=297: gross -0.094%, net -0.608%, PF 0.29",
+    "cost_model": "max(20 bps, measured entry spread) per round trip",
+    "source": "docs/research/evidence/2026-09-30_vr_paper_replay.md (commit 5be6528); forward 2026-09-30 "
+              "(n=156, net -0.463%) in docs/research/evidence/forward_alpha_validation.md",
+    "as_of": "2026-09-30",
+}
+LONDON_NOTE = "UTC; London = UTC+1 (BST) until 2026-10-25, then UTC+0 (GMT)"
+_STATES = ("PENDING", "RETRY", "HELD", "SENT", "AMBIGUOUS", "FAILED", "EXPIRED")
+
+
+def _period_start(now: datetime) -> datetime:
+    return now.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _lane_counts(con, table: str, *, created: str, where: str = "", args=(), since: str) -> dict:
+    """Rows (= notifications, one row per logical message) by state, all-time and for the period. Send ATTEMPTS are
+    reported separately and never added to a notification count. SENT = confirmed by the transport; AMBIGUOUS = a send
+    whose outcome is unknown (never counted as SENT)."""
+    w = f" WHERE {where}" if where else ""
+    hist = {s: 0 for s in _STATES}
+    hist.update(dict(con.execute(f"SELECT state, COUNT(*) FROM {table}{w} GROUP BY 1", args).fetchall()))
+    pw = f"{w} AND {created} >= ?" if w else f" WHERE {created} >= ?"
+    per = {s: 0 for s in _STATES}
+    per.update(dict(con.execute(f"SELECT state, COUNT(*) FROM {table}{pw} GROUP BY 1", (*args, since)).fetchall()))
+    a = con.execute(f"SELECT COALESCE(SUM(attempts),0), MIN({created}), MAX({created}), "
+                    f"MAX(CASE WHEN state='SENT' THEN sent_at_utc END) FROM {table}{w}", args).fetchone()
+    return {"history": hist, "period": per, "send_attempts_total": a[0], "first_created_utc": a[1],
+            "last_created_utc": a[2], "last_confirmed_send_utc": a[3]}
+
+
+def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
+    lane = {"lane": "PAPER_SIGNAL_PROMOTION", "label": "Opportunity promotion (PAPER_SIGNAL)",
+            "destination": "TRADE_EVENT", "bot": "Signal", "source": "results/opportunity/"
+            "promotion_signal_notifications.db + promotion.db", "research_status": PAPER_SIGNAL_VERDICT}
+    det = _j((comp or {}).get("detail_json"), {}) or {}
+    fps = _j((comp or {}).get("config_fps_json"), {}) or {}
+    loaded = det.get("signal_delivery") or fps.get("signal_delivery")
+    if not loaded and fps.get("mode") in ("PAPER_SIGNAL", "SHADOW"):     # runtime predating the pause control
+        loaded = "ACTIVE" if fps["mode"] == "PAPER_SIGNAL" else "OFF"
+    cfg = None
+    pf = r / "control" / "promotion_signal_delivery.json"
+    if pf.exists():
+        d = _j(pf.read_text(encoding="utf-8"), None)
+        cfg = {k: d.get(k) for k in ("paused", "effective_utc", "effective_local", "decision", "policy_id")} \
+            if isinstance(d, dict) else {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE"}
+    cfg_paused = bool(cfg and cfg.get("paused") is True)
+    if comp is None or not loaded:
+        mode = "UNKNOWN (no runtime evidence from the promotion component)"
+    elif loaded == "PAUSED":
+        mode = "PAUSED (record-only: promotions recorded, no Signal-bot delivery)"
+    elif cfg_paused:
+        mode = "PAUSE_CONFIGURED_NOT_YET_LOADED (component restart pending)"
+    else:
+        mode = {"ACTIVE": "ACTIVE (delivering to the Signal bot)", "OFF": "SHADOW (record-only)"}.get(loaded, loaded)
+    lane.update(mode=mode, loaded_signal_delivery=loaded, configured_pause=cfg)
+    ob = _ro(r / "promotion_signal_notifications.db")
+    if ob:
+        lane["notifications"] = _lane_counts(ob, "ops_notification_outbox", created="created_at_utc",
+                                             where="event_type='PAPER_OPPORTUNITY'", since=since)
+        lane["notifications"]["suppressed_by_policy"] = ob.execute(
+            "SELECT COUNT(*) FROM ops_notification_outbox WHERE last_error LIKE 'SUPPRESSED_POLICY_PAUSE%'").fetchone()[0]
+        ob.close()
+    pc = _ro(r / "promotion.db")
+    if pc:
+        lane["promotions"] = {
+            "history": dict(pc.execute("SELECT state, COUNT(*) FROM promotions GROUP BY 1").fetchall()),
+            "period": dict(pc.execute("SELECT state, COUNT(*) FROM promotions WHERE queued_utc >= ? GROUP BY 1",
+                                      (since,)).fetchall()),
+            "recorded_while_paused": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
+                                                "'SIGNAL_DELIVERY_PAUSED'").fetchone()[0]}
+        pc.close()
+    return lane
+
+
+def notification_lanes(root=None, *, now: datetime | None = None, repo: Path | None = None,
+                       home: Path | None = None) -> dict:
+    """Every Telegram notification lane, each counted from its OWN store (read-only). Lanes sharing a bot are listed
+    separately and never merged into one total."""
+    r, repo = opp_root(root), Path(repo or REPO_ROOT)
+    home = Path(home or os.environ.get("TALONX_HOME") or (Path.home() / ".talonx"))
+    now = now or datetime.now(timezone.utc)
+    start = _period_start(now)
+    since = start.isoformat()
+    lanes = []
+    rt = _ro(r / "runtime.db")
+    comp = None
+    if rt:
+        row = rt.execute("SELECT * FROM components WHERE name='promotion'").fetchone()
+        comp = dict(row) if row else None
+        rt.close()
+    lanes.append(_promotion_lane(r, comp, since))
+    specs = [
+        ("INTELLIGENCE_CARDS", "Intelligence cards (SEC filings)", "TRADE_EVENT", "Signal",
+         home / "ingestion_ledger.db", "intelligence_delivery", "enqueued_at_utc", ""),
+        ("V2_ACTIONABLE", "V2 INSIDER_BUY_CLUSTER_V2 paper alerts", "TRADE_EVENT", "Signal",
+         repo / "v2_release_rc1.db", "v2_alert_outbox", "created_at_utc", ""),
+        ("OPERATIONS", "Operations / Sentinel health", "OPERATIONS", "Sentinel",
+         repo / "v2_release_rc1_notifications.db", "ops_notification_outbox", "created_at_utc", ""),
+        ("LAB_RESEARCH", "Opportunity Lab research", "RESEARCH", "Lab",
+         r / "opportunity_research_notifications.db", "ops_notification_outbox", "created_at_utc", ""),
+        ("VR_PAPER", "VR_PAPER_V1 paper entry/exit (research)", "RESEARCH", "Lab",
+         repo / "results" / "vr_paper" / "vr_paper_notifications.db", "ops_notification_outbox", "created_at_utc", ""),
+    ]
+    for key, label, dest, bot, path, table, created, where in specs:
+        lane = {"lane": key, "label": label, "destination": dest, "bot": bot, "source": path.name}
+        try:
+            con = _ro(path)
+            if con is None:
+                lane["mode"] = "NO_STORE"
+            else:
+                cols = {c[1] for c in con.execute(f"PRAGMA table_info({table})")}
+                if not cols:
+                    lane["mode"] = "NO_TABLE"
+                else:
+                    if "attempts" not in cols or "sent_at_utc" not in cols or created not in cols:
+                        lane["mode"] = "UNKNOWN_SCHEMA"
+                    else:
+                        lane["notifications"] = _lane_counts(con, table, created=created, where=where, since=since)
+                        if key == "INTELLIGENCE_CARDS":
+                            lane["by_route"] = {f"{rt_}:{st}": n for rt_, st, n in con.execute(
+                                "SELECT route, state, COUNT(*) FROM intelligence_delivery GROUP BY 1, 2")}
+                con.close()
+        except sqlite3.Error as exc:
+            lane["mode"] = f"UNREADABLE ({type(exc).__name__})"
+        lanes.append(lane)
+    return {"period": {"start_utc": since, "end_utc": now.isoformat(), "label": f"{start.date()} UTC day so far",
+                       "timezone": LONDON_NOTE},
+            "history_note": "history = every row ever recorded in the lane's store (never pruned by this view)",
+            "count_unit": "one notification = one outbox row; send attempts are reported separately",
+            "lanes": lanes}
+
+
+def _git(repo: Path, *args) -> str | None:
+    try:
+        p = subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, timeout=5)
+        return p.stdout if p.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def version_attribution(commits: dict, repo: Path | None = None) -> dict:
+    """Repo HEAD vs each component's LOADED commit. A loaded commit that differs from HEAD is only "stale" when the
+    component's own package changed in between; a later Intelligence-only commit does not make it stale. Missing runtime
+    evidence is UNKNOWN. ``-dirty`` means the working tree had tracked edits at load: the exact content is unknown, and
+    the files that are dirty NOW are listed for attribution."""
+    repo = Path(repo or REPO_ROOT)
+    head = (_git(repo, "rev-parse", "HEAD") or "").strip() or None
+    dirty_now = [ln[3:] for ln in (_git(repo, "status", "--porcelain", "--untracked-files=no") or "").splitlines()]
+    out = {"repo_head": head[:12] if head else "UNKNOWN", "dirty_tracked_files_now": dirty_now, "components": {}}
+    memo: dict = {}
+    for name, loaded in commits.items():
+        if not loaded or loaded == "unknown":
+            out["components"][name] = {"loaded_commit": "UNKNOWN", "status": "UNKNOWN (no runtime evidence)"}
+            continue
+        sha, dirty = loaded.removesuffix("-dirty"), loaded.endswith("-dirty")
+        if head is None:
+            st = "UNKNOWN (repo HEAD unreadable)"
+        elif head.startswith(sha):
+            st = "MATCHES_HEAD"
+        else:
+            if sha not in memo:
+                memo[sha] = _git(repo, "diff", "--name-only", sha, "HEAD", "--", "talonx_opportunity/")
+            changed = memo[sha]
+            st = ("UNKNOWN (loaded commit not in this repo)" if changed is None
+                  else "COMPONENT_CODE_CHANGED_SINCE_LOAD" if changed.strip()
+                  else "LOADED_OLDER_COMMIT_NO_COMPONENT_CHANGE (not stale)")
+        out["components"][name] = {"loaded_commit": loaded, "status": st,
+                                   "dirty_at_load": "YES (exact content unknown)" if dirty else "NO"}
+    return out
+
+
 def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     r = opp_root(root)
     now = now or datetime.now(timezone.utc)
@@ -141,6 +322,7 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     latest = deps[0] if deps else None
     out["system"] = {"overall": overall, "commit": next((c.get("commit_sha") for c in comps.values()
                                                          if c.get("commit_sha")), None),
+                     "versions": version_attribution({n: (comps.get(n) or {}).get("commit_sha") for n in COMPONENTS}),
                      "latest_deployment": {k: latest[k] for k in ("deployment_id", "at_utc", "component",
                                                                   "classification", "reason")} if latest else None,
                      "recent_errors": errs}
@@ -207,7 +389,14 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
         p = nc.execute("SELECT policy_version, policy_fp FROM decisions ORDER BY decided_utc DESC LIMIT 1").fetchone()
         notif["policy"] = dict(p) if p else None
         nc.close()
-    notif["signal_sentinel"] = "owned by the V2 release outbox (see V2/Operations sections); untouched by research"
+    # 2026-10-07: the old line said the Signal bot was "untouched by research" -- false: the promotion component sent
+    # PAPER_SIGNAL messages to it. Every lane is now counted from its own store.
+    notif["signal_bot_note"] = ("The Signal bot (TRADE_EVENT) carries three lanes: PAPER_SIGNAL promotion, "
+                                "Intelligence cards and V2 alerts. See notification lanes; they are never merged.")
+    try:
+        notif["lanes"] = notification_lanes(r, now=now)
+    except Exception as exc:  # noqa: BLE001 -- lane visibility must never break the dashboard
+        notif["lanes"] = {"error": f"{type(exc).__name__}"}
     out["notification"] = notif
     rep = None
     rd = r / "reports"
