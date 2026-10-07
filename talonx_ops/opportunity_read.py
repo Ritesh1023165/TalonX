@@ -260,34 +260,95 @@ def _git(repo: Path, *args) -> str | None:
         return None
 
 
-def version_attribution(commits: dict, repo: Path | None = None) -> dict:
-    """Repo HEAD vs each component's LOADED commit. A loaded commit that differs from HEAD is only "stale" when the
-    component's own package changed in between; a later Intelligence-only commit does not make it stale. Missing runtime
-    evidence is UNKNOWN. ``-dirty`` means the working tree had tracked edits at load: the exact content is unknown, and
-    the files that are dirty NOW are listed for attribution."""
+def _component_sources(repo: Path) -> tuple[list, dict] | None:
+    """(_SHARED, COMPONENT_SOURCES) parsed STATICALLY out of the research lane's runtime.py (AST; the research lane is never
+    imported). Only list/dict/str literals, ``+`` and earlier module names are evaluated; anything else -> None."""
+    import ast
+    try:
+        tree = ast.parse((repo / "talonx_opportunity" / "runtime.py").read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    env: dict = {}
+
+    def ev(n):
+        if isinstance(n, ast.Constant) and isinstance(n.value, str):
+            return n.value
+        if isinstance(n, ast.Name):
+            return env[n.id]
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Add):
+            return ev(n.left) + ev(n.right)
+        if isinstance(n, (ast.List, ast.Tuple)):
+            return [ev(e) for e in n.elts]
+        if isinstance(n, ast.JoinedStr):                     # f"evaluator:{h}"
+            return "".join(ev(v.value) if isinstance(v, ast.FormattedValue) else ev(v) for v in n.values)
+        if isinstance(n, ast.Dict):
+            d = {}
+            for k, v in zip(n.keys, n.values):
+                d.update(ev(v) if k is None else {ev(k): ev(v)})  # k None = **{...}
+            return d
+        if isinstance(n, ast.DictComp) and len(n.generators) == 1 and isinstance(n.generators[0].target, ast.Name):
+            g, out = n.generators[0], {}
+            for item in ev(g.iter):
+                env[g.target.id] = item
+                out[ev(n.key)] = ev(n.value)
+            env.pop(g.target.id, None)
+            return out
+        raise ValueError(type(n).__name__)
+    for node in tree.body:
+        tgt = node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1 else \
+            node.target if isinstance(node, ast.AnnAssign) else None
+        if isinstance(tgt, ast.Name) and tgt.id in ("_P", "_SHARED", "COMPONENT_SOURCES") and node.value is not None:
+            try:
+                env[tgt.id] = ev(node.value)
+            except (KeyError, ValueError):
+                return None
+    if "_SHARED" not in env or "COMPONENT_SOURCES" not in env:
+        return None
+    return env["_SHARED"], env["COMPONENT_SOURCES"]
+
+
+def _checkout_version(repo: Path, shared: list, sources: dict, component: str) -> str:
+    """Same content hash as talonx_opportunity.runtime.component_version, over the files in this checkout."""
+    import hashlib
+    h = hashlib.sha256()
+    for rel in sorted(set(sources.get(component, []) + shared)):
+        f = repo / rel
+        h.update(rel.encode())
+        h.update(f.read_bytes().replace(b"\r\n", b"\n") if f.exists() else b"MISSING")
+    return h.hexdigest()[:12]
+
+
+def version_attribution(loaded: dict, repo: Path | None = None) -> dict:
+    """Per component: the source version it LOADED vs the version of its own sources in this checkout now, plus the
+    commit attribution. "Stale" is decided only by the component's OWN source hash, never by HEAD moving: a later
+    commit touching other code (e.g. Intelligence, or another component) leaves it CURRENT. ``-dirty`` = tracked edits
+    existed at load (exact content unknown; files dirty NOW are listed). No runtime evidence -> UNKNOWN.
+    ``loaded`` maps component -> {"commit_sha", "version"} (or None)."""
     repo = Path(repo or REPO_ROOT)
     head = (_git(repo, "rev-parse", "HEAD") or "").strip() or None
     dirty_now = [ln[3:] for ln in (_git(repo, "status", "--porcelain", "--untracked-files=no") or "").splitlines()]
+    src = _component_sources(repo)
     out = {"repo_head": head[:12] if head else "UNKNOWN", "dirty_tracked_files_now": dirty_now, "components": {}}
-    memo: dict = {}
-    for name, loaded in commits.items():
-        if not loaded or loaded == "unknown":
-            out["components"][name] = {"loaded_commit": "UNKNOWN", "status": "UNKNOWN (no runtime evidence)"}
+    for name, row in loaded.items():
+        row = row or {}
+        commit, ver = row.get("commit_sha"), row.get("version")
+        if not ver:
+            out["components"][name] = {"loaded_commit": commit or "UNKNOWN", "loaded_version": "UNKNOWN",
+                                       "status": "UNKNOWN (no runtime evidence)"}
             continue
-        sha, dirty = loaded.removesuffix("-dirty"), loaded.endswith("-dirty")
-        if head is None:
-            st = "UNKNOWN (repo HEAD unreadable)"
-        elif head.startswith(sha):
-            st = "MATCHES_HEAD"
+        if src is None:
+            st, now_v = "UNKNOWN (component source map unreadable)", None
         else:
-            if sha not in memo:
-                memo[sha] = _git(repo, "diff", "--name-only", sha, "HEAD", "--", "talonx_opportunity/")
-            changed = memo[sha]
-            st = ("UNKNOWN (loaded commit not in this repo)" if changed is None
-                  else "COMPONENT_CODE_CHANGED_SINCE_LOAD" if changed.strip()
-                  else "LOADED_OLDER_COMMIT_NO_COMPONENT_CHANGE (not stale)")
-        out["components"][name] = {"loaded_commit": loaded, "status": st,
-                                   "dirty_at_load": "YES (exact content unknown)" if dirty else "NO"}
+            now_v = _checkout_version(repo, src[0], src[1], name)
+            st = ("CURRENT (loaded sources = checkout)" if now_v == ver
+                  else "SOURCES_CHANGED_SINCE_LOAD (restart would load different code)")
+        c = commit or "UNKNOWN"
+        out["components"][name] = {
+            "loaded_commit": c, "loaded_version": ver, "checkout_version": now_v or "UNKNOWN", "status": st,
+            "commit_vs_head": ("UNKNOWN" if not head or c == "UNKNOWN" else
+                               "SAME_COMMIT" if head.startswith(c.removesuffix("-dirty")) else "OLDER_OR_OTHER_COMMIT"),
+            "dirty_at_load": "UNKNOWN" if c == "UNKNOWN" else
+                             ("YES (exact content unknown)" if c.endswith("-dirty") else "NO")}
     return out
 
 
@@ -322,7 +383,7 @@ def read_opportunity_status(root=None, *, now: datetime | None = None) -> dict:
     latest = deps[0] if deps else None
     out["system"] = {"overall": overall, "commit": next((c.get("commit_sha") for c in comps.values()
                                                          if c.get("commit_sha")), None),
-                     "versions": version_attribution({n: (comps.get(n) or {}).get("commit_sha") for n in COMPONENTS}),
+                     "versions": version_attribution({n: comps.get(n) for n in COMPONENTS}),
                      "latest_deployment": {k: latest[k] for k in ("deployment_id", "at_utc", "component",
                                                                   "classification", "reason")} if latest else None,
                      "recent_errors": errs}

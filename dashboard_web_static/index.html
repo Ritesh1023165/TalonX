@@ -862,7 +862,8 @@ function renderOpportunity(d){
        {label:'health', get:r=>r.health},{label:'hb age s', get:r=>r.heartbeat_age_s},{label:'restarts', get:r=>r.restarts},
        {label:'source version', get:r=>r.version},
        {label:'loaded commit', get:r=>((ver.components||{})[r.component]||{}).loaded_commit||'UNKNOWN'},
-       {label:'vs HEAD', get:r=>((ver.components||{})[r.component]||{}).status||'UNKNOWN'},
+       {label:'own sources', get:r=>((ver.components||{})[r.component]||{}).status||'UNKNOWN'},
+       {label:'commit vs HEAD', get:r=>((ver.components||{})[r.component]||{}).commit_vs_head||'UNKNOWN'},
        {label:'dirty at load', get:r=>((ver.components||{})[r.component]||{}).dirty_at_load||'UNKNOWN'}], 12, r=>r.component)+`</div>`;
   h+=`<div class="card"><h3>Paper (V2, read-only)</h3>`+kv('v2', esc(JSON.stringify((d.paper||{}).v2||{}).slice(0,160)))+
      kv('research paper orders', num((d.paper||{}).research_lane_paper_orders))+`</div>`;

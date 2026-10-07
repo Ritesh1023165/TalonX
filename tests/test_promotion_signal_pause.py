@@ -299,33 +299,67 @@ def _git(cwd, *a):
     return subprocess.run(["git", *a], cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
 
 
+RUNTIME_STUB = """
+_P = "talonx_opportunity/"
+_SHARED = [_P + "runtime.py"]
+COMPONENT_SOURCES: dict[str, list[str]] = {
+    "promotion": [_P + "promotion.py"],
+    **{f"evaluator:{h}": [_P + "evaluators.py"] for h in ("INTRADAY", "SAME_DAY")},
+}
+"""
+
+
 @pytest.fixture
 def repo(tmp_path):
     r = tmp_path / "repo"
-    r.mkdir()
+    (r / "talonx_opportunity").mkdir(parents=True)
+    (r / "talonx_ingest").mkdir()
     _git(r, "init", "-q")
     _git(r, "config", "user.email", "t@t")
     _git(r, "config", "user.name", "t")
-    (r / "talonx_opportunity").mkdir()
-    (r / "talonx_opportunity" / "a.py").write_text("x=1\n")
-    (r / "talonx_ingest").mkdir()
+    (r / "talonx_opportunity" / "runtime.py").write_text(RUNTIME_STUB)
+    (r / "talonx_opportunity" / "promotion.py").write_text("x=1\n")
+    (r / "talonx_opportunity" / "evaluators.py").write_text("e=1\n")
     (r / "talonx_ingest" / "i.py").write_text("y=1\n")
     _git(r, "add", ".")
     _git(r, "commit", "-qm", "c1")
     return r
 
 
-def test_loaded_version_differing_from_head_only_by_intelligence_is_not_stale(repo):
-    loaded = _git(repo, "rev-parse", "HEAD")[:12]
-    (repo / "talonx_ingest" / "i.py").write_text("y=2\n")
-    _git(repo, "commit", "-qam", "intel only")
-    v = R.version_attribution({"promotion": loaded + "-dirty", "notifier": None}, repo)
-    assert v["repo_head"] == _git(repo, "rev-parse", "HEAD")[:12] != loaded
-    assert v["components"]["promotion"]["status"].startswith("LOADED_OLDER_COMMIT_NO_COMPONENT_CHANGE")
-    assert v["components"]["promotion"]["dirty_at_load"].startswith("YES")
+def _loaded(repo, name):
+    srcs = R._component_sources(repo)
+    return {"commit_sha": _git(repo, "rev-parse", "HEAD")[:12] + "-dirty",
+            "version": R._checkout_version(repo, srcs[0], srcs[1], name)}
+
+
+def test_static_source_map_matches_runtime_and_hashes_agree():
+    from talonx_opportunity import runtime as RT
+    shared, sources = R._component_sources(REPO)
+    assert shared == RT._SHARED and sources == RT.COMPONENT_SOURCES
+    for n in ("promotion", "ingestion", "evaluator:INTRADAY", "sentinel"):
+        assert R._checkout_version(REPO, shared, sources, n) == RT.component_version(n)
+
+
+def test_loaded_version_differing_from_head_by_other_code_is_not_stale(repo):
+    loaded = {"promotion": _loaded(repo, "promotion"), "evaluator:INTRADAY": _loaded(repo, "evaluator:INTRADAY"),
+              "notifier": None}
+    (repo / "talonx_ingest" / "i.py").write_text("y=2\n")                 # an Intelligence-only commit
+    (repo / "talonx_opportunity" / "evaluators.py").write_text("e=2\n")   # ...and another component's code
+    _git(repo, "commit", "-qam", "later commits")
+    v = R.version_attribution(loaded, repo)
+    p = v["components"]["promotion"]
+    assert v["repo_head"] != p["loaded_commit"][:12]
+    assert p["status"].startswith("CURRENT") and p["commit_vs_head"] == "OLDER_OR_OTHER_COMMIT"
+    assert p["dirty_at_load"].startswith("YES")
+    assert v["components"]["evaluator:INTRADAY"]["status"].startswith("SOURCES_CHANGED_SINCE_LOAD")
     assert v["components"]["notifier"]["status"].startswith("UNKNOWN")
-    (repo / "talonx_opportunity" / "a.py").write_text("x=2\n")
-    assert v and R.version_attribution({"p": loaded}, repo)["dirty_tracked_files_now"] == ["talonx_opportunity/a.py"]
-    _git(repo, "commit", "-qam", "component change")
-    assert R.version_attribution({"p": loaded}, repo)["components"]["p"]["status"] == \
-        "COMPONENT_CODE_CHANGED_SINCE_LOAD"
+    (repo / "talonx_opportunity" / "promotion.py").write_text("x=2\n")    # uncommitted edit to its own source
+    v = R.version_attribution(loaded, repo)
+    assert v["dirty_tracked_files_now"] == ["talonx_opportunity/promotion.py"]
+    assert v["components"]["promotion"]["status"].startswith("SOURCES_CHANGED_SINCE_LOAD")
+
+
+def test_unreadable_source_map_is_unknown_not_stale(repo):
+    loaded = {"promotion": _loaded(repo, "promotion")}
+    (repo / "talonx_opportunity" / "runtime.py").write_text("COMPONENT_SOURCES = build()\n")
+    assert R.version_attribution(loaded, repo)["components"]["promotion"]["status"].startswith("UNKNOWN")
