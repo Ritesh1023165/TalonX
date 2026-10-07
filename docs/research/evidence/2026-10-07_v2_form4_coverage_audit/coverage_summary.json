@@ -1,0 +1,75 @@
+{
+ "symbols_total": 633,
+ "issuers_total": 629,
+ "by_symbol": {
+  "INTENTIONALLY_OUT_OF_SCOPE": 537,
+  "CONFIGURED_AND_SUCCESSFULLY_POLLED_WITH_FILINGS": 24,
+  "CONFIGURED_AND_SUCCESSFULLY_POLLED_NO_FILINGS": 15,
+  "IDENTITY_UNRESOLVED": 57
+ },
+ "by_issuer": {
+  "INTENTIONALLY_OUT_OF_SCOPE": 533,
+  "CONFIGURED_AND_SUCCESSFULLY_POLLED_WITH_FILINGS": 24,
+  "CONFIGURED_AND_SUCCESSFULLY_POLLED_NO_FILINGS": 15,
+  "IDENTITY_UNRESOLVED": 57
+ },
+ "symbols_in_626": 626,
+ "symbols_in_39": 39,
+ "symbols_in_48": 48,
+ "39_subset_of_626": true,
+ "626_unresolved_cik": 57,
+ "626_resolved_cik": 569,
+ "shared_cik_groups": {
+  "0001754301": [
+   "FOX",
+   "FOXA"
+  ],
+  "0001652044": [
+   "GOOG",
+   "GOOGL"
+  ],
+  "0001564708": [
+   "NWS",
+   "NWSA"
+  ],
+  "0001336917": [
+   "UA",
+   "UAA"
+  ]
+ },
+ "poll_history": {
+  "first": "2026-09-24T04:22:12.011712+00:00",
+  "last": "2026-10-07T17:36:01.559422+00:00",
+  "cycles": 4649,
+  "all_success_cycles": 4637,
+  "partial_failure_cycles": 12,
+  "last_all_success": "2026-10-07T17:36:01.559422+00:00"
+ },
+ "in39_with_filings_since_campaign": 24,
+ "in39_codeP_rows_since_0823": {
+  "ABCL": [
+   1,
+   1
+  ],
+  "ADC": [
+   6,
+   3
+  ],
+  "ORCL": [
+   1,
+   1
+  ]
+ },
+ "out_of_scope_codeP_rows_since_0823": 14,
+ "out_of_scope_symbols_with_codeP_since_0823": [
+  "ALLE",
+  "AMT",
+  "AON",
+  "BSX",
+  "CINF",
+  "CZR",
+  "DVN",
+  "ECL"
+ ],
+ "out_of_scope_last_form4_ingested": "2026-09-15T20:46:43"
+}
