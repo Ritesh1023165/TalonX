@@ -117,8 +117,9 @@ def component_health(row: dict | None, now: datetime, *, root: Path | None = Non
 # no operator mistakes a delivery count for evidence of value. Source: committed evidence only (descriptive constant).
 PAPER_SIGNAL_VERDICT = {
     "status": "NEGATIVE",
-    "statement": "Not a validated profitable strategy. Measured negative after costs; Signal-bot delivery paused "
-                 "2026-10-07 by owner decision (product policy, not a new strategy verdict).",
+    "statement": "Not a validated profitable strategy. Measured negative after costs. Signal-bot delivery was "
+                 "paused 2026-10-07 and is restored only as UNVALIDATED research-review alerts (owner direction): "
+                 "review items, not trade events, not buy instructions, independent of any paper admission.",
     "verdict": "INTRADAY_PREMISE_FAILURE_SUPPORTED / NO_EDGE_OBSERVED",
     "evidence": "VR replay 2026-09-28..29, CONTROL_VR_LIFECYCLE n=297: gross -0.094%, net -0.608%, PF 0.29",
     "cost_model": "max(20 bps, measured entry spread) per round trip",
@@ -151,7 +152,8 @@ def _lane_counts(con, table: str, *, created: str, where: str = "", args=(), sin
 
 
 def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
-    lane = {"lane": "PAPER_SIGNAL_PROMOTION", "label": "Opportunity promotion (PAPER_SIGNAL)",
+    lane = {"lane": "PAPER_SIGNAL_PROMOTION", "label": "Opportunity promotion: research-review alerts",
+            "alert_class": "RESEARCH_REVIEW (not a trade event)",
             "destination": "TRADE_EVENT", "bot": "Signal", "source": "results/opportunity/"
             "promotion_signal_notifications.db + promotion.db", "research_status": PAPER_SIGNAL_VERDICT}
     det = _j((comp or {}).get("detail_json"), {}) or {}
@@ -163,11 +165,21 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
     pf = r / "control" / "promotion_signal_delivery.json"
     if pf.exists():
         d = _j(pf.read_text(encoding="utf-8"), None)
-        cfg = {k: d.get(k) for k in ("paused", "effective_utc", "effective_local", "decision", "policy_id")} \
+        cfg = {k: d.get(k) for k in ("paused", "effective_utc", "effective_local", "decision", "policy_id",
+                                     "delivery_mode", "delivery_boundary_utc", "delivery_boundary_local")} \
             if isinstance(d, dict) else {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE"}
     cfg_paused = bool(cfg and cfg.get("paused") is True)
+    if loaded and loaded.startswith("RESEARCH_REVIEW"):
+        loaded = "RESEARCH_REVIEW"
     if comp is None or not loaded:
         mode = "UNKNOWN (no runtime evidence from the promotion component)"
+    elif loaded == "RESEARCH_REVIEW" and cfg_paused:
+        mode = "PAUSE_CONFIGURED_NOT_YET_LOADED (component restart pending)"
+    elif loaded == "RESEARCH_REVIEW":
+        mode = ("RESEARCH_REVIEW_DELIVERY_ENABLED (UNVALIDATED review alerts to the Signal bot since "
+                f"{det.get('delivery_boundary_utc') or (cfg or {}).get('delivery_boundary_utc') or 'UNKNOWN'})")
+    elif cfg and cfg.get("delivery_mode") == "RESEARCH_REVIEW" and not cfg_paused and loaded == "PAUSED":
+        mode = "REVIEW_DELIVERY_CONFIGURED_NOT_YET_LOADED (still paused until the component restarts)"
     elif loaded == "PAUSED":
         mode = "PAUSED (record-only: promotions recorded, no Signal-bot delivery)"
     elif cfg_paused:
@@ -178,7 +190,12 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
     ob = _ro(r / "promotion_signal_notifications.db")
     if ob:
         lane["notifications"] = _lane_counts(ob, "ops_notification_outbox", created="created_at_utc",
-                                             where="event_type='PAPER_OPPORTUNITY'", since=since)
+                                             where="event_type IN ('PAPER_OPPORTUNITY','RESEARCH_OPPORTUNITY')",
+                                             since=since)
+        lane["notifications"]["by_event_type"] = {
+            et: _lane_counts(ob, "ops_notification_outbox", created="created_at_utc", where="event_type=?",
+                             args=(et,), since=since)["history"]
+            for et in ("PAPER_OPPORTUNITY", "RESEARCH_OPPORTUNITY")}
         lane["notifications"]["suppressed_by_policy"] = ob.execute(
             "SELECT COUNT(*) FROM ops_notification_outbox WHERE last_error LIKE 'SUPPRESSED_POLICY_PAUSE%'").fetchone()[0]
         ob.close()
@@ -189,9 +206,37 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
             "period": dict(pc.execute("SELECT state, COUNT(*) FROM promotions WHERE queued_utc >= ? GROUP BY 1",
                                       (since,)).fetchall()),
             "recorded_while_paused": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
-                                                "'SIGNAL_DELIVERY_PAUSED'").fetchone()[0]}
+                                                "'SIGNAL_DELIVERY_PAUSED'").fetchone()[0],
+            "review_alerts_promoted": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
+                                                 "'RESEARCH_REVIEW_ALERT'").fetchone()[0],
+            "pre_restoration_record_only": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
+                                                      "'PRE_RESTORATION_RECORD_ONLY'").fetchone()[0]}
         pc.close()
     return lane
+
+
+def vr_entry_collection(vr: Path) -> dict:
+    """VR_PAPER_V1 entry control as configured (entry_control.json) and as last reported by the tracker heartbeat."""
+    out = {"entry_control_configured": "NONE", "entry_control_loaded": "UNKNOWN"}
+    f = vr / "entry_control.json"
+    if f.exists():
+        d = _j(f.read_text(encoding="utf-8"), None)
+        out["entry_control_configured"] = (("ENTRIES_BLOCKED since " + str(d.get("boundary_utc")))
+                                           if isinstance(d, dict) and d.get("entries_blocked") is True else
+                                           "ENTRIES_OPEN" if isinstance(d, dict) and d.get("entries_blocked") is False
+                                           else "MALFORMED (tracker blocks all new entries)")
+    con = _ro(vr / "vr_live.db")
+    if con:
+        r = con.execute("SELECT at_utc, detail_json FROM heartbeat WHERE component='vr_paper'").fetchone()
+        con.close()
+        if r:
+            det = _j(r[1], {}) or {}
+            out["entry_control_loaded"] = det.get("entry_control") or "NOT_REPORTED (tracker predates the control)"
+            out["tracker_heartbeat_utc"] = r[0]
+    out["mode"] = ("ENTRY COLLECTION INTERRUPTED (both arms; open positions still managed)"
+                   if out["entry_control_loaded"] in ("BLOCKED", "MALFORMED_BLOCKING")
+                   else f"ENTRY CONTROL {out['entry_control_loaded']} (configured: {out['entry_control_configured']})")
+    return out
 
 
 def notification_lanes(root=None, *, now: datetime | None = None, repo: Path | None = None,
@@ -244,6 +289,8 @@ def notification_lanes(root=None, *, now: datetime | None = None, repo: Path | N
                 con.close()
         except sqlite3.Error as exc:
             lane["mode"] = f"UNREADABLE ({type(exc).__name__})"
+        if key == "VR_PAPER":
+            lane.update(vr_entry_collection(repo / "results" / "vr_paper"))
         lanes.append(lane)
     return {"period": {"start_utc": since, "end_utc": now.isoformat(), "label": f"{start.date()} UTC day so far",
                        "timezone": LONDON_NOTE},

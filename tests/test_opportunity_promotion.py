@@ -180,7 +180,10 @@ def test_13_paper_signal_enqueues_to_trade_event_destination_with_signal_credent
 
 def test_14_lab_credentials_and_default_client_never_referenced():
     src = (REPO / "talonx_opportunity" / "promotion.py").read_text(encoding="utf-8")
-    assert "RESEARCH" not in src.replace("RESEARCH_", "") and "TelegramClient(" not in src
+    # 2026-10-07: the review label "RESEARCH OPPORTUNITY" is message text; what must never appear is the Lab
+    # (RESEARCH) destination or its credentials.
+    for banned in ("import RESEARCH", ", RESEARCH", "destination=RESEARCH", "TALONX_NOTIFY_RESEARCH", "TelegramClient("):
+        assert banned not in src, banned
     assert "TELEGRAM_BOT_TOKEN" not in src
 
 

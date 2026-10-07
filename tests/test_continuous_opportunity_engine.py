@@ -487,8 +487,11 @@ def test_15b_promotion_is_the_only_signal_producer_and_only_paper_opportunities(
     for forbidden in ("import talonx_v2", "from talonx_v2", "/v2/orders", "paper_trading.db", "submit_order",
                       "execute_buy", "execute_sell", "OPERATIONS", 'event_type="TRADE_EVENT"'):
         assert forbidden not in text, forbidden
-    assert text.count("destination=TRADE_EVENT") == 2 and 'event_type="PAPER_OPPORTUNITY"' in text   # enqueue + drain
-    assert "if self.mode == PAPER_SIGNAL and self.outbox is not None:" in text                         # enqueue gate
+    # 2026-10-07: restored deliveries are RESEARCH_OPPORTUNITY review alerts (owner direction); legacy rows keep
+    # PAPER_OPPORTUNITY. Still exactly one enqueue + one drain to TRADE_EVENT, gated on PAPER_SIGNAL mode.
+    assert text.count("destination=TRADE_EVENT") == 2 and '"PAPER_OPPORTUNITY"' in text            # enqueue + drain
+    assert 'REVIEW_EVENT_TYPE = "RESEARCH_OPPORTUNITY"' in text
+    assert "elif self.mode == PAPER_SIGNAL and self.outbox is not None:" in text                       # enqueue gate
     assert "if self.mode != PAPER_SIGNAL or self.outbox is None:\n            return None" in text      # drain gate
     assert 'str((env if env is not None else os.environ).get(MODE_ENV, SHADOW))' in text      # default SHADOW
     # every OTHER lane source is still held to test_15's AST guard (no TRADE_EVENT / OPERATIONS name in code)

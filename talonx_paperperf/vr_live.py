@@ -12,6 +12,14 @@ Engine component: it never touches runtime.py hashes, discovery, ingestion, prom
   recovery  every state transition is durable; alerts are idempotent by event id (VR_ENTRY:/VR_EXIT:<trade_id>),
             so a restart restores OPEN positions and never replays a completed trade or re-sends an alert.
 If this process dies, Signals are unaffected (it is read-only on every production store).
+
+ENTRY CONTROL (2026-10-07, owner decision; enforces results/vr_paper/ARM_INTERRUPTION_2026-10-07.json in code).
+  ``results/vr_paper/entry_control.json`` {"entries_blocked": true, "boundary_utc": ...} closes BOTH arms to new
+  entries: Signals decided at/after the boundary never become trades (the cursor still advances, so a later
+  rollback cannot replay them), and no PAPER_ENTRY_PENDING row whose Signal is at/after the boundary can open.
+  OPEN positions keep being managed to exit. A malformed / unreadable control blocks ALL new entries (fail safe)
+  and is reported in the heartbeat. No control file = the original (uninterrupted) behaviour.
+  ACTIONABLE: a Signal SENT at or after its session's flatten (15:50 ET) is SENT_AFTER_FLATTEN (never enters).
 usage: python -m talonx_paperperf.vr_live run [--once] [--until YYYY-MM-DD]  |  eod WINDOW_ID
 """
 from __future__ import annotations
@@ -53,6 +61,36 @@ CREATE TABLE IF NOT EXISTS trades (
 
 def ts(s):
     return V.ts(s)
+
+
+ENTRY_CONTROL = "entry_control.json"
+
+
+def entry_control(root: Path = OUT) -> dict:
+    """{"state": OPEN | BLOCKED | MALFORMED_BLOCKING, "boundary_utc": datetime|None, "detail": str}."""
+    f = root / ENTRY_CONTROL
+    if not f.exists():
+        return {"state": "OPEN", "boundary_utc": None, "detail": "no entry control"}
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(d, dict) or not isinstance(d.get("entries_blocked"), bool):
+            raise ValueError("entries_blocked must be a boolean")
+        if not d["entries_blocked"]:
+            return {"state": "OPEN", "boundary_utc": None, "detail": "entries_blocked=false"}
+        b = ts(d["boundary_utc"])
+        if b.tzinfo is None:
+            raise ValueError("boundary_utc must be timezone-aware")
+        return {"state": "BLOCKED", "boundary_utc": b, "detail": d.get("record", "")}
+    except Exception as exc:  # noqa: BLE001 -- fail safe: unreadable control blocks every new entry, loudly
+        return {"state": "MALFORMED_BLOCKING", "boundary_utc": None, "detail": f"{type(exc).__name__}: {exc}"[:200]}
+
+
+def entry_blocked(ctl: dict, decision_utc: str | None) -> bool:
+    if ctl["state"] == "MALFORMED_BLOCKING":
+        return True
+    if ctl["state"] == "BLOCKED":
+        return decision_utc is None or ts(decision_utc) >= ctl["boundary_utc"]
+    return False
 
 
 def iso(t):
@@ -174,6 +212,23 @@ class VRLive:
 
     def ingest(self, wid: str) -> int:
         sigs = self.new_signals(wid)
+        ctl = entry_control(self.root)
+        if ctl["state"] != "OPEN":
+            blocked = [s for s in sigs if entry_blocked(ctl, s["decision_utc"])]
+            if blocked:
+                # never become trades; the cursor advances past them so a rollback of the control cannot replay them
+                key = f"entry_control_blocked:{wid}"
+                r = self.con.execute("SELECT v FROM meta WHERE k=?", (key,)).fetchone()
+                prev = json.loads(r[0]) if r else {"signals": 0}
+                with self.con:
+                    self.con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)", (key, json.dumps(
+                        {"signals": prev["signals"] + len(blocked), "control": ctl["state"],
+                         "through": blocked[-1]["decision_utc"]})))
+                    self.con.execute("INSERT OR REPLACE INTO cursor VALUES (?,?,?)",
+                                     (wid, sigs[-1]["decision_utc"], sigs[-1]["promotion_id"]))
+                sigs = [s for s in sigs if s not in blocked]
+                if not sigs:
+                    return 0
         fresh = self.con.execute("SELECT 1 FROM cursor WHERE name=?", (wid,)).fetchone() is None
         if fresh and self.skip_backlog and sigs:
             # first start inside a running session: Signals decided before the tracker existed are NOT replayed live
@@ -228,8 +283,11 @@ class VRLive:
                     exited += self._try_exit(t, clock, T, flat, wid)
             else:
                 exited += self._try_exit(t, clock, T, flat, wid)
+        ctl = entry_control(self.root)
         self.heartbeat(T, {"window": wid, "new_signals": n_new, "opened": opened, "exited": exited,
-                           "open_vr": self.n_open("VIRTUAL_REALTIME", wid), "open_act": self.n_open("ACTIONABLE", wid)})
+                           "open_vr": self.n_open("VIRTUAL_REALTIME", wid), "open_act": self.n_open("ACTIONABLE", wid),
+                           "entry_control": ctl["state"], "entry_boundary_utc": iso(ctl["boundary_utc"])
+                           if ctl["boundary_utc"] else None, "entry_control_detail": ctl["detail"]})
         d = self.drain()
         return {"virtual_time": iso(T), "new": n_new, "opened": opened, "exited": exited, "drain": d}
 
@@ -243,6 +301,8 @@ class VRLive:
 
     def _try_open(self, t, clock, T, p, window, pw, prev, flat, wid) -> int:
         sig = dict(p.execute("SELECT * FROM promotions WHERE promotion_id=?", (t["promotion_id"],)).fetchone())
+        if entry_blocked(entry_control(self.root), sig.get("decision_utc")):
+            return 0                                          # interrupted arm: stays pending, never opens
         M = ts(sig["data_as_of_utc"])
         after = M
         wall = self.sent_time(sig)
@@ -250,6 +310,9 @@ class VRLive:
             if not wall:
                 if T > flat:
                     self._skip(t, "NEVER_SENT_BEFORE_FLATTEN")
+                return 0
+            if ts(wall) >= flat:                              # sent at/after this session's flatten: no entry
+                self._skip(t, "SENT_AFTER_FLATTEN")
                 return 0
             from talonx_paperperf.signal_forensics import ceil_min
             after = ceil_min(ts(wall))

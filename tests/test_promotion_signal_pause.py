@@ -79,13 +79,22 @@ def test_malformed_pause_file_fails_safe_to_paused(tmp_path):
     assert pr.mode == P.SHADOW and pr.pause["decision"] == "UNREADABLE_CONTROL_FILE_FAIL_SAFE" and d.calls == 0
 
 
-def test_paused_false_or_absent_file_keeps_existing_behaviour(tmp_path):
+def test_paused_false_without_a_boundary_stays_paused_fail_safe(tmp_path):
+    # 2026-10-07 (review restoration): a resumption must name its delivery boundary, otherwise it stays paused
     pause(tmp_path, {**PAUSE, "paused": False})
     d = Drains()
     pr = signal_promoter(tmp_path, T(15), d)
     seed(tmp_path, [dict(sym="AAA", at=T(15))])
     pr.tick()
-    assert pr.mode == P.PAPER_SIGNAL and d.calls == 1
+    assert pr.mode == P.SHADOW and pr.pause["decision"] == "RESUME_WITHOUT_VALID_BOUNDARY_FAIL_SAFE" and d.calls == 0
+
+
+def test_absent_control_file_keeps_legacy_paper_signal_behaviour(tmp_path):
+    d = Drains()
+    pr = signal_promoter(tmp_path, T(15), d)
+    seed(tmp_path, [dict(sym="AAA", at=T(15))])
+    pr.tick()
+    assert pr.mode == P.PAPER_SIGNAL and pr.delivery_boundary is None and d.calls == 1
     assert list(outbox(tmp_path).values())[0][0] == "PENDING"
 
 
@@ -133,8 +142,9 @@ def test_no_replay_on_restart_or_resumption(tmp_path):
     seed(tmp_path, [dict(sym=f"Q{i}", at=T(15, 6), asof=T(14, 50), score=60 + i) for i in range(5)])
     pr.tick()                                                              # 3 released (record-only) + 2 queued
     assert rows(pr, "SELECT COUNT(*) FROM promotions WHERE state='QUEUED'") == [(2,)]
-    # explicit resumption: paused=false + restart. Nothing suppressed or queued while paused is sent.
-    pause(tmp_path, {**PAUSE, "paused": False})
+    # explicit resumption: paused=false + boundary + restart. Nothing suppressed or queued while paused is sent.
+    pause(tmp_path, {**PAUSE, "paused": False, "delivery_mode": "RESEARCH_REVIEW",
+                     "delivery_boundary_utc": T(15, 12).isoformat()})
     sent = []
     from talonx_ops.notify.outbox import NotifyStore
 
@@ -155,7 +165,7 @@ def test_no_replay_on_restart_or_resumption(tmp_path):
 def test_config_fingerprint_records_the_pause_and_main_passes_it():
     body = (REPO / "talonx_opportunity" / "promotion.py").read_text(encoding="utf-8")
     body = body[body.index("def main("):]
-    assert '"signal_delivery": "PAUSED" if pr.pause else "ACTIVE"' in body
+    assert '"signal_delivery": "PAUSED" if pr.pause else (' in body and '"RESEARCH_REVIEW@"' in body
 
 
 # ---------------------------------------------------------------------------------------------- scope (other lanes)

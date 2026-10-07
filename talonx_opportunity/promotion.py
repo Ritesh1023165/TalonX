@@ -30,6 +30,13 @@ PAPER_OPPORTUNITY row (PENDING / RETRY / HELD -> EXPIRED, last_error ``SUPPRESSE
 replay later. SENT and AMBIGUOUS rows are never touched. Promotion records and paper outcomes continue unchanged. A
 malformed control file is treated as PAUSED (fail safe: no send). Resuming needs an explicit edit (``"paused": false``)
 plus a restart; rows queued while paused then expire (MODE_SWITCH_NO_CARRYOVER) instead of being sent.
+
+RESEARCH-REVIEW DELIVERY (owner direction 2026-10-07). Resumption is ``"paused": false`` + ``"delivery_mode":
+"RESEARCH_REVIEW"`` + a timezone-aware ``"delivery_boundary_utc"``. Only promotions QUEUED at/after that boundary can
+enter the Signal outbox; anything older is recorded PROMOTED_SHADOW / PRE_RESTORATION_RECORD_ONLY. Messages are
+labelled "TALONX — RESEARCH OPPORTUNITY / UNVALIDATED — not a buy instruction" with the policy's negative research
+verdict, event_type RESEARCH_OPPORTUNITY. ``paused: false`` without a valid boundary stays PAUSED (fail safe). Alert
+delivery is independent of any paper-trading admission (it never consults VR, V2 or a paper ledger).
 """
 from __future__ import annotations
 
@@ -47,6 +54,10 @@ from talonx_opportunity.store import OpportunityStore, opportunity_db
 MODE_ENV = "TALONX_OPPORTUNITY_PROMOTION_MODE"
 SHADOW, PAPER_SIGNAL = "SHADOW", "PAPER_SIGNAL"
 PAUSE_REASON = "SIGNAL_DELIVERY_PAUSED"            # promotions recorded while Signal delivery is paused
+PRE_RESTORATION = "PRE_RESTORATION_RECORD_ONLY"     # queued before the review-delivery boundary: never sent
+REVIEW_REASON = "RESEARCH_REVIEW_ALERT"             # delivered as a research-review alert (not a trade event)
+REVIEW_EVENT_TYPE = "RESEARCH_OPPORTUNITY"
+SIGNAL_EVENT_TYPES = ("PAPER_OPPORTUNITY", REVIEW_EVENT_TYPE)
 SUPPRESS_PREFIX = "SUPPRESSED_POLICY_PAUSE"        # outbox rows retired by the pause (policy, never a transport error)
 SOURCE = "OPPORTUNITY_ENGINE"
 PRODUCER = "talonx_opportunity.promotion"
@@ -122,7 +133,29 @@ def signal_delivery_pause(root=None) -> dict | None:
         d = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         return {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE", "detail": type(exc).__name__}
-    return d if d.get("paused") is True else None
+    if not isinstance(d, dict):
+        return {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE", "detail": "not an object"}
+    if d.get("paused") is False:
+        if delivery_boundary(d) is None:             # a resumption must name its boundary, else stay paused
+            return {**d, "paused": True, "decision": "RESUME_WITHOUT_VALID_BOUNDARY_FAIL_SAFE"}
+        return None
+    return d if d.get("paused") is True else {**d, "paused": True, "decision": "PAUSED_FLAG_NOT_BOOLEAN_FAIL_SAFE"}
+
+
+def delivery_boundary(d: dict | None) -> datetime | None:
+    try:
+        b = datetime.fromisoformat(str((d or {}).get("delivery_boundary_utc")).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return b if b.tzinfo is not None else None
+
+
+def signal_delivery_control(root=None) -> dict | None:
+    f = pause_path(root)
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except (OSError, ValueError):
+        return None
 
 
 def mode_from_env(env=None) -> str:
@@ -144,6 +177,36 @@ def _ref(px) -> str:
     return f"${px:,.2f}" if px >= 1 else f"${px:.4f}"
 
 
+REVIEW_VERDICT = ("NEGATIVE: this policy's evaluated paper results were negative after costs "
+                  "(VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)")
+
+
+def _age_min(asof: str | None, now: datetime) -> str:
+    try:
+        return f"{int((now - _ts(asof)).total_seconds() // 60)}m"
+    except (TypeError, ValueError):
+        return "UNKNOWN"
+
+
+def render_review(p: dict, now: datetime, policy: str) -> str:
+    """Research-review alert (owner direction 2026-10-07). Plain text. Unknown data is shown as UNKNOWN."""
+    asof = p.get("data_as_of_utc")
+    data = f"{asof[11:16]}Z (age {_age_min(asof, now)})" if asof else "UNKNOWN (age UNKNOWN)"
+    horizons = " / ".join(json.loads(p.get("horizons_json") or "[]")) or "UNKNOWN"
+    return "\n".join([
+        "🔎 TALONX — RESEARCH OPPORTUNITY",
+        "⚠️ UNVALIDATED — not a buy instruction", "",
+        f"🟢 {p['symbol']} · BULLISH setup",
+        f"⭐ Score {round(p['score'] or 0, 1)}",
+        f"💵 Ref {_ref(p.get('reference_price'))}",
+        f"🕒 Signal {now.astimezone(timezone.utc).strftime('%H:%MZ')} · {p.get('processing_phase') or 'UNKNOWN'} · data {data}",
+        f"⏱ Horizon {horizons}",
+        f"🧪 Policy {policy} (Opportunity Engine)",
+        f"📉 Research verdict: {REVIEW_VERDICT}", "",
+        "For review only · not a trade event · no order placed",
+    ])
+
+
 def render(p: dict) -> str:
     """Compact mobile-first Signal message (presentation only, 2026-09-28). Plain text (parse_mode=None). Same fields
     as before: symbol, direction, score, reference, phase + data time, horizons, paper/no-order status."""
@@ -163,6 +226,8 @@ class Promoter:
                  drain=None, data=None):
         self.requested_mode = mode
         self.pause = signal_delivery_pause(root) if mode == PAPER_SIGNAL else None
+        ctl = signal_delivery_control(root) if mode == PAPER_SIGNAL and not self.pause else None
+        self.delivery_boundary = delivery_boundary(ctl)   # None: legacy PAPER_SIGNAL (no control file at all)
         if self.pause:                               # durable owner pause overrides a PAPER_SIGNAL environment
             mode = SHADOW
         self.root, self.policy, self.mode = root, policy, mode
@@ -192,7 +257,7 @@ class Promoter:
                f"({self.pause.get('decision', 'owner')}; effective {self.pause.get('effective_utc', 'unknown')})")
         n = 0
         for r in ob.all_outbox():
-            if r.get("event_type") == "PAPER_OPPORTUNITY" and r.get("state") in ("PENDING", "RETRY", "HELD"):
+            if r.get("event_type") in SIGNAL_EVENT_TYPES and r.get("state") in ("PENDING", "RETRY", "HELD"):
                 ob.update_outbox(r["event_id"], state="EXPIRED",
                                  last_error=f"{why}; was {r['state']} after {r.get('attempts') or 0} transport attempt(s)")
                 n += 1
@@ -328,7 +393,10 @@ class Promoter:
         self.last = {"mode": self.mode, "cursor": self.cursor(), "evaluated": evaluated, "queued": queued,
                      "released": released, "drain": drained, "outcomes": outc, "policy": self.policy.version,
                      "requested_mode": self.requested_mode,
-                     "signal_delivery": "PAUSED" if self.pause else ("ACTIVE" if self.mode == PAPER_SIGNAL else "OFF"),
+                     "signal_delivery": "PAUSED" if self.pause else (
+                         ("RESEARCH_REVIEW" if self.delivery_boundary else "ACTIVE") if self.mode == PAPER_SIGNAL
+                         else "OFF"),
+                     "delivery_boundary_utc": iso(self.delivery_boundary) if self.delivery_boundary else None,
                      "pause": dict(self.pause) if self.pause else None,
                      "suppressed_pending_at_start": self.suppressed_at_start}
         return 30.0
@@ -372,22 +440,29 @@ class Promoter:
                                      (why, iso(now), (cand or {}).get("state"), q["promotion_id"]))
                 out["rejected_while_queued"] += 1
                 continue
-            state, sig = "PROMOTED_SHADOW", None
-            if self.mode == PAPER_SIGNAL and self.outbox is not None:
+            state, sig, reason = "PROMOTED_SHADOW", None, (PAUSE_REASON if self.pause else None)
+            review = self.delivery_boundary is not None
+            if (self.mode == PAPER_SIGNAL and self.outbox is not None and review
+                    and _ts(q["queued_utc"]) < self.delivery_boundary):
+                reason = PRE_RESTORATION                  # queued before restoration: record-only, never sent
+            elif self.mode == PAPER_SIGNAL and self.outbox is not None:
                 from talonx_ops.notify import TRADE_EVENT
                 sig = q["promotion_id"]
-                self.outbox.enqueue(event_id=sig, destination=TRADE_EVENT, event_type="PAPER_OPPORTUNITY",
-                                    producer=PRODUCER, dedup_key=sig, payload_text=render(q),
+                self.outbox.enqueue(event_id=sig, destination=TRADE_EVENT,
+                                    event_type=REVIEW_EVENT_TYPE if review else "PAPER_OPPORTUNITY",
+                                    producer=PRODUCER, dedup_key=sig,
+                                    payload_text=render_review(q, now, self.policy.version) if review else render(q),
                                     provenance={"source_strategy": SOURCE, "candidate_id": q["candidate_id"],
                                                 "symbol": q["symbol"], "mode": PAPER_SIGNAL, "paper_only": True,
-                                                "not_a_v2_trade_event": True, "policy": self.policy.version},
+                                                "not_a_v2_trade_event": True, "policy": self.policy.version,
+                                                "research_review_alert": review, "unvalidated": True},
                                     deliver_by_utc=iso(now + timedelta(minutes=30)))
                 state = "PROMOTED_SIGNAL"
+                reason = REVIEW_REASON if review else None
             with self.con:
                 self.con.execute("UPDATE promotions SET state=?, decision_utc=?, promotion_mode=?, signal_event_id=?, "
                                  "lifecycle_state=?, reason_code=COALESCE(?, reason_code) WHERE promotion_id=?",
-                                 (state, iso(now), self.mode, sig, cand.get("state"),
-                                  PAUSE_REASON if self.pause else None, q["promotion_id"]))
+                                 (state, iso(now), self.mode, sig, cand.get("state"), reason, q["promotion_id"]))
             used += 1
             out["promoted"] += 1
         return out
@@ -487,5 +562,6 @@ def main(argv=None) -> int:
     src = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:12]
     run_component("promotion", tick=pr.tick, root=root, detail=pr.detail,
                   config_fps={"PROMOTION_POLICY": PROMOTION_V1.fingerprint(), "mode": mode, "promotion_src": src,
-                              "signal_delivery": "PAUSED" if pr.pause else "ACTIVE"})
+                              "signal_delivery": "PAUSED" if pr.pause else (
+                                  "RESEARCH_REVIEW@" + iso(pr.delivery_boundary) if pr.delivery_boundary else "ACTIVE")})
     return 0

@@ -809,13 +809,20 @@ function renderNotificationLanes(L){
   const p=L.lanes.find(x=>x.lane==='PAPER_SIGNAL_PROMOTION');
   if(p){
     const rs=p.research_status||{}, pr=p.promotions||{}, cp=p.configured_pause||{};
-    h+=`<div class="card card-wide"><h3>PAPER_SIGNAL promotion lane ${pill(rs.status)}</h3>`+
+    const bt=(p.notifications||{}).by_event_type||{};
+    h+=`<div class="card card-wide"><h3>Opportunity research-review alerts ${pill(rs.status)}</h3>`+
+      kv('alert class', esc(p.alert_class||'RESEARCH_REVIEW (not a trade event)'))+
       `<div class="banner internal">${esc(rs.statement||'')}</div>`+
       kv('Signal-bot delivery mode', esc(p.mode))+
-      kv('pause configured', cp.paused?esc(`yes · effective ${cp.effective_utc||'?'} (${cp.effective_local||''}) · ${cp.policy_id||''}`):'no')+
+      kv('pause configured', cp.paused?esc(`yes · effective ${cp.effective_utc||'?'} (${cp.effective_local||''}) · ${cp.policy_id||''}`):esc(`no · ${cp.delivery_mode||''}`))+
       kv('promotions (all) by state', esc(JSON.stringify(pr.history||{})))+
       kv('promotions (period) by state', esc(JSON.stringify(pr.period||{})))+
+      kv('delivery boundary', esc(cp.delivery_boundary_utc?`${cp.delivery_boundary_utc} (${cp.delivery_boundary_local||''})`:'none'))+
       kv('promotions recorded while paused', num(pr.recorded_while_paused))+
+      kv('review alerts promoted (since boundary)', num(pr.review_alerts_promoted))+
+      kv('pre-restoration record-only', num(pr.pre_restoration_record_only))+
+      kv('review-alert rows by state', esc(JSON.stringify(bt.RESEARCH_OPPORTUNITY||{})))+
+      kv('legacy PAPER_OPPORTUNITY rows by state', esc(JSON.stringify(bt.PAPER_OPPORTUNITY||{})))+
       kv('Signal-bot messages sent (all, confirmed)', num((nh(p)||{}).SENT))+
       kv('research verdict', esc(rs.verdict))+kv('evidence', esc(rs.evidence))+kv('cost model', esc(rs.cost_model))+
       kv('source / as of', esc(`${rs.source||''} · ${rs.as_of||''}`))+`</div>`;
