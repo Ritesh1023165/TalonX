@@ -1,0 +1,104 @@
+{
+ "observed_utc": "2026-10-06T20:40:01.269319+00:00",
+ "task": {
+  "Status": "Ready",
+  "Next Run Time": "N/A",
+  "Last Run Time": "06/10/2026 21:35:00",
+  "Last Result": "1"
+ },
+ "launcher": {
+  "launched_lock": true,
+  "lock_created_utc": "2026-10-06T20:35:02.395623+00:00",
+  "log_lines": [
+   "2026-10-06T20:35:02.4572646Z precheck: lock verify",
+   "2026-10-06T20:35:02.6224273Z START: python -u -m research.erm_nominee_validation.run --window B --execute",
+   "2026-10-06T20:35:06.3950539Z END: exit 1"
+  ],
+  "start_line": "2026-10-06T20:35:02.6224273Z START: python -u -m research.erm_nominee_validation.run --window B --execute",
+  "end_line": "2026-10-06T20:35:06.3950539Z END: exit 1",
+  "refused_line": null
+ },
+ "logs": {
+  "run.out.log": {
+   "bytes": 0,
+   "mtime": "2026-10-06T20:35:02.629526+00:00"
+  },
+  "run.err.log": {
+   "bytes": 2596,
+   "mtime": "2026-10-06T20:35:06.230776+00:00"
+  },
+  "lock_verify_prerun.json": {
+   "bytes": 237,
+   "mtime": "2026-10-06T20:35:02.603632+00:00"
+  }
+ },
+ "attempt_ledger": {
+  "events": [
+   "EXECUTION_STARTED",
+   "EXECUTION_FAILED"
+  ],
+  "acquisition_attempts": 1,
+  "scoring_attempts": 0,
+  "failures": [
+   {
+    "stage": "ACQUIRE",
+    "failure_class": "ACQUISITION_BLOCKED",
+    "outcome_exposure": false,
+    "utc": "2026-10-06T20:35:06.230775+00:00"
+   }
+  ],
+  "complete": false
+ },
+ "release_journal": [
+  "PREPARED",
+  "ERM_AUDIT_WRITTEN",
+  "TASK75_LEDGER_WRITTEN",
+  "ACTIVE"
+ ],
+ "run_record": {
+  "status": "INCOMPLETE_ACQUIRE",
+  "attempt": 1,
+  "acquisition_attempt": 1,
+  "started_utc": "2026-10-06T20:35:04.141566+00:00",
+  "ended_utc": "2026-10-06T20:35:06.230775+00:00",
+  "stages_done": [],
+  "failed_stage": "ACQUIRE",
+  "failure_class": "ACQUISITION_BLOCKED",
+  "outcome_exposure": false,
+  "retry_allowed": true,
+  "error": "AcquisitionBlocked: ACQUISITION_BLOCKED at S0_SP500_COVERAGE: 1 required request(s) failed; first: {'category': 'sp500_pit', 'request': 'https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv', 'state': 'INSUFFICIENT_HISTORICAL_COVERAGE', 'required': True, 'detail': 'last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown'}",
+  "reference_date": "2026-10-06",
+  "mtime": "2026-10-06T20:35:06.230776+00:00"
+ },
+ "acquisition_status": {
+  "stage": "S0_SP500_COVERAGE",
+  "complete": false,
+  "by_category": {
+   "sp500_pit": {
+    "RETRIEVED_USABLE": 2
+   }
+  },
+  "reference_date": "2026-10-06",
+  "required_failures": [
+   {
+    "category": "sp500_pit",
+    "state": "INSUFFICIENT_HISTORICAL_COVERAGE",
+    "detail": "last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown"
+   }
+  ]
+ },
+ "acquisition_ledger": {
+  "records": 2,
+  "last_category": "sp500_pit",
+  "last_state": "RETRIEVED_USABLE",
+  "mtime": "2026-10-06T20:35:06.167751+00:00"
+ },
+ "outputs_exist": {
+  "RUN_COMPLETE.json": false,
+  "report.md": false,
+  "gates.json": false,
+  "obs.csv": false
+ },
+ "last_progress_utc": "2026-10-06T20:35:06.395054+00:00",
+ "status": "ACQUISITION_BLOCKED"
+}

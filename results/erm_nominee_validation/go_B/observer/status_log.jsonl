@@ -1,0 +1,4 @@
+{"utc": "2026-10-06T20:25:01.129479+00:00", "status": "ARMED_NOT_LAUNCHED", "stage": null, "acq_records": null, "last_progress_utc": null, "attempts": [0, 0]}
+{"utc": "2026-10-06T20:30:01.211993+00:00", "status": "ARMED_NOT_LAUNCHED", "stage": null, "acq_records": null, "last_progress_utc": null, "attempts": [0, 0]}
+{"utc": "2026-10-06T20:35:01.241878+00:00", "status": "ARMED_NOT_LAUNCHED", "stage": null, "acq_records": null, "last_progress_utc": null, "attempts": [0, 0]}
+{"utc": "2026-10-06T20:40:01.269319+00:00", "status": "ACQUISITION_BLOCKED", "stage": "INCOMPLETE_ACQUIRE", "acq_records": 2, "last_progress_utc": "2026-10-06T20:35:06.395054+00:00", "attempts": [1, 0]}

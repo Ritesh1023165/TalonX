@@ -1,0 +1,89 @@
+{
+ "absent_artifacts": [
+  "obs.csv",
+  "gates.json",
+  "diagnostics.json",
+  "manifest.csv",
+  "report.md",
+  "RUN_COMPLETE.json"
+ ],
+ "acquisition_attempts": 1,
+ "authorisation_expiry": {
+  "basis": "attempts.admit and acquirer.get refuse when UTC date > R + 1; journal state remains ACTIVE (no expiry transition in the mechanism; not edited)",
+  "europe_london": "2026-10-08T01:00:00+01:00",
+  "utc": "2026-10-08T00:00:00Z"
+ },
+ "candidate_status": "PARKED_DATA_COVERAGE_BLOCK",
+ "closeout": "ERM_NOMINEE_VALIDATION_B",
+ "closeout_report_sha256": "62e8af380841b42e918f857d772e6c4a3d6d986f74ba60d84208c843e808ba92",
+ "evidence_sha256": {
+  "results/erm_nominee_validation/ATTEMPT_LEDGER.jsonl": "24293c732ab87567a379279e10897d63c6e645b67edc67269a4ef7942c9f02c1",
+  "results/erm_nominee_validation/GUARD_RELEASE_AUTHORISATION.json": "208d12277a67bbd1d533bdb960460dcc73268319808e77d59285bef5cf557bb2",
+  "results/erm_nominee_validation/go_B/LAUNCHED.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "results/erm_nominee_validation/go_B/activation_record.json": "aecc70781be46ccefb0c33a17efa98e950247409eb076a79f5a5910b899eccba",
+  "results/erm_nominee_validation/go_B/launch_validation_B.ps1": "1d68c55eaf33f6881c18f1d19f87b190a2f3570bc7eefdd4c195ed71b2aae343",
+  "results/erm_nominee_validation/go_B/launcher.log": "8d75a42d8808782a11f4cd7cd54732d70ff6badfc2d776b863835b226eebba4a",
+  "results/erm_nominee_validation/go_B/lock_verify_prerun.json": "781e278b0ea1560e4acd2bf5d7e2257aa647047fa71e4a4b86d92f9cc3d5bab0",
+  "results/erm_nominee_validation/go_B/observer/FINAL_OBSERVATION.json": "10ba5e238ea6638f173e5b468c5cf47df738176f821a4096a13c4862829db7d8",
+  "results/erm_nominee_validation/go_B/observer/OBSERVER.lock": "795e5a5c7f69a207a9f488e171cf9c2859f3ecdfda7d0309ba4e30115a26a880",
+  "results/erm_nominee_validation/go_B/observer/latest.json": "10ba5e238ea6638f173e5b468c5cf47df738176f821a4096a13c4862829db7d8",
+  "results/erm_nominee_validation/go_B/observer/observe_validation_B.py": "96af532ecb2800363b9ac47ccbbeb1501753091e8b7fcf4878fdcfd55cc06af3",
+  "results/erm_nominee_validation/go_B/observer/status_2026-10-06T202501Z_ARMED_NOT_LAUNCHED.json": "9b7163fab8888112ae00e50b9df11775d112d590027e5e9d5c899e8cc2dcdb32",
+  "results/erm_nominee_validation/go_B/observer/status_2026-10-06T204001Z_ACQUISITION_BLOCKED.json": "10ba5e238ea6638f173e5b468c5cf47df738176f821a4096a13c4862829db7d8",
+  "results/erm_nominee_validation/go_B/observer/status_log.jsonl": "3743e879b3a8a9bdcdd7c7e3d4ad925715e7cf758c4e8614a750fb163d2b8cf9",
+  "results/erm_nominee_validation/go_B/run.err.log": "497a35f26ca4ea63ea8c2b9e6d5965fa1aa5a31f15fa0ff4e5584a49001e0660",
+  "results/erm_nominee_validation/go_B/run.out.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "results/erm_nominee_validation/guard_release/erm_guard_release_audit.json": "98843d1777931138e000587d92290f5b6e71d206ba591bab922cb1004136eacd",
+  "results/erm_nominee_validation/guard_release/release_journal.jsonl": "20871ab3642a790a795929b0f6d45ac5060e42bc7175645e30ecd6e109552efd",
+  "results/erm_nominee_validation/guard_release/task75_reserve_consumption.json": "0c8bf1c23d1be4188bf88e2c72911262c6c7765883b6e47a07f157341c61ec9e",
+  "results/erm_nominee_validation/validation_B/archive/acquisition/acquisition_status.json": "169e332426d409294349cadcee538b4351cecfeea0383ca4671e1799e46d2798",
+  "results/erm_nominee_validation/validation_B/archive/acquisition/events.jsonl": "2749793227f93c9dac42d280087ada37f8115ae1345792ee2719221eea71cb9f",
+  "results/erm_nominee_validation/validation_B/archive/acquisition/ledger.jsonl": "3ca4ad7738be8a01e6be781b5c9a4ae1c69f805c4d4a9d18b85470db972b0408",
+  "results/erm_nominee_validation/validation_B/archive/acquisition/reference.json": "7e9b1a69c03d046a06feff1f357b4c69e5adef8077c26d1611e16a7860d34f11",
+  "results/erm_nominee_validation/validation_B/run_record.json": "e1909118dcf8ba083fcf8244c94e6a481170f32aae27dfe14184f9315720471c"
+ },
+ "exposure": "S&P 500 PIT membership metadata only (listing + file)",
+ "locks": {
+  "config": "d8ad21af7d7f646373947041b8cd86e76057889d0386e099cd0307710c8bdf90",
+  "implementation": "ce924d902d620a873d6bf693e0e590b6ac066d4ce8117deddf04ff96a942c75e",
+  "implementation_lock": "1584e460676f3d3703588b05860f45a44f4b90905d692d9307bc1ad02734a0b3",
+  "protocol": "7e71fabc9ed68e6de99981839a97d75d235792e1ca57decd98bd735194613043",
+  "protocol_lock": "55a31d24a7d1e9d2eecc03073af0e29e89bc2f8bc1530798c6b14cc6e0440829"
+ },
+ "not_requested": [
+  "SEC (all)",
+  "Alpaca metadata (all)",
+  "bars",
+  "outcomes"
+ ],
+ "outcome": "ACQUISITION_BLOCKED",
+ "outcome_exposure": false,
+ "raw_archive_local_not_in_git": {
+  "results/erm_nominee_validation/validation_B/archive/sp500/listing.json.gz": {
+   "body_bytes": 9854,
+   "body_sha256": "3e33b93c99c8f3b7d99e35a4b4ed445f0c876db3274a47d69cc79e5731e0280d",
+   "gz_sha256": "0fb850c31dbd9bd125e8ac610b98ea700bedd62fb98b98e3c8c79115054d2fef"
+  },
+  "results/erm_nominee_validation/validation_B/archive/sp500/raw.csv.gz": {
+   "body_bytes": 5530907,
+   "body_sha256": "36326709d46d6cd25834de5df457b16f5f96fad3a06b9beac28f7b88aa0b0d54",
+   "gz_sha256": "784536bda17d2285cb7e9435081d0a4bf3492c53ef0b0f4855617ffeb46bcdcd"
+  }
+ },
+ "reason": "last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown",
+ "reference_date": "2026-10-06",
+ "release_id": "b98689a94b459721ca53b00c0bb0719b63a9d9575a9efe83727777a384995bbc",
+ "remaining_retry": "available under D6a but intentionally NOT used (no evidence of recoverability)",
+ "requests": 2,
+ "scoring_attempts": 0,
+ "stage": "S0_SP500_COVERAGE",
+ "statistical_verdict": null,
+ "times_utc": {
+  "blocked": "2026-10-06T20:35:06.231Z",
+  "execution_started": "2026-10-06T20:35:04.151Z",
+  "launcher_end_exit_1": "2026-10-06T20:35:06.395Z",
+  "launcher_start": "2026-10-06T20:35:02.622Z",
+  "scheduled": "2026-10-06T20:35:00Z"
+ },
+ "transport_failures": 0
+}

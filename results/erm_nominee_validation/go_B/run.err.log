@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\workflow.py", line 176, in stage
+    out = fn()
+          ^^^^
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\workflow.py", line 199, in acquire
+    m = comp.acquirer.acquire(cfg, archive)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\acquisition\acquirer.py", line 497, in acquire
+    self._require("S0_SP500_COVERAGE")
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\acquisition\acquirer.py", line 178, in _require
+    raise S.AcquisitionBlocked(f"ACQUISITION_BLOCKED at {stage}: {len(bad)} required request(s) failed; "
+research.erm_nominee_validation.acquisition.states.AcquisitionBlocked: ACQUISITION_BLOCKED at S0_SP500_COVERAGE: 1 required request(s) failed; first: {'category': 'sp500_pit', 'request': 'https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv', 'state': 'INSUFFICIENT_HISTORICAL_COVERAGE', 'required': True, 'detail': 'last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\run.py", line 218, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\run.py", line 187, in main
+    W.run_validation(cfg, auth, comps, OUT / f"validation_{a.window}",
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\workflow.py", line 203, in run_validation
+    man = stage("ACQUIRE", acquire)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\workspace\TalonX-erm-val\research\erm_nominee_validation\workflow.py", line 188, in stage
+    raise StageFailure(name, e) from e
+research.erm_nominee_validation.workflow.StageFailure: ACQUIRE: AcquisitionBlocked: ACQUISITION_BLOCKED at S0_SP500_COVERAGE: 1 required request(s) failed; first: {'category': 'sp500_pit', 'request': 'https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv', 'state': 'INSUFFICIENT_HISTORICAL_COVERAGE', 'required': True, 'detail': 'last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown'}

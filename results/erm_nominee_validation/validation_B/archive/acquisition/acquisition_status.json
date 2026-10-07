@@ -1,0 +1,46 @@
+{
+ "stage": "S0_SP500_COVERAGE",
+ "complete": false,
+ "window_id": "B",
+ "period": {
+  "window_id": "B",
+  "events_from": "2024-01-02",
+  "events_to": "2026-09-30",
+  "bars_from": "2023-11-01",
+  "corporate_actions_from": "2024-01-01",
+  "corporate_actions_to": "2026-09-30",
+  "identity_rename_ranges": "(('2026-10-01', 'DOWNLOAD_DATE'),)",
+  "identity_f345_from": "2024-01-01",
+  "evidence_f345_from": "2018-01-01",
+  "filings_from": "2024-01-02",
+  "filings_to": "2026-09-30",
+  "sp500_from": "2024-01-01",
+  "sp500_to": "2026-09-30",
+  "etf_dividends_from": "2024-01-01",
+  "etf_dividends_to": "2026-09-30",
+  "submissions_page_rule": "ALL_PAGES_TO_WINDOW_END"
+ },
+ "download_date": "2026-10-06",
+ "by_category": {
+  "sp500_pit": {
+   "RETRIEVED_USABLE": 2
+  }
+ },
+ "required_failures": [
+  {
+   "category": "sp500_pit",
+   "request": "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv",
+   "state": "INSUFFICIENT_HISTORICAL_COVERAGE",
+   "required": true,
+   "detail": "last membership row 2026-08-18 < required coverage 2026-09-30: membership after 2026-08-18 unknown"
+  }
+ ],
+ "optional_failures": [],
+ "legitimate_absences": [],
+ "protected_range_requests": {
+  "sp500_pit": {
+   "RETRIEVED_USABLE": 2
+  }
+ },
+ "reference_date": "2026-10-06"
+}
