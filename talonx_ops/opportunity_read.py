@@ -231,7 +231,8 @@ def vr_entry_collection(vr: Path) -> dict:
         con.close()
         if r:
             det = _j(r[1], {}) or {}
-            out["entry_control_loaded"] = det.get("entry_control") or "NOT_REPORTED (tracker predates the control)"
+            out["entry_control_loaded"] = det.get("entry_control") or ("NOT_REPORTED (last tracker heartbeat predates the control; "
+                                                                  "reports at the next in-session tick)")
             out["tracker_heartbeat_utc"] = r[0]
     out["mode"] = ("ENTRY COLLECTION INTERRUPTED (both arms; open positions still managed)"
                    if out["entry_control_loaded"] in ("BLOCKED", "MALFORMED_BLOCKING")
