@@ -28,6 +28,7 @@ def record(state_dir: Path, *, cycle: int, summary: dict, max_bytes: int = DEFAU
         "new_events": summary.get("new_events"),
         "freshness": summary.get("freshness"),
         "error_count": len(summary.get("errors") or []),
+        "identity_drops": summary.get("identity_drops", 0),
         "recovery_timed_out": (summary.get("recovery") or {}).get("timed_out"),
         "recovery_failed": (summary.get("recovery") or {}).get("failed"),
         "delivery_ok": summary.get("delivery_ok"),

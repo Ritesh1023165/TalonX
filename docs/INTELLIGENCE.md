@@ -35,6 +35,14 @@ supervisor, unbounded restart with capped backoff). A `DEGRADED` / `FAILED` Inte
 never affects Original or Experimental. If there is simply no new SEC event, `ZERO_ACTIVITY` is
 the correct state — not a defect.
 
+**Health predicate and other-issuer ownership filings (2026-10-07).** A watched CIK's submissions can list ownership
+filings in which that entity is the *filer / reporting owner* and the declared issuer is another company. The identity
+guard drops them (never persisted, never force-mapped). Such a drop is counted as `identity_drops` in the cycle
+summary, heartbeat and `poll_history.jsonl` and is **not** a poll error, so it does not raise `POLL_ERRORS`. Every
+genuine failure (submissions fetch, ownership XML fetch, a filing without a parseable issuer CIK, parse/ingest
+failure) still counts, and `SOURCE_STALE` / `SOURCE_DOWN` still alert. Evidence:
+`docs/research/evidence/2026-10-07_intelligence_poll_errors_identity_drop.md`.
+
 ## Wording rules (CI-linted)
 
 No predictive language. No forward-return or probability field. No trade direction. The band
