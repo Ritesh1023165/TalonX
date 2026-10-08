@@ -1,0 +1,746 @@
+{
+ "source": "results/opportunity/market.db (mode=ro)",
+ "windows": {
+  "2026-10-05": {
+   "snapshot_version": "2026-10-05@2026-10-02#65f3285f8181c552",
+   "reference_session": "2026-10-02",
+   "snapshot_created_utc": "2026-10-05T02:20:19.802384+00:00",
+   "policy_fp": "65f3285f8181c552",
+   "snapshot_counts": {
+    "ACTIVE_CORE": 1200,
+    "STRUCTURALLY_EXCLUDED": 8737,
+    "AUTO_EXCLUDED": 3561,
+    "EVENT_ELIGIBLE": 890
+   },
+   "current_core_size": 1200,
+   "qualifying_both_floors": 2090,
+   "current_admissible": 2090,
+   "caps": {
+    "500": {
+     "selected": 500,
+     "filled": true,
+     "adv20_cutoff_usd": 255997600,
+     "adv20_next_excluded_usd": 255308903,
+     "cutoff_symbol": "PSA",
+     "adv20_usd": {
+      "min": 255997600,
+      "p25": 334501050,
+      "median": 492835386,
+      "p75": 906552614,
+      "max": 27205033081
+     },
+     "close_usd": {
+      "min": 7.24,
+      "p25": 69.33,
+      "median": 150.77,
+      "p75": 275.34,
+      "max": 5993.85
+     },
+     "price_buckets": {
+      "5-10": 5,
+      "10-20": 27,
+      "20-50": 58,
+      "50-200": 215,
+      ">=200": 195
+     },
+     "exchange": {
+      "NASDAQ": 188,
+      "NYSE": 311,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1590
+    },
+    "600": {
+     "selected": 600,
+     "filled": true,
+     "adv20_cutoff_usd": 207934176,
+     "adv20_next_excluded_usd": 207365680,
+     "cutoff_symbol": "VG",
+     "adv20_usd": {
+      "min": 207934176,
+      "p25": 283502771,
+      "median": 419518530,
+      "p75": 782498324,
+      "max": 27205033081
+     },
+     "close_usd": {
+      "min": 5.17,
+      "p25": 64.05,
+      "median": 134.19,
+      "p75": 269.45,
+      "max": 754790.0
+     },
+     "price_buckets": {
+      "5-10": 7,
+      "10-20": 36,
+      "20-50": 74,
+      "50-200": 265,
+      ">=200": 218
+     },
+     "exchange": {
+      "NASDAQ": 224,
+      "NYSE": 375,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1490
+    },
+    "700": {
+     "selected": 700,
+     "filled": true,
+     "adv20_cutoff_usd": 168972880,
+     "adv20_next_excluded_usd": 168493828,
+     "cutoff_symbol": "DBX",
+     "adv20_usd": {
+      "min": 168972880,
+      "p25": 244225255,
+      "median": 356984228,
+      "p75": 651368053,
+      "max": 27205033081
+     },
+     "close_usd": {
+      "min": 5.17,
+      "p25": 58.19,
+      "median": 117.08,
+      "p75": 251.93,
+      "max": 754790.0
+     },
+     "price_buckets": {
+      "5-10": 11,
+      "10-20": 41,
+      "20-50": 98,
+      "50-200": 318,
+      ">=200": 232
+     },
+     "exchange": {
+      "NASDAQ": 257,
+      "NYSE": 442,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1390
+    },
+    "1200": {
+     "selected": 1200,
+     "filled": true,
+     "adv20_cutoff_usd": 73255389,
+     "adv20_next_excluded_usd": 73242081,
+     "cutoff_symbol": "CMC",
+     "adv20_usd": {
+      "min": 73255389,
+      "p25": 116976339,
+      "median": 207649928,
+      "p75": 419379205,
+      "max": 27205033081
+     },
+     "close_usd": {
+      "min": 5.17,
+      "p25": 41.35,
+      "median": 91.53,
+      "p75": 195.13,
+      "max": 754790.0
+     },
+     "price_buckets": {
+      "5-10": 27,
+      "10-20": 94,
+      "20-50": 241,
+      "50-200": 544,
+      ">=200": 294
+     },
+     "exchange": {
+      "NASDAQ": 446,
+      "NYSE": 745,
+      "BATS": 1,
+      "AMEX": 6,
+      "ARCA": 2
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 890
+    }
+   },
+   "exact_adv20_ties_adjacent": 0,
+   "observed_regular_cycles": {
+    "n": 321,
+    "fetched_symbols_median": 1468,
+    "batches_median": 8,
+    "duration_s_median": 11.89
+   },
+   "dtu_event_sweep": {
+    "n": 756,
+    "requests_median": 1.0
+   },
+   "effective_active": {
+    "median": 1434.0,
+    "max": 1843,
+    "operator_added_median": 39.0,
+    "event_promoted_median": 232.0
+   }
+  },
+  "2026-10-06": {
+   "snapshot_version": "2026-10-06@2026-10-05#65f3285f8181c552",
+   "reference_session": "2026-10-05",
+   "snapshot_created_utc": "2026-10-06T00:02:08.165790+00:00",
+   "policy_fp": "65f3285f8181c552",
+   "snapshot_counts": {
+    "ACTIVE_CORE": 1200,
+    "STRUCTURALLY_EXCLUDED": 8737,
+    "AUTO_EXCLUDED": 3555,
+    "EVENT_ELIGIBLE": 896
+   },
+   "current_core_size": 1200,
+   "qualifying_both_floors": 2096,
+   "current_admissible": 2096,
+   "caps": {
+    "500": {
+     "selected": 500,
+     "filled": true,
+     "adv20_cutoff_usd": 258980073,
+     "adv20_next_excluded_usd": 257635749,
+     "cutoff_symbol": "DOW",
+     "adv20_usd": {
+      "min": 258980073,
+      "p25": 337401224,
+      "median": 497862946,
+      "p75": 913672370,
+      "max": 26385096456
+     },
+     "close_usd": {
+      "min": 7.34,
+      "p25": 71.41,
+      "median": 152.57,
+      "p75": 279.45,
+      "max": 5970.21
+     },
+     "price_buckets": {
+      "5-10": 6,
+      "10-20": 26,
+      "20-50": 55,
+      "50-200": 216,
+      ">=200": 197
+     },
+     "exchange": {
+      "NASDAQ": 192,
+      "NYSE": 307,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1596
+    },
+    "600": {
+     "selected": 600,
+     "filled": true,
+     "adv20_cutoff_usd": 210086118,
+     "adv20_next_excluded_usd": 209963466,
+     "cutoff_symbol": "GPN",
+     "adv20_usd": {
+      "min": 210086118,
+      "p25": 285975032,
+      "median": 420797150,
+      "p75": 790895844,
+      "max": 26385096456
+     },
+     "close_usd": {
+      "min": 5.51,
+      "p25": 65.88,
+      "median": 136.62,
+      "p75": 271.29,
+      "max": 5970.21
+     },
+     "price_buckets": {
+      "5-10": 7,
+      "10-20": 32,
+      "20-50": 75,
+      "50-200": 268,
+      ">=200": 218
+     },
+     "exchange": {
+      "NASDAQ": 225,
+      "NYSE": 374,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1496
+    },
+    "700": {
+     "selected": 700,
+     "filled": true,
+     "adv20_cutoff_usd": 172385323,
+     "adv20_next_excluded_usd": 171631764,
+     "cutoff_symbol": "SBAC",
+     "adv20_usd": {
+      "min": 172385323,
+      "p25": 246561026,
+      "median": 358963133,
+      "p75": 653543568,
+      "max": 26385096456
+     },
+     "close_usd": {
+      "min": 5.51,
+      "p25": 58.17,
+      "median": 117.03,
+      "p75": 251.41,
+      "max": 756376.0
+     },
+     "price_buckets": {
+      "5-10": 11,
+      "10-20": 40,
+      "20-50": 99,
+      "50-200": 318,
+      ">=200": 232
+     },
+     "exchange": {
+      "NASDAQ": 256,
+      "NYSE": 443,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1396
+    },
+    "1200": {
+     "selected": 1200,
+     "filled": true,
+     "adv20_cutoff_usd": 74419778,
+     "adv20_next_excluded_usd": 74314309,
+     "cutoff_symbol": "ELVN",
+     "adv20_usd": {
+      "min": 74419778,
+      "p25": 118403781,
+      "median": 210024792,
+      "p75": 420738203,
+      "max": 26385096456
+     },
+     "close_usd": {
+      "min": 5.15,
+      "p25": 41.82,
+      "median": 92.28,
+      "p75": 195.84,
+      "max": 756376.0
+     },
+     "price_buckets": {
+      "5-10": 27,
+      "10-20": 91,
+      "20-50": 239,
+      "50-200": 547,
+      ">=200": 296
+     },
+     "exchange": {
+      "NASDAQ": 447,
+      "NYSE": 745,
+      "BATS": 1,
+      "AMEX": 5,
+      "ARCA": 2
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 896
+    }
+   },
+   "exact_adv20_ties_adjacent": 0,
+   "observed_regular_cycles": {
+    "n": 315,
+    "fetched_symbols_median": 1459,
+    "batches_median": 8,
+    "duration_s_median": 13.73
+   },
+   "dtu_event_sweep": {
+    "n": 837,
+    "requests_median": 1
+   },
+   "effective_active": {
+    "median": 1442,
+    "max": 1527,
+    "operator_added_median": 39,
+    "event_promoted_median": 240
+   }
+  },
+  "2026-10-07": {
+   "snapshot_version": "2026-10-07@2026-10-06#65f3285f8181c552",
+   "reference_session": "2026-10-06",
+   "snapshot_created_utc": "2026-10-07T00:01:45.597524+00:00",
+   "policy_fp": "65f3285f8181c552",
+   "snapshot_counts": {
+    "ACTIVE_CORE": 1200,
+    "STRUCTURALLY_EXCLUDED": 8740,
+    "AUTO_EXCLUDED": 3558,
+    "EVENT_ELIGIBLE": 893
+   },
+   "current_core_size": 1200,
+   "qualifying_both_floors": 2093,
+   "current_admissible": 2093,
+   "caps": {
+    "500": {
+     "selected": 500,
+     "filled": true,
+     "adv20_cutoff_usd": 257532663,
+     "adv20_next_excluded_usd": 257399705,
+     "cutoff_symbol": "HSY",
+     "adv20_usd": {
+      "min": 257532663,
+      "p25": 336057920,
+      "median": 495222318,
+      "p75": 905787148,
+      "max": 26192531569
+     },
+     "close_usd": {
+      "min": 6.38,
+      "p25": 72.39,
+      "median": 153.4,
+      "p75": 280.41,
+      "max": 6046.6
+     },
+     "price_buckets": {
+      "5-10": 4,
+      "10-20": 26,
+      "20-50": 55,
+      "50-200": 222,
+      ">=200": 193
+     },
+     "exchange": {
+      "NASDAQ": 191,
+      "NYSE": 308,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1593
+    },
+    "600": {
+     "selected": 600,
+     "filled": true,
+     "adv20_cutoff_usd": 207383162,
+     "adv20_next_excluded_usd": 206417846,
+     "cutoff_symbol": "SCCO",
+     "adv20_usd": {
+      "min": 207383162,
+      "p25": 285236134,
+      "median": 417897778,
+      "p75": 774701058,
+      "max": 26192531569
+     },
+     "close_usd": {
+      "min": 5.4,
+      "p25": 66.96,
+      "median": 137.81,
+      "p75": 273.99,
+      "max": 6046.6
+     },
+     "price_buckets": {
+      "5-10": 5,
+      "10-20": 33,
+      "20-50": 74,
+      "50-200": 273,
+      ">=200": 215
+     },
+     "exchange": {
+      "NASDAQ": 224,
+      "NYSE": 375,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1493
+    },
+    "700": {
+     "selected": 700,
+     "filled": true,
+     "adv20_cutoff_usd": 171316839,
+     "adv20_next_excluded_usd": 171312114,
+     "cutoff_symbol": "DBX",
+     "adv20_usd": {
+      "min": 171316839,
+      "p25": 245847290,
+      "median": 350050140,
+      "p75": 642541272,
+      "max": 26192531569
+     },
+     "close_usd": {
+      "min": 5.4,
+      "p25": 58.41,
+      "median": 118.88,
+      "p75": 253.72,
+      "max": 758166.0
+     },
+     "price_buckets": {
+      "5-10": 9,
+      "10-20": 41,
+      "20-50": 99,
+      "50-200": 322,
+      ">=200": 229
+     },
+     "exchange": {
+      "NASDAQ": 257,
+      "NYSE": 442,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1393
+    },
+    "1200": {
+     "selected": 1200,
+     "filled": true,
+     "adv20_cutoff_usd": 74636311,
+     "adv20_next_excluded_usd": 74504032,
+     "cutoff_symbol": "ULS",
+     "adv20_usd": {
+      "min": 74636311,
+      "p25": 118758122,
+      "median": 206900504,
+      "p75": 417431968,
+      "max": 26192531569
+     },
+     "close_usd": {
+      "min": 5.21,
+      "p25": 41.68,
+      "median": 91.78,
+      "p75": 195.17,
+      "max": 758166.0
+     },
+     "price_buckets": {
+      "5-10": 25,
+      "10-20": 91,
+      "20-50": 243,
+      "50-200": 549,
+      ">=200": 292
+     },
+     "exchange": {
+      "NASDAQ": 447,
+      "NYSE": 745,
+      "BATS": 1,
+      "AMEX": 5,
+      "ARCA": 2
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 893
+    }
+   },
+   "exact_adv20_ties_adjacent": 0,
+   "observed_regular_cycles": {
+    "n": 301,
+    "fetched_symbols_median": 1532,
+    "batches_median": 8,
+    "duration_s_median": 16.7
+   },
+   "dtu_event_sweep": {
+    "n": 820,
+    "requests_median": 1.0
+   },
+   "effective_active": {
+    "median": 1511.0,
+    "max": 1587,
+    "operator_added_median": 39.0,
+    "event_promoted_median": 309.0
+   }
+  },
+  "2026-10-08": {
+   "snapshot_version": "2026-10-08@2026-10-07#65f3285f8181c552",
+   "reference_session": "2026-10-07",
+   "snapshot_created_utc": "2026-10-08T00:02:39.350599+00:00",
+   "policy_fp": "65f3285f8181c552",
+   "snapshot_counts": {
+    "ACTIVE_CORE": 1200,
+    "STRUCTURALLY_EXCLUDED": 8740,
+    "AUTO_EXCLUDED": 3558,
+    "EVENT_ELIGIBLE": 893
+   },
+   "current_core_size": 1200,
+   "qualifying_both_floors": 2093,
+   "current_admissible": 2093,
+   "caps": {
+    "500": {
+     "selected": 500,
+     "filled": true,
+     "adv20_cutoff_usd": 256481124,
+     "adv20_next_excluded_usd": 255981220,
+     "cutoff_symbol": "XP",
+     "adv20_usd": {
+      "min": 256481124,
+      "p25": 333521529,
+      "median": 493440530,
+      "p75": 912505329,
+      "max": 26650225270
+     },
+     "close_usd": {
+      "min": 5.83,
+      "p25": 71.74,
+      "median": 152.72,
+      "p75": 278.12,
+      "max": 5931.62
+     },
+     "price_buckets": {
+      "5-10": 5,
+      "10-20": 27,
+      "20-50": 56,
+      "50-200": 219,
+      ">=200": 193
+     },
+     "exchange": {
+      "NASDAQ": 191,
+      "NYSE": 308,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1593
+    },
+    "600": {
+     "selected": 600,
+     "filled": true,
+     "adv20_cutoff_usd": 205307225,
+     "adv20_next_excluded_usd": 204980797,
+     "cutoff_symbol": "PCVX",
+     "adv20_usd": {
+      "min": 205307225,
+      "p25": 284900468,
+      "median": 419996930,
+      "p75": 769814408,
+      "max": 26650225270
+     },
+     "close_usd": {
+      "min": 5.39,
+      "p25": 66.5,
+      "median": 136.53,
+      "p75": 271.36,
+      "max": 5931.62
+     },
+     "price_buckets": {
+      "5-10": 6,
+      "10-20": 33,
+      "20-50": 75,
+      "50-200": 273,
+      ">=200": 213
+     },
+     "exchange": {
+      "NASDAQ": 224,
+      "NYSE": 375,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1493
+    },
+    "700": {
+     "selected": 700,
+     "filled": true,
+     "adv20_cutoff_usd": 172739785,
+     "adv20_next_excluded_usd": 172360213,
+     "cutoff_symbol": "ANF",
+     "adv20_usd": {
+      "min": 172739785,
+      "p25": 243338317,
+      "median": 348853285,
+      "p75": 638125708,
+      "max": 26650225270
+     },
+     "close_usd": {
+      "min": 5.39,
+      "p25": 58.49,
+      "median": 117.89,
+      "p75": 246.49,
+      "max": 759900.0
+     },
+     "price_buckets": {
+      "5-10": 10,
+      "10-20": 43,
+      "20-50": 100,
+      "50-200": 319,
+      ">=200": 228
+     },
+     "exchange": {
+      "NASDAQ": 257,
+      "NYSE": 442,
+      "BATS": 1
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 1393
+    },
+    "1200": {
+     "selected": 1200,
+     "filled": true,
+     "adv20_cutoff_usd": 75003628,
+     "adv20_next_excluded_usd": 74998624,
+     "cutoff_symbol": "RYN",
+     "adv20_usd": {
+      "min": 75003628,
+      "p25": 118887315,
+      "median": 205144011,
+      "p75": 419769463,
+      "max": 26650225270
+     },
+     "close_usd": {
+      "min": 5.0,
+      "p25": 41.26,
+      "median": 90.01,
+      "p75": 194.75,
+      "max": 759900.0
+     },
+     "price_buckets": {
+      "5-10": 27,
+      "10-20": 94,
+      "20-50": 239,
+      "50-200": 549,
+      ">=200": 291
+     },
+     "exchange": {
+      "NASDAQ": 447,
+      "NYSE": 745,
+      "BATS": 1,
+      "AMEX": 5,
+      "ARCA": 2
+     },
+     "sector": "UNKNOWN (no sector/SIC metadata stored for the OE universe)",
+     "removed_vs_current_admissible": 893
+    }
+   },
+   "exact_adv20_ties_adjacent": 0
+  }
+ },
+ "turnover": {
+  "2026-10-05->2026-10-06": {
+   "500": {
+    "entered": 8,
+    "left": 8,
+    "kept": 492
+   },
+   "600": {
+    "entered": 7,
+    "left": 7,
+    "kept": 593
+   },
+   "700": {
+    "entered": 6,
+    "left": 6,
+    "kept": 694
+   }
+  },
+  "2026-10-06->2026-10-07": {
+   "500": {
+    "entered": 6,
+    "left": 6,
+    "kept": 494
+   },
+   "600": {
+    "entered": 6,
+    "left": 6,
+    "kept": 594
+   },
+   "700": {
+    "entered": 5,
+    "left": 5,
+    "kept": 695
+   }
+  },
+  "2026-10-07->2026-10-08": {
+   "500": {
+    "entered": 6,
+    "left": 6,
+    "kept": 494
+   },
+   "600": {
+    "entered": 6,
+    "left": 6,
+    "kept": 594
+   },
+   "700": {
+    "entered": 5,
+    "left": 5,
+    "kept": 695
+   }
+  }
+ }
+}
