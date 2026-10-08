@@ -172,7 +172,7 @@ def test_config_fingerprint_records_the_pause_and_main_passes_it():
 def test_pause_control_is_read_only_by_promotion_and_the_dashboard():
     hits = []
     for p in REPO.rglob("*.py"):
-        if any(x in p.parts for x in (".venv", "results", ".git", "tests")):
+        if any(x in p.parts for x in (".venv", "results", ".git", "tests", "docs")):   # docs: read-only evidence
             continue
         try:
             if "promotion_signal_delivery" in p.read_text(encoding="utf-8", errors="ignore"):

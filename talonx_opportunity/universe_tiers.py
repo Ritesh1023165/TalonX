@@ -39,6 +39,22 @@ symbol is AUTO_EXCLUDED with its reason (data quality first, then price / liquid
 V2 positions / intents, V2 execution scope, operator adds and open-candidate protections keep the symbol FETCHED, but
 discovery never creates a NEW identity for a symbol outside the window's qualifying set (fail closed without a
 snapshot of the active policy). ``TALONX_DTU_POLICY=DTU_V1`` is the rollback (bit-identical V1 fingerprint).
+
+DTU_V3_TOP600 (owner decision 2026-10-08; membership cap, NOT evidence of profitability). DTU_V2's floors and
+data-quality rules unchanged; the qualifying names are ranked by the SAME live ADV20 (desc, tie: symbol asc) and only
+ranks <= 600 are ADMISSIBLE (state ACTIVE_CORE). Ranks > 600 are AUTO_EXCLUDED with reason
+``CAP_RANK_EXCLUDED_RANK_<r>_OF_<n>_CAP_600`` (kept apart from the floor reasons); there is NO event tier (no
+EVENT_ELIGIBLE rows, so no GAP / SEC_8K promotion can admit anything). Protections (open setups, V2 positions /
+intents / execution scope, operator adds, today's Signals) still keep a capped-out symbol FETCHED for management, but
+discovery admits only Core names -- a protection never makes an excluded name eligible for a NEW identity.
+
+POLICY SCHEDULE (deferred activation at a window boundary): ``<opp root>/control/dtu_policy_schedule.json``
+{"schedule": [{"policy": "DTU_V3_TOP600", "effective_from_window": "YYYY-MM-DD"}, ...]} selects the policy per
+trading window (latest entry with effective_from_window <= window); earlier windows keep the base policy
+(TALONX_DTU_POLICY / DTU_V2). ``effective_policy`` never changes a window whose snapshot already exists under another
+known policy (no in-place rewrite of published membership); ingestion and discovery use the same function. A
+malformed schedule is ignored (base policy, recorded) -- admission stays consistent. Rollback = append an entry for
+DTU_V2 at a FUTURE window (no replay, no rewrite).
 """
 from __future__ import annotations
 
@@ -102,8 +118,95 @@ class LiveFloorPolicy(DTUPolicy):
 
 
 DTU_V2 = LiveFloorPolicy()
+
+
+@dataclass(frozen=True)
+class CappedLiveFloorPolicy(LiveFloorPolicy):
+    """DTU_V2 floors + an admission cap: only the top ``admission_cap`` qualifying names by live ADV20 are admissible;
+    no event tier. A subclass, so the DTU_V1 / DTU_V2 fingerprints are unchanged."""
+    version: str = "DTU_V3_TOP600"
+    core_size: int = 600
+    admission_cap: int = 600
+    event_tier: bool = False
+    cap_rank_basis: str = ("live ADV20 (mean close x volume over the 20 completed XNYS sessions ending at D-1, Alpaca "
+                           "SIP 1Day adjustment=raw) descending; exact ties by symbol ascending")
+
+
+DTU_V3_TOP600 = CappedLiveFloorPolicy()
 POLICY_ENV = "TALONX_DTU_POLICY"
-POLICIES = {"DTU_V1": DTU_V1, "DTU_V2": DTU_V2}
+POLICIES = {"DTU_V1": DTU_V1, "DTU_V2": DTU_V2, "DTU_V3_TOP600": DTU_V3_TOP600}
+CAP_RANK = "CAP_RANK_EXCLUDED"
+SCHEDULE_FILE = "dtu_policy_schedule.json"
+
+
+def is_capped(policy: DTUPolicy) -> bool:
+    return isinstance(policy, CappedLiveFloorPolicy)
+
+
+def policy_by_fingerprint(fp: str | None) -> DTUPolicy | None:
+    return next((p for p in POLICIES.values() if p.fingerprint() == fp), None)
+
+
+def schedule_path(root=None) -> Path:
+    from talonx_opportunity.db import root_dir
+    return root_dir(root) / "control" / SCHEDULE_FILE
+
+
+def read_schedule(root=None) -> tuple[list[dict], str | None]:
+    """(entries sorted by effective_from_window, error). Missing file = ([], None); malformed = ([], reason)."""
+    f = schedule_path(root)
+    if not f.exists():
+        return [], None
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+        out = []
+        for e in d["schedule"]:
+            name, eff = str(e["policy"]).strip().upper(), str(e["effective_from_window"])
+            if name not in POLICIES or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", eff):
+                raise ValueError(f"bad entry {e!r}")
+            out.append({"policy": name, "effective_from_window": eff})
+        return sorted(out, key=lambda e: e["effective_from_window"]), None
+    except Exception as exc:  # noqa: BLE001 -- never break ingestion: base policy, error surfaced in detail
+        return [], f"MALFORMED_SCHEDULE_IGNORED: {type(exc).__name__}: {str(exc)[:120]}"
+
+
+def scheduled_policy(window_id: str, root=None, env=None, base: DTUPolicy | None = None) -> DTUPolicy:
+    pol = base or policy_from_env(env)
+    for e in read_schedule(root)[0]:
+        if e["effective_from_window"] <= window_id:
+            pol = POLICIES[e["policy"]]
+    return pol
+
+
+def effective_policy(window_id: str, root=None, env=None, snapshot_fp: str | None = None,
+                     base: DTUPolicy | None = None) -> DTUPolicy:
+    """The window's policy: the scheduled one, EXCEPT that a window already published under another known policy keeps
+    that policy (membership is never rewritten in place). ``snapshot_fp`` = dtu_snapshots.policy_fp of the window."""
+    pol = scheduled_policy(window_id, root, env, base)
+    if snapshot_fp and snapshot_fp != pol.fingerprint():
+        published = policy_by_fingerprint(snapshot_fp)
+        if published is not None:
+            return published
+    return pol
+
+
+def window_snapshot_fp(root, window_id: str, con: sqlite3.Connection | None = None) -> str | None:
+    try:
+        if con is not None:
+            r = con.execute("SELECT policy_fp FROM dtu_snapshots WHERE window_id=?", (window_id,)).fetchone()
+            return r[0] if r else None
+        from talonx_opportunity.db import root_dir
+        p = root_dir(root) / "market.db"
+        if not p.exists():
+            return None
+        c = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=10)
+        try:
+            r = c.execute("SELECT policy_fp FROM dtu_snapshots WHERE window_id=?", (window_id,)).fetchone()
+            return r[0] if r else None
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return None
 DEFAULT_POLICY = "DTU_V2"
 
 # live-floor reason codes (mutually exclusive; data quality is decided first, then the two thresholds)
@@ -164,6 +267,8 @@ def floor_category(state: str, reason: str) -> str:
     """Mutually exclusive report bucket of one snapshot row."""
     if state in (CORE, EVENT_ELIGIBLE):
         return "QUALIFYING"
+    if (reason or "").startswith(CAP_RANK):
+        return CAP_RANK
     if state == STRUCTURAL:
         return "STRUCTURAL"
     r = reason or ""
@@ -254,10 +359,13 @@ def classify_members(members: list[dict], daily: dict[str, list[dict]], referenc
         rows.append({"symbol": s, "state": st, "reason": why, "price": price, "prev_close": prev_close, "adv20": adv,
                      "cik": m.get("cik"), "core_rank": None})
     ranked = sorted((r for r in rows if r["state"] == EVENT_ELIGIBLE), key=lambda r: (-r["adv20"], r["symbol"]))
+    capped = is_capped(policy)
     for i, r in enumerate(ranked, 1):
         r["core_rank"] = i
         if i <= policy.core_size:
             r["state"], r["reason"] = CORE, f"ADV20_RANK_{i}"
+        elif capped:                                   # no event tier above the cap: not admissible at all
+            r["state"], r["reason"] = AUTO_EXCLUDED, f"{CAP_RANK}_RANK_{i}_OF_{len(ranked)}_CAP_{policy.admission_cap}"
         else:
             r["reason"] = f"ADV20_RANK_{i}_OUTSIDE_CORE_{policy.core_size}"
     return rows
@@ -556,8 +664,13 @@ class DTU:
         snap = self.snapshot(w.window_id)
         prev = None
         if previous_policy is not None and previous_policy.fingerprint() != self.policy.fingerprint():
-            prev = {r["symbol"]: r for r in classify_members(members, daily, w.reference_session.isoformat(),
-                                                             previous_policy)}
+            kw = {}
+            if has_live_floor(previous_policy):         # e.g. DTU_V3 vs DTU_V2: same window's recorded live inputs
+                inp = self.live_inputs(w.window_id)
+                kw = {"live": inp[0], "live_failed": inp[1], "sessions": inp[2]} if inp else None
+            if kw is not None:
+                prev = {r["symbol"]: r for r in classify_members(members, daily, w.reference_session.isoformat(),
+                                                                 previous_policy, **kw)}
         prot, positions = self.protections(w)
         protected = {}
         for s in sorted((set(prot) | positions | set(v2_scope) | set(operator_added)) - {"__V2_UNREADABLE__"}):
@@ -727,7 +840,9 @@ def window_report(snapshot: dict[str, dict], meta: dict, previous: dict[str, dic
     ``previous`` = the previous policy on the SAME window data. Categories are mutually exclusive (floor_category);
     every count reconciles to the per-symbol list."""
     protected = protected or {}
-    rows, cat, chg = [], dict.fromkeys(CATEGORIES, 0), {}
+    cats = CATEGORIES + ((CAP_RANK,) if any(floor_category(r["state"], r["reason"]) == CAP_RANK
+                                           for r in snapshot.values()) else ())    # V1/V2 report shape unchanged
+    rows, cat, chg = [], dict.fromkeys(cats, 0), {}
     for s in sorted(snapshot):
         r = snapshot[s]
         c = floor_category(r["state"], r["reason"])
@@ -742,7 +857,7 @@ def window_report(snapshot: dict[str, dict], meta: dict, previous: dict[str, dic
                      "previous_state": p["state"] if p else None, "previous_reason": p["reason"] if p else None,
                      "protected": protected.get(s, "")})
     removed = [x for x in rows if x["change"] == "REMOVED"]
-    rem_cat = {k: sum(1 for x in removed if x["category"] == k) for k in CATEGORIES if k != "QUALIFYING"}
+    rem_cat = {k: sum(1 for x in removed if x["category"] == k) for k in cats if k != "QUALIFYING"}
     prev_pool = sum(1 for p in (previous or {}).values() if p["state"] in (CORE, EVENT_ELIGIBLE)) if previous else None
     counts = {"universe_members": len(rows), "categories": cat, "qualifying": cat["QUALIFYING"],
               "core": sum(1 for x in rows if x["state"] == CORE),
@@ -813,6 +928,9 @@ def report_meta(con: sqlite3.Connection, w, policy: DTUPolicy, previous_policy: 
             "snapshot_version": snap[0] if snap else None, "snapshot_built_utc": snap[2] if snap else None,
             "snapshot_policy_fp": snap[3] if snap else None,
             "policy_version": policy.version, "policy_fp": policy.fingerprint(),
+            "admission_cap": getattr(policy, "admission_cap", None),
+            "cap_rank_basis": getattr(policy, "cap_rank_basis", None),
+            "event_tier": getattr(policy, "event_tier", True),
             "min_close_usd": getattr(policy, "live_min_close_usd", policy.v1_min_price),
             "min_adv20_usd": getattr(policy, "live_min_adv20_usd", policy.v1_min_adv20_usd),
             "sessions_required": getattr(policy, "live_sessions", 20),

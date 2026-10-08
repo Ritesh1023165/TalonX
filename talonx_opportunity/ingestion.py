@@ -61,6 +61,7 @@ class Ingestion:
         from talonx_opportunity import universe_tiers as U
         self.dtu_mode = dtu_mode or U.mode()
         self.dtu_policy = dtu.policy if dtu is not None else U.policy_from_env()
+        self.dtu_base_policy = self.dtu_policy         # the process's configured policy; the schedule overrides per window
         self._dtu, self.dtu_last, self.dtu_prep = dtu, None, None
         self._dtu_cache: tuple[str, list[dict], dict] | None = None
         self.root = root
@@ -169,6 +170,7 @@ class Ingestion:
             self.last_note = "CLOSED: no trading window"
             return 300.0
         self._ensure_window(w)
+        self._apply_window_policy(w)
         last = self._last_probe.get(phase, 0.0)
         probe = None
         if time.monotonic() - last >= self.probe_every_s or not last:
@@ -249,6 +251,18 @@ class Ingestion:
         self._write_cycle(w, phase, end, len(changed), nbars, (len(failed), agg_stats), t0, self.last_note)
         return self.cycle_s
 
+    def _apply_window_policy(self, w) -> None:
+        """Per-window DTU policy (deferred activation, 2026-10-08): the schedule's policy for THIS window, unless the
+        window was already published under another known policy (never rewritten in place)."""
+        from talonx_opportunity import universe_tiers as U
+        pol = U.effective_policy(w.window_id, self.root, base=self.dtu_base_policy,
+                                 snapshot_fp=U.window_snapshot_fp(self.root, w.window_id, con=self.con))
+        self.dtu_schedule_error = U.read_schedule(self.root)[1]
+        if pol.fingerprint() != self.dtu_policy.fingerprint():
+            self.dtu_policy = pol
+            if self._dtu is not None:
+                self._dtu.policy = pol
+
     def _dtu_init(self, w) -> None:
         from talonx_opportunity import universe_tiers as U
         if self._dtu is None:
@@ -281,7 +295,8 @@ class Ingestion:
             out = U.report_dir(self.root, w.window_id)
             if not (out / f"universe_{w.window_id}.json").exists():
                 from talonx_premarket import __main__ as M
-                rep = self._dtu.report(w, self._dtu_cache[1], self._dtu_cache[2], v2_scope=set(M._v2_scope(None)))
+                rep = self._dtu.report(w, self._dtu_cache[1], self._dtu_cache[2], v2_scope=set(M._v2_scope(None)),
+                                       **({"previous_policy": U.DTU_V2} if U.is_capped(self.dtu_policy) else {}))
                 self.dtu_prep = {"window_id": w.window_id, "report": U.write_report(rep, out),
                                  "counts": {k: rep["counts"][k] for k in ("qualifying", "core", "removed")},
                                  "reconciled": rep["reconciled"]}
@@ -324,7 +339,9 @@ class Ingestion:
     def detail(self) -> dict:
         return {"window_id": self._window_id, "note": self.last_note,
                 "requests": getattr(self._data, "requests", 0) if self._data else 0,
-                "dtu_mode": self.dtu_mode, "dtu_policy": self.dtu_policy.version, "dtu": self.dtu_last,
+                "dtu_mode": self.dtu_mode, "dtu_policy": self.dtu_policy.version,
+                "dtu_policy_fp": self.dtu_policy.fingerprint(),
+                "dtu_schedule_error": getattr(self, "dtu_schedule_error", None), "dtu": self.dtu_last,
                 "dtu_prep": self.dtu_prep}
 
 
@@ -369,5 +386,7 @@ def main(argv=None) -> int:
     ing = Ingestion(root=root)
     from talonx_opportunity import universe_tiers as U
     fps = {} if ing.dtu_mode == U.OFF else {"DTU": ing.dtu_policy.fingerprint()}   # OFF keeps today's fingerprints
+    if ing.dtu_mode != U.OFF and U.read_schedule(root)[0]:                          # deferred activation, recorded
+        fps["DTU_SCHEDULE"] = json.dumps(U.read_schedule(root)[0], sort_keys=True)
     run_component("ingestion", tick=ing.tick, config_fps=fps, root=root, detail=ing.detail)
     return 0

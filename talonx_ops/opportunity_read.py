@@ -128,6 +128,56 @@ PAPER_SIGNAL_VERDICT = {
     "as_of": "2026-09-30",
 }
 LONDON_NOTE = "UTC; London = UTC+1 (BST) until 2026-10-25, then UTC+0 (GMT)"
+# 2026-10-08 label correction: promotion.db paper_outcomes (and the candidate outcome tracker) are markouts measured
+# from the reference price at the DATA timestamp, which predates the decision and any Telegram delivery.
+MARKOUT_LABEL = "Gross markout from data timestamp"
+MARKOUT_EXPLANATION = ("Not an executable return from Telegram alert delivery; the reference price can predate the "
+                       "alert.")
+
+
+def markout_timing(data_as_of: str | None, sent_at: str | None) -> dict:
+    """Reference (data) time, alert delivery time and the delay between them. Missing -> UNKNOWN (never invented)."""
+    def ok(s):
+        try:
+            return datetime.fromisoformat(str(s).replace("Z", "+00:00")) if s else None
+        except ValueError:
+            return None
+    a, b = ok(data_as_of), ok(sent_at)
+    return {"reference_data_utc": data_as_of if a else "UNKNOWN",
+            "alert_delivered_utc": sent_at if b else "UNKNOWN",
+            "delay_min": round((b - a).total_seconds() / 60, 1) if a and b else "UNKNOWN"}
+
+
+def promotion_markout_view(r: Path, limit: int = 10) -> dict:
+    """Label + timing of the promotion markouts (NO return values are added here)."""
+    out = {"label": MARKOUT_LABEL, "explanation": MARKOUT_EXPLANATION,
+           "not": "not a realised paper trade and not user-achievable profit", "recent": []}
+    pc = _ro(r / "promotion.db")
+    if pc is None:
+        return out
+    sent = {}
+    ob = _ro(r / "promotion_signal_notifications.db")
+    if ob:
+        sent = dict(ob.execute("SELECT event_id, sent_at_utc FROM ops_notification_outbox WHERE state='SENT'"))
+        ob.close()
+    try:
+        rows = pc.execute("SELECT p.promotion_id, p.symbol, p.data_as_of_utc, p.decision_utc, p.signal_event_id, "
+                          "o.ref_time_utc FROM promotions p JOIN paper_outcomes o USING(promotion_id) "
+                          "ORDER BY p.decision_utc DESC LIMIT ?", (limit,)).fetchall()
+        delays = [markout_timing(x[2], sent.get(x[4])) for x in pc.execute(
+            "SELECT p.promotion_id, p.symbol, p.data_as_of_utc, p.decision_utc, p.signal_event_id FROM promotions p "
+            "JOIN paper_outcomes o USING(promotion_id)").fetchall()]
+    except sqlite3.Error:
+        pc.close()
+        return out
+    pc.close()
+    for pid, sym, asof, dec, sig, ref in rows:
+        out["recent"].append({"symbol": sym, "decision_utc": dec or "UNKNOWN",
+                              **markout_timing(ref or asof, sent.get(sig) if sig else None)})
+    known = sorted(d["delay_min"] for d in delays if d["delay_min"] != "UNKNOWN")
+    out["delay_summary"] = {"with_delivery_time": len(known), "without_delivery_time": len(delays) - len(known),
+                            "median_delay_min": known[len(known) // 2] if known else "UNKNOWN"}
+    return out
 _STATES = ("PENDING", "RETRY", "HELD", "SENT", "AMBIGUOUS", "FAILED", "EXPIRED")
 
 
@@ -187,6 +237,11 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
     else:
         mode = {"ACTIVE": "ACTIVE (delivering to the Signal bot)", "OFF": "SHADOW (record-only)"}.get(loaded, loaded)
     lane.update(mode=mode, loaded_signal_delivery=loaded, configured_pause=cfg)
+    try:
+        lane["paper_markouts"] = promotion_markout_view(r)
+    except Exception as exc:  # noqa: BLE001 -- label visibility must never break the dashboard
+        lane["paper_markouts"] = {"label": MARKOUT_LABEL, "explanation": MARKOUT_EXPLANATION,
+                                  "error": type(exc).__name__}
     ob = _ro(r / "promotion_signal_notifications.db")
     if ob:
         lane["notifications"] = _lane_counts(ob, "ops_notification_outbox", created="created_at_utc",

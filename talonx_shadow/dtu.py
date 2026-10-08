@@ -25,6 +25,12 @@ Per trading window:
                              snapshot field contract can be verified per phase (dtu_eval.verify_contract).
 Form 4: DISABLED -- open-market purchase codes are not available universe-wide without parsing every filing.
 usage: python -m talonx_shadow.dtu run | snapshot [WINDOW_ID]
+
+STUDY ENDPOINT (2026-10-08 containment): the registered collection end ``COLLECTION_END_UTC`` (= the segment registry
+results/dtu_shadow/UNIVERSE_SEGMENTS.json "end_date") is enforced IN the collector: ``run`` refuses to start at/after
+it, the loop stops before starting a new sweep at/after it, and a sweep whose snapshot fetch finished after it writes
+nothing. (Before this, only the relaunch wrapper checked the endpoint, so the running process overran 08:00-10:36Z on
+2026-10-08; that data is preserved and listed in docs/research/evidence/2026-10-08_dtu_containment/.)
 """
 from __future__ import annotations
 
@@ -51,6 +57,11 @@ GAP_TRIGGER_PCT = 3.0
 CROSS_THRESHOLDS = (2.0, 3.0, 5.0, 10.0)
 STALE_MIN = 45
 SWEEP_EVERY_S = 60
+COLLECTION_END_UTC = datetime(2026, 10, 8, 0, 15, tzinfo=timezone.utc)     # registered study endpoint (expired)
+
+
+def collection_expired(now: datetime) -> bool:
+    return now >= COLLECTION_END_UTC
 EDGAR_EVERY_S = 300
 VERIFY_EVERY_N = 5
 VERIFY_SAMPLE = 150
@@ -356,6 +367,8 @@ class Collector:
     def sweep(self, now: datetime) -> dict | None:
         from talonx_opportunity.phases import phase_at
         from talonx_premarket.alpaca_data import data_as_of
+        if collection_expired(now):
+            return None                                   # registered endpoint passed: no new work
         phase, w = phase_at(now)
         if w is None or phase not in ("PREMARKET", "REGULAR", "AFTER_HOURS"):
             return None
@@ -365,6 +378,8 @@ class Collector:
         t0 = time.monotonic()
         snaps, nreq, errs = self._snapshots(self.eligible)
         dur = time.monotonic() - t0
+        if collection_expired(datetime.now(UTC)):
+            return None                                   # endpoint reached during the fetch: write nothing
         with self.c:
             cur = self.c.execute("INSERT INTO sweeps (window_id, at_utc, phase, sip_as_of, requests, duration_s, "
                                  "symbols_checked) VALUES (?,?,?,?,?,?,?)",
@@ -437,6 +452,9 @@ class Collector:
 
 
 def run_forever() -> None:
+    if collection_expired(datetime.now(UTC)):
+        print(json.dumps({"collector": "REFUSED_STUDY_ENDED", "endpoint_utc": iso(COLLECTION_END_UTC)}), flush=True)
+        return
     col = Collector()
     with col.c:
         col.c.execute("INSERT OR REPLACE INTO meta VALUES ('started_utc', ?)", (iso(datetime.now(UTC)),))
@@ -444,6 +462,10 @@ def run_forever() -> None:
     while True:
         t = time.monotonic()
         now = datetime.now(UTC)
+        if collection_expired(now):
+            print(json.dumps({"collector": "STOPPED_AT_ENDPOINT", "at": iso(now),
+                              "endpoint_utc": iso(COLLECTION_END_UTC)}), flush=True)
+            return
         try:
             r = col.sweep(now)
             if r:

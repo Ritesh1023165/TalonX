@@ -104,6 +104,38 @@ def _age_seconds(ts: str | None, now: datetime) -> float | None:
         return None
 
 
+V2_ACCOUNTING_BASIS = {
+    "label": "Before fees, spread and slippage",
+    "detail": ("V2 live paper accounting fills at the Alpaca SIP daily open (entry) and close (exit) with zero fees "
+               "(talonx_v2.sizing.zero_fee; the service passes no fee model) and no spread or slippage. "
+               "INSIDER_BUY_CLUSTER_V2 research results subtract 20 bps round trip and are reported separately; the "
+               "two are not directly comparable."),
+    "modeled": False,
+}
+_V2_OLD_COST_SUMMARY = ("Realized P&L = exit net minus persisted entry total, including recorded fees. Costs remain "
+                        "uncalibrated.")
+
+
+def _relabel_v2_costs(perf):
+    """Presentation-only correction of the V2 cost wording (values untouched): the source breakdown in
+    talonx_ops/paper_performance.py says fees are 'included', but no fee is ever recorded (zero-fee accounting)."""
+    if not isinstance(perf, dict):
+        return perf
+    perf["costs"] = {"summary": V2_ACCOUNTING_BASIS["label"] + " -- " + V2_ACCOUNTING_BASIS["detail"],
+                     "modeled": False, "spread_slippage": "NOT modelled (fills at SIP daily open/close)",
+                     "explicit_commissions_fees": "zero (talonx_v2.sizing.zero_fee)",
+                     "research_comparison": "research results are net of 20 bps round trip; reported separately"}
+    for key in ("closed_trades",):
+        for t in perf.get(key) or []:
+            if isinstance(t, dict) and t.get("costs") == _V2_OLD_COST_SUMMARY:
+                t["costs"] = V2_ACCOUNTING_BASIS["label"]
+    od = (perf.get("open_positions") or {}).get("detail") if isinstance(perf.get("open_positions"), dict) else None
+    for p in od or []:
+        if isinstance(p, dict) and p.get("unrealized_status") == _V2_OLD_COST_SUMMARY:
+            p["unrealized_status"] = V2_ACCOUNTING_BASIS["label"]
+    return perf
+
+
 class DashboardReadModel:
     """One instance per request batch. Cheap to construct."""
 
@@ -229,6 +261,7 @@ class DashboardReadModel:
                 "allocated_capital": ldg.get("allocated_capital"),
                 "available_capital": ldg.get("available_capital"),
                 "realized_pnl_usd": ldg.get("realized_pnl_usd"),
+                "realized_pnl_basis": V2_ACCOUNTING_BASIS["label"],
                 "exit_unresolved": ldg.get("exit_unresolved"),
                 "eod_state": v2.get("eod", {}).get("state"),
                 "eod_forced_flatten": "OFF",
@@ -1121,8 +1154,8 @@ class DashboardReadModel:
                     # a second "Paper Performance" tab duplicating it.
                     try:
                         from talonx_ops.paper_performance import build_v2_paper_performance
-                        out["ledger"]["performance"] = build_v2_paper_performance(
-                            Path(db), home=self.home, now=self.now)
+                        out["ledger"]["performance"] = _relabel_v2_costs(build_v2_paper_performance(
+                            Path(db), home=self.home, now=self.now))
                     except Exception as exc:  # noqa: BLE001
                         out["ledger"]["performance"] = {"status": "UNKNOWN",
                                                         "note": f"{type(exc).__name__}: {exc}"}
@@ -1264,6 +1297,7 @@ class DashboardReadModel:
                                      if _d == "RESEARCH" else ""))
         out["operator"] = operator
         account = operator["account"]
+        out["ledger"]["accounting_basis"] = V2_ACCOUNTING_BASIS
         out["ledger"].update(
             cash=account["settled_cash"],
             realized_pnl_usd=account["realized_pnl"],
@@ -1616,6 +1650,7 @@ class DashboardReadModel:
                         "n_open": len(bd_open),
                         "n_closed": len(bd_closed),
                         "realized_pnl_usd": bd_realized,
+                        "accounting_basis": V2_ACCOUNTING_BASIS,
                         "open_symbols": sorted({r["symbol"] for r in bd_open}),
                         "administrative_adjustments_note": (
                             "the V2 positions table carries no administrative-adjustment "

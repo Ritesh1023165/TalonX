@@ -231,7 +231,8 @@ function renderOverview(d){
        `<div>`+kv('campaign cash', num(v2.cash)+' / '+num(v2.starting_campaign_cash))+
          kv('open / capacity', (v2.open_positions==null?'—':v2.open_positions)+' / '+(v2.capacity||'—'))+
          kv('BUY / SELL (lifetime)', (v2.buys==null?'—':v2.buys)+' / '+(v2.sells==null?'—':v2.sells))+
-         kv('realized P&L', num(v2.realized_pnl_usd))+kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
+         kv('realized P&L', num(v2.realized_pnl_usd))+kv('P&L basis', esc(v2.realized_pnl_basis||'UNKNOWN'))+
+         kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
        `<div>`+kv('pre-open intents PENDING', num(v2.pending_entry_intents))+
          kv('delivery SENT / HELD / RETRY', `${num(del.sent)} / ${num(del.held)} / ${num(del.retry)}`)+
          kv('delivery FAILED / AMBIGUOUS / EXPIRED', `${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.by_state&&del.by_state.EXPIRED||0)}`)+
@@ -569,7 +570,8 @@ function renderV2(d){
        kv('capacity', l.capacity)+kv('equity (cash+marked open)', num(veq.value)+' '+pill(veq.status))+`</div>`+
      `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
        kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
-       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+
+       kv('realized P&L', num(l.realized_pnl_usd))+kv('P&L basis', esc((l.accounting_basis||{}).label||'UNKNOWN'))+
+       kv('EXIT_UNRESOLVED', l.exit_unresolved)+
        kv('reconciliation', pill(vrc.status))+kv('costs', costLine(vco))+`</div></div>`+
      (vrc.status && vrc.status!=='UNAVAILABLE'? `<div class="src">reconciliation: expected_cash=${num(vrc.expected_cash)} actual_cash=${num(vrc.actual_cash)} diff=${num(vrc.diff)} — ${esc(vrc.basis||'')}</div>`:'')+
      boundedTable(l.open_positions||[], [
@@ -710,7 +712,7 @@ function renderV2Discovery(d){
   // D. paper trading (shared ledger, symbol-filtered)
   h+=`<div class="card card-wide"><h3>Paper trading — broad-discovery-only symbols ${pill(led.status)}</h3><div class="grid">`+
      `<div>`+kv('open positions', num(led.n_open))+kv('closed positions', num(led.n_closed))+
-       kv('realized P&L (broad-only)', num(led.realized_pnl_usd))+
+       kv('realized P&L (broad-only)', num(led.realized_pnl_usd))+kv('P&L basis', esc((led.accounting_basis||{}).label||'UNKNOWN'))+
        kv('open symbols', esc((led.open_symbols||[]).join(', ')||'none'))+`</div>`+
      `<div>`+kv('reserved cash (pending)', num(aq.reserved_cash_usd))+
        kv('reserved slots (pending)', num(aq.reserved_slots))+
@@ -825,7 +827,12 @@ function renderNotificationLanes(L){
       kv('legacy PAPER_OPPORTUNITY rows by state', esc(JSON.stringify(bt.PAPER_OPPORTUNITY||{})))+
       kv('Signal-bot messages sent (all, confirmed)', num((nh(p)||{}).SENT))+
       kv('research verdict', esc(rs.verdict))+kv('evidence', esc(rs.evidence))+kv('cost model', esc(rs.cost_model))+
-      kv('source / as of', esc(`${rs.source||''} · ${rs.as_of||''}`))+`</div>`;
+      kv('source / as of', esc(`${rs.source||''} · ${rs.as_of||''}`))+
+      (p.paper_markouts? `<h4>${esc(p.paper_markouts.label)}</h4><div class="small muted">${esc(p.paper_markouts.explanation)} ${esc(p.paper_markouts.not||'')}</div>`+
+        kv('alert delay (median, min)', esc(String((p.paper_markouts.delay_summary||{}).median_delay_min??'UNKNOWN')))+
+        kv('with / without delivery time', esc(`${(p.paper_markouts.delay_summary||{}).with_delivery_time??'?'} / ${(p.paper_markouts.delay_summary||{}).without_delivery_time??'?'}`))+
+        boundedTable(p.paper_markouts.recent||[],[{label:'symbol',get:x=>x.symbol},{label:'reference (data) UTC',get:x=>x.reference_data_utc},
+          {label:'alert delivered UTC',get:x=>x.alert_delivered_utc},{label:'delay min',get:x=>x.delay_min}],10,x=>x.symbol+x.reference_data_utc) : '')+`</div>`;
   }
   return h;
 }

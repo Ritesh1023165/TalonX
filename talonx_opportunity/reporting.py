@@ -118,6 +118,13 @@ def build_report(root, window_id: str) -> dict:
                      "close_ret": _stats([o["close_ret_pct"] for o in os_]),
                      "mfe": _stats([o["mfe_pct"] for o in os_]), "mae": _stats([o["mae_pct"] for o in os_])})
     rep["segments"] = segs
+    # 2026-10-08 label correction (presentation only; values unchanged): ret_30m / close_ret / mfe / mae are the
+    # outcome tracker's direction-signed returns from the candidate's reference price at its data timestamp.
+    rep["outcome_metric"] = {"label": "Gross markout from data timestamp",
+                             "explanation": "Not an executable return from Telegram alert delivery; the reference price can predate the alert.",
+                             "reference": "price at first sighting, at the candidate's causal data timestamp "
+                                          "(first_data_as_of_utc; fallback first_seen_utc)",
+                             "costs": "none (gross)", "fields": ["ret_30m", "close_ret", "mfe", "mae"]}
     rep["scans"] = scans
     dec_counts: dict[str, int] = {}
     deliv: dict[str, int] = {}
@@ -165,8 +172,9 @@ def render_md(rep: dict) -> str:
     L += ["", "## Segments", ""]
     for s in rep["segments"]:
         L.append(f"- {s['from_utc'][11:19]}Z -> {s['to_utc'][11:19]}Z: {s['candidates_first_seen']} candidates "
-                 f"{s['by_first_seen_phase']}, outcomes {s['outcome_status']}, +30m {s['ret_30m']}, close "
-                 f"{s['close_ret']}")
+                 f"{s['by_first_seen_phase']}, outcomes {s['outcome_status']}, gross markout from data timestamp: "
+                 f"+30m {s['ret_30m']}, close {s['close_ret']}")
+    L += ["", f"Outcome metric: {rep['outcome_metric']['label']}. {rep['outcome_metric']['explanation']}"]
     L += ["", "## Notification (attention only; never affects detection)", "",
           f"- decisions: {rep['notification']['decisions']}", f"- delivery: {rep['notification']['delivery_states']}",
           "", "## Horizons", ""]

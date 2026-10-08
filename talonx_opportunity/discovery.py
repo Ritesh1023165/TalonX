@@ -70,15 +70,24 @@ class Discovery:
         from talonx_opportunity import universe_tiers as U
         self.dtu_mode = U.mode()
         self.dtu_policy = U.policy_from_env()
-        self.admission_reader = admission_reader or (lambda wid: U.read_admission(root, wid, self.dtu_policy))
+        self.dtu_base_policy = self.dtu_policy
+        self.admission_reader = admission_reader or (lambda wid: U.read_admission(root, wid, self._policy_for(wid)))
         self._admission: tuple[str, set[str]] | None = None      # (window_id, qualifying set): immutable per snapshot
         self.last_summary: dict = {}
+
+    def _policy_for(self, wid: str):
+        """The window's DTU policy -- the SAME resolution as ingestion (schedule + never-rewrite-published)."""
+        from talonx_opportunity import universe_tiers as U
+        pol = U.effective_policy(wid, self.root, base=self.dtu_base_policy,
+                                 snapshot_fp=U.window_snapshot_fp(self.root, wid))
+        self.dtu_policy = pol
+        return pol
 
     def _admissible(self, wid: str) -> set[str] | None:
         """Live-floor admission set of this window (None = no live floor: V1 behaviour). Fails CLOSED (empty set)
         while the window has no snapshot of the running policy."""
         from talonx_opportunity import universe_tiers as U
-        if self.dtu_mode != U.ACTIVE or not U.has_live_floor(self.dtu_policy):
+        if self.dtu_mode != U.ACTIVE or not U.has_live_floor(self._policy_for(wid)):
             return None
         if self._admission is None or self._admission[0] != wid:
             got = self.admission_reader(wid)
@@ -362,5 +371,8 @@ def main(argv=None) -> int:
     from talonx_opportunity import universe_tiers as U
     if disc.dtu_mode == U.ACTIVE:                       # key only when ACTIVE: OFF keeps today's fingerprints (rollback)
         fps["DTU"] = disc.dtu_policy.fingerprint()
+        if U.read_schedule(root)[0]:                    # deferred activation (2026-10-08), recorded with the deploy
+            import json as _json
+            fps["DTU_SCHEDULE"] = _json.dumps(U.read_schedule(root)[0], sort_keys=True)
     run_component("discovery", tick=disc.tick, root=root, detail=disc.detail, config_fps=fps)
     return 0

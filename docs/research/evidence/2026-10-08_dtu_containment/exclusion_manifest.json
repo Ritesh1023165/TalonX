@@ -1,0 +1,124 @@
+{
+ "registered_endpoint_utc": "2026-10-08T00:15:00Z",
+ "database": "results\\dtu_shadow\\shadow.db",
+ "rule": "EXCLUDE: collection time >= endpoint. AMBIGUOUS: collected before the endpoint but event time >= endpoint (excluded by default). Raw rows are NOT deleted or modified.",
+ "tables": {
+  "sweeps": {
+   "collection_time_column": "at_utc",
+   "event_time_column": null,
+   "excluded_rows": 154,
+   "excluded_collection_range": [
+    "2026-10-08T08:00:41.120186+00:00",
+    "2026-10-08T10:36:19.207026+00:00"
+   ],
+   "excluded_keys_by_window": {
+    "2026-10-08": 154
+   }
+  },
+  "verify": {
+   "collection_time_column": "at_utc",
+   "event_time_column": null,
+   "excluded_rows": 3286,
+   "excluded_collection_range": [
+    "2026-10-08T08:00:41.120186+00:00",
+    "2026-10-08T10:33:19.192190+00:00"
+   ]
+  },
+  "promotions": {
+   "collection_time_column": "first_at_utc",
+   "event_time_column": null,
+   "excluded_rows": 242,
+   "excluded_collection_range": [
+    "2026-10-08T08:00:41.120186+00:00",
+    "2026-10-08T10:36:19.207026+00:00"
+   ],
+   "excluded_keys_by_window": {
+    "2026-10-08": 242
+   }
+  },
+  "first_cross": {
+   "collection_time_column": "at_utc",
+   "event_time_column": "trade_utc",
+   "excluded_rows": 1442,
+   "excluded_collection_range": [
+    "2026-10-08T08:15:18.601880+00:00",
+    "2026-10-08T10:36:19.207026+00:00"
+   ],
+   "excluded_keys_by_window": {
+    "2026-10-08": 1442
+   },
+   "ambiguous_rows_event_after_collected_before": 0
+  },
+  "edgar_8k": {
+   "collection_time_column": "seen_utc",
+   "event_time_column": "updated_utc",
+   "excluded_rows": 22,
+   "excluded_collection_range": [
+    "2026-10-08T10:03:19.031606+00:00",
+    "2026-10-08T10:31:19.198335+00:00"
+   ],
+   "ambiguous_rows_event_after_collected_before": 0
+  },
+  "edgar_polls": {
+   "collection_time_column": "at_utc",
+   "event_time_column": null,
+   "excluded_rows": 28,
+   "excluded_collection_range": [
+    "2026-10-08T08:00:41.120186+00:00",
+    "2026-10-08T10:31:19.198335+00:00"
+   ]
+  },
+  "snapshots": {
+   "collection_time_column": "built_utc",
+   "event_time_column": null,
+   "excluded_rows": 1,
+   "excluded_collection_range": [
+    "2026-10-08T08:04:12.035143+00:00",
+    "2026-10-08T08:04:12.035143+00:00"
+   ],
+   "excluded_keys_by_window": {
+    "2026-10-08": 1
+   }
+  },
+  "snapshot": {
+   "collection_time_column": "via snapshots.built_utc",
+   "excluded_snapshot_ids": [
+    "2026-10-08@2026-10-07"
+   ],
+   "excluded_rows": 14391
+  }
+ },
+ "post_endpoint_windows": [
+  "2026-10-08"
+ ],
+ "in_study_windows": {
+  "SEG1_PROD_DTU_V1": [
+   "2026-09-30",
+   "2026-10-01",
+   "2026-10-02"
+  ],
+  "SEG2_PROD_DTU_V2": [
+   "2026-10-05",
+   "2026-10-06",
+   "2026-10-07"
+  ],
+  "pre_segment_start_day": [
+   "2026-09-29"
+  ]
+ },
+ "last_collection_row_utc": "2026-10-08T10:36:19.207026+00:00",
+ "last_in_study_sweep_utc": "2026-10-07T23:59:40.638486+00:00",
+ "files": {
+  "shadow.db": {
+   "bytes": 80658432,
+   "sha256": "b312604ba264130ece61e99b62fba74f65423b96c6fbc5899c7bce68e4e0ebfa"
+  },
+  "shadow.db-wal": {
+   "bytes": 6933992,
+   "note": "WAL not checkpointed by this read-only tool; hash the db after a checkpoint for an archival copy"
+  },
+  "collector.log": {
+   "bytes": 1176653
+  }
+ }
+}
