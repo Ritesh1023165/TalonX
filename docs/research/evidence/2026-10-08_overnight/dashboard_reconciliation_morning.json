@@ -1,0 +1,49 @@
+{
+ "checked_utc": "2026-10-08T08:30:50.818894+00:00",
+ "lanes": {
+  "PAPER_SIGNAL_PROMOTION": {
+   "status": "MATCH",
+   "history": {
+    "SENT": 1221
+   },
+   "mode": "RESEARCH_REVIEW_DELIVERY_ENABLED (UNVALIDATED review alerts to the Signal bot since 2026-10-07T22:42:55+00:00)"
+  },
+  "INTELLIGENCE_CARDS": {
+   "status": "MATCH",
+   "history": {
+    "SENT": 355,
+    "AMBIGUOUS": 3,
+    "EXPIRED": 50846
+   },
+   "mode": null
+  },
+  "V2_ACTIONABLE": {
+   "status": "MATCH",
+   "history": {},
+   "mode": null
+  },
+  "OPERATIONS": {
+   "status": "MATCH",
+   "history": {
+    "SENT": 56,
+    "FAILED": 1,
+    "EXPIRED": 2
+   },
+   "mode": null
+  },
+  "LAB_RESEARCH": {
+   "status": "MATCH",
+   "history": {
+    "SENT": 2250
+   },
+   "mode": null
+  },
+  "VR_PAPER": {
+   "status": "MATCH",
+   "history": {
+    "SENT": 334
+   },
+   "mode": "ENTRY COLLECTION INTERRUPTED (both arms; open positions still managed)"
+  }
+ }
+}
