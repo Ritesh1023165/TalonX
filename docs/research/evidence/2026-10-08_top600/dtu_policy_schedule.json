@@ -1,0 +1,9 @@
+{
+ "schedule": [
+  {"policy": "DTU_V3_TOP600", "effective_from_window": "2026-10-09"}
+ ],
+ "decision": "owner decision 2026-10-08: cap new Opportunity Engine membership at 600 by the existing live ADV20; no event tier above rank 600",
+ "code_commit": "7715b84",
+ "written_utc": "2026-10-08T20:06:18Z",
+ "rollback": "append {\"policy\": \"DTU_V2\", \"effective_from_window\": \"<future window>\"}; never edit or remove past entries"
+}

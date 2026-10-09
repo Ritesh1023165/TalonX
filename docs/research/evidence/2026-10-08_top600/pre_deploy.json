@@ -1,0 +1,32 @@
+{
+ "captured": "2026-10-08T20:06:18.796292+00:00",
+ "head": "7715b84",
+ "components": [
+  [
+   "discovery",
+   18992,
+   "063e541827a2",
+   "{\"CONTINUOUS_RESEARCH\": \"2ef115ee19f99574\", \"DTU\": \"65f3285f8181c552\", \"PREMARKET_RESEARCH_V1\": \"62ba413daf85e674\", \"SEC_CATALYST_CACHE\": \"BACKGROUND_REFRESH_V1\"}"
+  ],
+  [
+   "ingestion",
+   10624,
+   "907fad4c0de0",
+   "{\"DTU\": \"65f3285f8181c552\"}"
+  ],
+  [
+   "sentinel",
+   11140,
+   "4dbd66f0b3e2",
+   "{\"destination\": \"SENTINEL\", \"enabled\": \"1\", \"mutation_mode\": \"DRY_RUN\"}"
+  ]
+ ],
+ "snapshot_2026_10_08": [
+  [
+   "2026-10-08@2026-10-07#65f3285f8181c552",
+   "2026-10-08T00:02:39.350599+00:00",
+   "65f3285f8181c552",
+   "{\"ACTIVE_CORE\": 1200, \"STRUCTURALLY_EXCLUDED\": 8740, \"AUTO_EXCLUDED\": 3558, \"EVENT_ELIGIBLE\": 893}"
+  ]
+ ]
+}

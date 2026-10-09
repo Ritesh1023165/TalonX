@@ -1,0 +1,9 @@
+⚙️ TALONX SENTINEL — UNIVERSE (2026-10-09)
+Live floors DTU_V3_TOP600: close ≥ $5 · ADV20 ≥ $20M (as of 2026-10-08 close, 20 sessions)
+Qualifying: 600 (Core 600 · event-eligible 0)
+Previous (DTU_V2_LIVE_FLOOR): 2090 · retained 600 · added 0 · removed 1490
+Excluded: price 81 · liquidity 1741 · both 1543 · data 193
+Protected (fetched, not admissible): 359
+Snapshot: 2026-10-09@2026-10-08#2849da5594f272db
+Tradability/workload filter only — not a profitability claim.
+Full list: /universe excluded file
