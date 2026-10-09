@@ -43,9 +43,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import sqlite3
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from talonx_opportunity.db import connect, iso, j, root_dir, utcnow
 from talonx_opportunity.phases import phase_at, trading_window
@@ -209,6 +212,127 @@ def render_review(p: dict, now: datetime, policy: str) -> str:
         f"📉 Research verdict: {REVIEW_VERDICT}", "",
         "For review only · not a trade event · no order placed",
     ])
+
+
+# 2026-10-09 (owner-approved, PRESENTATION ONLY): compact research-review template. Every value comes from records that
+# exist when the message is rendered -- the promotion row, the generation-time candidate event (features / score /
+# catalyst / provenance), the exchange-calendar close of the window, earlier CONFIRMED (outbox SENT) deliveries and the
+# DTU policy schedule. The Telegram acknowledgement time is not known at render time and is never shown. Plain text
+# (the worker sends parse_mode=None). Missing evidence renders as UNKNOWN (or the optional Repeat line is omitted).
+# Previous wording: ``render_review`` (kept unchanged for rollback). Detailed score arithmetic stays in the
+# candidate_events record (score_json) and the deployment evidence.
+REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_COMPACT_V1"
+_ET = ZoneInfo("America/New_York")
+_FORM_WORDS = {"144": "Form 144 proposed-sale notice", "3": "Form 3 initial ownership report",
+               "4": "Form 4 insider transaction report", "5": "Form 5 annual insider report"}
+_INCOMPLETE = "catalyst lookup incomplete"
+
+
+def _num(v):
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if x == x else None
+
+
+def _et(v) -> str:
+    try:
+        t = v if isinstance(v, datetime) else _ts(v)
+        return t.astimezone(_ET).strftime("%H:%M") + " ET"
+    except (TypeError, ValueError, AttributeError):
+        return "UNKNOWN"
+
+
+def _sec_context(cat) -> str:
+    c = str(cat).strip() if cat is not None else ""
+    if not c:
+        return "SEC context: UNKNOWN (no catalyst record). News not checked."
+    if c == "none found":
+        return "SEC context: No matching SEC/insider record found in the checked sources. News not checked."
+    labels = [x.strip() for x in c.split("; ") if x.strip()]
+    gaps = [x for x in labels if x.startswith(_INCOMPLETE)]
+    found = []
+    for lab in (x for x in labels if not x.startswith(_INCOMPLETE)):
+        m = re.fullmatch(r"\d+ other SEC filing\(s\): (.+)", lab)
+        found.append("other filing(s): " + ", ".join(_FORM_WORDS.get(f.strip(), f"Form {f.strip()}")
+                                                   for f in m.group(1).split(",")) if m else lab)
+    if not found:
+        return f"SEC context: UNKNOWN ({'; '.join(gaps) or c}). News not checked."
+    tail = f"; other sources UNKNOWN ({'; '.join(gaps)})" if gaps else ""
+    return f"SEC context: {'; '.join(found)}{tail}. Connection to the move unverified; news not checked."
+
+
+def _why(f: dict) -> str:
+    out = []
+    gap, atr = _num(f.get("gap_pct")), _num(f.get("atr20_pct"))
+    out.append(f"move = {abs(gap) / atr:.1f}× its 20-day average true range ({atr:.2f}% of price)"
+               if gap is not None and atr else "move vs 20-day range UNKNOWN")
+    vol, frac = _num(f.get("pm_volume")), _num(f.get("activity_adv_fraction"))
+    out.append(f"volume since 04:00 ET {vol:,.0f} sh = {frac * 100:.1f}% of 20-day avg daily volume"
+               if vol is not None and frac is not None else
+               (f"volume since 04:00 ET {vol:,.0f} sh" if vol is not None else "volume UNKNOWN"))
+    pos, d = f.get("range_position"), _num(f.get("range_distance_pct"))
+    ph, pl = _num(f.get("prev_high")), _num(f.get("prev_low"))
+    if pos == "ABOVE_PREV_HIGH" and d is not None and ph:
+        out.append(f"{d:.2f}% above prior-day high {_ref(ph)}")
+    elif pos == "INSIDE_PREV_RANGE" and ph:
+        out.append(f"inside prior-day range (high {_ref(ph)})")
+    elif pos == "BELOW_PREV_LOW" and d is not None and pl:
+        out.append(f"{d:.2f}% below prior-day low {_ref(pl)}")
+    else:
+        out.append("position vs prior-day high UNKNOWN")
+    return "Why flagged: " + " · ".join(out)
+
+
+def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
+    """The deployed research-review alert (REVIEW_TEMPLATE_VERSION). ``ctx``: {"event": candidate_events row or None,
+    "close_utc": window close or None, "prior_delivery_date": ET date of the latest earlier CONFIRMED delivery for the
+    symbol or None, "universe": policy name or None}. Never raises on missing evidence."""
+    ctx = ctx or {}
+    ev = ctx.get("event") or {}
+    try:
+        f = json.loads(ev.get("features_json") or "{}")
+    except (TypeError, ValueError):
+        f = {}
+    try:
+        prov = json.loads(ev.get("provenance_json") or "{}")
+    except (TypeError, ValueError):
+        prov = {}
+    gap = _num(f.get("gap_pct"))
+    pc = _num(f.get("prev_close"))
+    move = (f"price {'up' if gap >= 0 else 'down'} {abs(gap):.2f}% from prior close {_ref(pc)}"
+            if gap is not None and pc else "price move vs prior close UNKNOWN")
+    asof = p.get("data_as_of_utc")
+    try:
+        age = f"{int((now - _ts(asof)).total_seconds() // 60)} min"
+    except (TypeError, ValueError):
+        age = "UNKNOWN age"
+    delay = prov.get("delay_minutes")
+    ref = _num(p.get("reference_price"))
+    score = _num(p.get("score"))
+    lines = [
+        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        f"{p.get('symbol') or 'UNKNOWN'} · {move}",
+        "",
+        _why(f) if f else "Why flagged: UNKNOWN (generation record unavailable)",
+        "",
+        f"Historical price: {_ref(ref) if ref else 'UNKNOWN'} at {_et(asof)}",
+        f"{f'{delay}-min delayed feed' if delay else 'Delayed feed'} · data {age} old when written · not a live quote",
+        f"Detected {_et(p.get('event_utc'))} · written {_et(now)}",
+        "",
+        _sec_context(ev.get("catalyst") if ev else None),
+        "",
+        f"Scope: Today’s session, closing {_et(ctx.get('close_utc'))}. No entry, exit or holding rule.",
+        f"Rule score: {score:.1f}/100; not a probability." if score is not None else "Rule score: UNKNOWN.",
+    ]
+    if ctx.get("prior_delivery_date"):
+        lines.append(f"Repeat: earlier alert for {p.get('symbol')} delivered {ctx['prior_delivery_date']}")
+    lines += ["",
+              "⚠️ This policy’s evaluated paper results were negative after costs.",
+              "For review only · not a buy instruction · no order placed",
+              f"Policy {policy} · universe {ctx.get('universe') or 'UNKNOWN'} · reference {p.get('promotion_id')}"]
+    return "\n".join(lines)
 
 
 def render(p: dict) -> str:
@@ -455,11 +579,12 @@ class Promoter:
                 self.outbox.enqueue(event_id=sig, destination=TRADE_EVENT,
                                     event_type=REVIEW_EVENT_TYPE if review else "PAPER_OPPORTUNITY",
                                     producer=PRODUCER, dedup_key=sig,
-                                    payload_text=render_review(q, now, self.policy.version) if review else render(q),
+                                    payload_text=self._render_review(s, q, now) if review else render(q),
                                     provenance={"source_strategy": SOURCE, "candidate_id": q["candidate_id"],
                                                 "symbol": q["symbol"], "mode": PAPER_SIGNAL, "paper_only": True,
                                                 "not_a_v2_trade_event": True, "policy": self.policy.version,
-                                                "research_review_alert": review, "unvalidated": True},
+                                                "research_review_alert": review, "unvalidated": True,
+                                                **({"template_version": REVIEW_TEMPLATE_VERSION} if review else {})},
                                     deliver_by_utc=iso(now + timedelta(minutes=30)))
                 state = "PROMOTED_SIGNAL"
                 reason = REVIEW_REASON if review else None
@@ -470,6 +595,50 @@ class Promoter:
             used += 1
             out["promoted"] += 1
         return out
+
+    def _review_context(self, s: OpportunityStore, q: dict) -> dict:
+        """Render-time evidence for the compact review template (read-only; each part independently UNKNOWN on error)."""
+        ctx = {"event": None, "close_utc": None, "prior_delivery_date": None, "universe": None}
+        try:
+            cur = s.con.execute("SELECT features_json, score_json, catalyst, provenance_json, at_utc FROM "
+                                "candidate_events WHERE event_id=?", (q["event_id"],))
+            row = cur.fetchone()
+            ctx["event"] = dict(zip([d[0] for d in cur.description], row)) if row else None
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            ctx["close_utc"] = trading_window(date.fromisoformat(q["window_id"])).close_utc
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            ids = [r[0] for r in self.con.execute(
+                "SELECT signal_event_id FROM promotions WHERE symbol=? AND promotion_id!=? AND state='PROMOTED_SIGNAL' "
+                "AND signal_event_id IS NOT NULL", (q["symbol"], q["promotion_id"]))]
+            if ids:
+                ob = sqlite3.connect(f"file:{signal_outbox_path(self.root)}?mode=ro", uri=True, timeout=2)
+                try:
+                    last = ob.execute(f"SELECT MAX(sent_at_utc) FROM ops_notification_outbox WHERE state='SENT' AND "
+                                      f"event_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
+                finally:
+                    ob.close()
+                if last:
+                    ctx["prior_delivery_date"] = _ts(last).astimezone(_ET).date().isoformat()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            sched = json.loads((root_dir(self.root) / "control" / "dtu_policy_schedule.json").read_text(encoding="utf-8"))
+            for e in sorted(sched["schedule"], key=lambda e: e["effective_from_window"]):
+                if e["effective_from_window"] <= q["window_id"]:
+                    ctx["universe"] = str(e["policy"])
+        except Exception:  # noqa: BLE001
+            pass
+        return ctx
+
+    def _render_review(self, s: OpportunityStore, q: dict, now: datetime) -> str:
+        try:
+            return render_review_compact(q, now, self.policy.version, self._review_context(s, q))
+        except Exception:  # noqa: BLE001 -- a presentation fault must never block a release: evidence-free form
+            return render_review_compact(q, now, self.policy.version, None)
 
     def _drain_signal(self):
         if self.mode != PAPER_SIGNAL or self.outbox is None:
