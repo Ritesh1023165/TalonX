@@ -150,7 +150,7 @@ lag) and made no admission decision.
 | Cycle | Effective active | Breakdown |
 |---|---|---|
 | 08:02:25Z | 959 | includes setups carried over from 10-08 |
-| 08:05:26Z | **603** | 564 Core + 39 V2/operator scope (3 of the V2 names lie outside the 600); protected 0; no fallback |
+| 08:05:26Z | **603** | **600 Core (C) + 3 V2-only names (V − C: ABCL, ACHR, ADC)**; protected 0; no fallback. *Correction 2026-10-09:* "564 Core + 39" were resolver **labels** (V2 names inside the Core are labelled OPERATOR_ADDED), not memberships: \|C\| = 600, \|V\| = 39, \|C ∩ V\| = 36, \|C ∪ V\| = 603 (`2026-10-09_post_delivery_markout/RECONCILIATION.md`) |
 
 **New candidates.** At the time of the check there were 0 new candidate identities for 2026-10-09, and **none outside
 the admitted 600**.

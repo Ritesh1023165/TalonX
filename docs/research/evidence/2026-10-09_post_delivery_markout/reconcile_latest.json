@@ -1,0 +1,109 @@
+{
+ "window_id": "2026-10-09",
+ "generation": 54,
+ "snapshot": {
+  "version": "2026-10-09@2026-10-08#2849da5594f272db",
+  "policy_fp": "2849da5594f272db"
+ },
+ "generation_row": {
+  "generation": 54,
+  "data_as_of_utc": "2026-10-09T08:41:00+00:00",
+  "ingestion_cycle_utc": "2026-10-09T08:56:47.268755+00:00",
+  "dtu_cycle_utc": "2026-10-09T08:56:47.448566+00:00",
+  "symbols_changed": 603
+ },
+ "fetch_list_source": {
+  "stored_at_cycle_utc": "2026-10-09T08:03:26.231590+00:00",
+  "rule": "symbols_json is written only when the fetch list changes; the list in force is the latest non-null row at or before the cycle (same rule as universe_tiers.latest_active)"
+ },
+ "dtu_active_row": {
+  "cycle_utc": "2026-10-09T08:56:47.448566+00:00",
+  "n_active": 603,
+  "label_counts": {
+   "ACTIVE_CORE": 564,
+   "AUTO_EXCLUDED": 5045,
+   "STRUCTURALLY_EXCLUDED": 8744,
+   "OPERATOR_ADDED": 39,
+   "effective_active": 603,
+   "protected": 0
+  },
+  "fallback": null,
+  "policy_fp": "2849da5594f272db"
+ },
+ "membership": {
+  "C_core": 600,
+  "V_v2_scope": 39,
+  "C_and_V": 36,
+  "C_minus_V": 564,
+  "V_minus_C": [
+   "ABCL",
+   "ACHR",
+   "ADC"
+  ],
+  "P_protected_or_shared_additions": [],
+  "union_C_V_P": 603,
+  "V_minus_C_snapshot_state": {
+   "ABCL": [
+    "AUTO_EXCLUDED",
+    "CAP_RANK_EXCLUDED_RANK_1229_OF_2090_CAP_600",
+    1229
+   ],
+   "ACHR": [
+    "AUTO_EXCLUDED",
+    "LIVE_BELOW_CLOSE_5",
+    null
+   ],
+   "ADC": [
+    "AUTO_EXCLUDED",
+    "CAP_RANK_EXCLUDED_RANK_924_OF_2090_CAP_600",
+    924
+   ]
+  }
+ },
+ "fetch_scheduling": {
+  "requested_this_cycle": 603,
+  "requested_eq_union": true,
+  "requested_minus_union": [],
+  "union_minus_requested": []
+ },
+ "response": {
+  "cycle_row": {
+   "at_utc": "2026-10-09T08:56:49.242654+00:00",
+   "phase": "PREMARKET",
+   "as_of_utc": "2026-10-09T08:41:00+00:00",
+   "fetched_symbols": 603,
+   "bars": 52,
+   "failed_symbols": 0,
+   "batches": 4,
+   "failed_batches": 0,
+   "note": "PREMARKET: as_of 2026-10-09T08:41:00Z bars+52 incomplete 0"
+  },
+  "aggregates_written_in_this_generation": 603
+ },
+ "data_freshness": {
+  "ingestion_state_generation": 54,
+  "incomplete_symbols": 0,
+  "requested_with_any_bar_so_far": 357,
+  "requested_with_no_bar_yet_premarket": 246,
+  "requested_with_a_bar_starting_in_last_15min_before_as_of": 189,
+  "bar_timestamp_convention": "bar t = interval START (1-min); as_of = end of the last complete minute",
+  "watermark_at_as_of": 603,
+  "aggregate_fields_sample": [
+   "bars",
+   "dollars_c",
+   "dollars_s",
+   "first_t",
+   "high",
+   "last_c",
+   "last_t",
+   "low",
+   "symbol",
+   "trades",
+   "volume_c",
+   "volume_s",
+   "window_id"
+  ],
+  "note": "no premarket bar yet != missing subscription: the symbol was requested and its watermark advanced; thin names simply have not traded since 04:00 ET"
+ },
+ "label_explanation": "dtu_active counts are per-symbol RESOLVED STATES, not set memberships: resolve() gives V2_EXECUTION_SCOPE (OPERATOR_ADDED) precedence over ACTIVE_CORE, so the V names inside the Core are labelled OPERATOR_ADDED and only the rest are labelled ACTIVE_CORE"
+}
