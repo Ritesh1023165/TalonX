@@ -2,7 +2,11 @@
 POST_DELIVERY_ALERT_MARKOUT_V1 -- the single scheduled collector invocation (one bounded run, then exit).
 
 usage: python -m talonx_paperperf.post_delivery_collector --config LOCKED_CONFIG.json [--enable]
-                                                           [--store DIR] [--budget-s 900] [--max-observations 200]
+                                                           [--store DIR] [--budget-s 900] [--max-observations N]
+The per-run observation PROCESSING budget is authoritative in the locked config
+(``collector.max_observations_per_run``); it is a batch size, never a sample-size cap -- unprocessed work stays pending
+for the next run. ``--max-observations`` is optional and must EQUAL the locked value; a different or invalid value
+refuses the run (CONFIG_REJECTED) instead of being silently ignored.
 Each run:
   1. singleton lock (refuses an overlapping run; a lock whose pid is gone is recorded and replaced);
   2. revalidates the LOCKED config: owner approval, protocol fingerprint AND implementation file hashes;
@@ -91,7 +95,22 @@ def missed_days(log_path: Path, now: datetime) -> list[str]:
     return [(prev + timedelta(days=i)).isoformat() for i in range(1, (cur - prev).days)]
 
 
-def collect(*, config: Path, enable: bool, store: Path, budget_s: float, max_observations: int,
+def resolve_max_observations(config: Path, requested: int | None) -> int:
+    """The single effective value: the locked config's collector.max_observations_per_run. Raises ValueError when it is
+    missing/invalid or when an explicitly requested value conflicts with it."""
+    from talonx_paperperf.post_delivery_markout import validate_max_observations
+    try:
+        locked = json.loads(Path(config).read_text(encoding="utf-8"))["collector"]["max_observations_per_run"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"locked collector.max_observations_per_run unreadable: {exc.__class__.__name__}") from None
+    locked = validate_max_observations(locked)
+    if requested is not None and validate_max_observations(requested) != locked:
+        raise ValueError(f"--max-observations {requested} conflicts with locked collector.max_observations_per_run "
+                         f"{locked}")
+    return locked
+
+
+def collect(*, config: Path, enable: bool, store: Path, budget_s: float, max_observations: int | None = None,
             now: datetime | None = None, acquirer=None, outbox_path: Path | None = None,
             promotion_path: Path | None = None, trace_path: Path | None = None, repo: Path = REPO,
             lock_alive=None) -> dict:
@@ -110,6 +129,11 @@ def collect(*, config: Path, enable: bool, store: Path, budget_s: float, max_obs
         return rec
     try:
         rec["lock_note"] = lock.note
+        try:
+            rec["max_observations"] = resolve_max_observations(config, max_observations)
+        except ValueError as exc:
+            rec["state"], rec["reason"] = "CONFIG_REJECTED", str(exc)
+            return rec
         if not enable:
             rec["state"] = "DISABLED"
             return rec
@@ -123,7 +147,7 @@ def collect(*, config: Path, enable: bool, store: Path, budget_s: float, max_obs
             acquirer = _LazyAcquirer(lambda: AlpacaAcquirer.from_env(budget_s=budget_s))
         out = M.run({M.ENABLE_ENV: "1", M.CONFIG_ENV: str(config)}, store_root=store, acquirer=acquirer, now=now,
                     outbox_path=ob, promotion_path=pc, trace_lookup=make_trace_lookup(ob, tp),
-                    require_integrity=True, repo=repo)
+                    require_integrity=True, repo=repo, max_observations=rec["max_observations"])
         rec.update(state=out.get("state"), reason=out.get("reason"),
                    summary={k: out.get(k) for k in ("expired_before", "registered", "observations_created",
                                                     "acquisition", "expired_after")},
@@ -168,14 +192,15 @@ def main(argv=None) -> int:
     ap.add_argument("--enable", action="store_true")
     ap.add_argument("--store", default=str(REPO / "results" / "post_delivery_markout"))
     ap.add_argument("--budget-s", type=float, default=900.0)
-    ap.add_argument("--max-observations", type=int, default=200)
+    ap.add_argument("--max-observations", type=int, default=None,
+                    help="optional; must equal the locked collector.max_observations_per_run")
     a = ap.parse_args(argv)
     from talonx_premarket import __main__ as M
     M._env()
     rec = collect(config=Path(a.config), enable=a.enable, store=Path(a.store), budget_s=a.budget_s,
                   max_observations=a.max_observations)
     print(json.dumps({k: rec.get(k) for k in ("state", "reason", "scheduled_utc", "actual_utc", "late_s",
-                                              "missed_days")}, default=str))
+                                              "missed_days", "max_observations")}, default=str))
     return 0 if rec.get("state") in ("ENABLED", "DISABLED", "BEFORE_ACTIVATION") else 3
 
 

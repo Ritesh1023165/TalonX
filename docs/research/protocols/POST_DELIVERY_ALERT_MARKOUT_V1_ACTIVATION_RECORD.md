@@ -78,7 +78,9 @@ C:\workspace\TalonX\.venv\Scripts\python.exe -m talonx_paperperf.post_delivery_c
 **Guards.**
 - Scheduler: `MultipleInstancesPolicy=IgnoreNew` and a 30-minute execution limit.
 - Collector: its own lock (an overlapping run is refused) and a 900 s request budget.
-- Provider limits: 40 requests/min, 2 retries, ≤ 5 quote pages, ≤ 200 observations per run.
+- Provider limits: 40 requests/min, 2 retries, ≤ 5 quote pages.
+- Processing budget: ≤ 200 due observations per run (`collector.max_observations_per_run`, authoritative). This is a batch size,
+  not a sample cap; see *Operational correction* below.
 - **Scope:**
   - No request before the activation boundary.
   - No new admission outside the 20 sessions. After the last session, only outstanding in-scope observations are
@@ -150,3 +152,93 @@ Evidence: `NATURAL_TRACE_VERIFICATION_2026-10-09.json` (sanitised: no message ID
   2.0 s.
 
 No alert was paired with bars or quotes, and no synthetic message was sent.
+
+## Operational correction: `--max-observations` (2026-10-09, before any collection)
+
+**Defect.** The collector recorded `--max-observations` but never passed it on, so `acquire()` used a built-in 200.
+
+**Was it batching or truncation?** Batching. No delivery was ever dropped:
+- source scan, registration and first-per-symbol selection are unbounded and re-run on every run (idempotent by
+  `event_id`, with no cursor);
+- the limit applied only to per-run acquisition, and unprocessed observations stayed `SELECTED_WAITING`.
+
+**Defects inside that batch:**
+- not-yet-matured observations and work after time-budget exhaustion still took slots;
+- budget-exhausted iterations counted as attempts;
+- within a session the order fell back to `obs_id`, which embeds the ticker, so any shortfall would land
+  alphabetically.
+
+**Correction.** Study rules are unchanged: population, selection, dates, timing, costs, method and endpoint.
+- **One authoritative value.** It is `collector.max_observations_per_run` = **200** in the locked config.
+  - The optional CLI flag must equal it.
+  - A missing, invalid, or conflicting value refuses the run (`CONFIG_REJECTED`) before any request.
+  - The engine also rejects values below 1 and non-integers.
+- **Due work only.** A run processes matured observations before their original deadline.
+- **Processing order** is earliest deadline, then fewest attempts, then `sha256(obs_id)`. The hash is deterministic,
+  independent of prices and outcomes, and never used for selection.
+- **Budget exhaustion.** The run stops. Nothing more is requested, and no error or attempt is recorded for untouched
+  observations. The remainder is reported as `deferred` and stays pending.
+- Deadlines keep their meaning, and final reporting still requires reconciled sources and all-terminal observations.
+
+**Lock update.** The procedure:
+1. Confirm no collector is running and no study store exists.
+2. Fix the code and tests.
+3. Recompute `implementation_hashes()`.
+4. Append a `lock_history` entry with old and new hashes.
+5. Recompute the config SHA.
+6. Verify integrity and the fingerprint.
+
+Approval, protocol fingerprint, parameters, first session and trace policy are byte-identical. The task definition is
+unchanged, and so is its config path.
+
+Config SHA-256 (excluding its own field): `d1b14b4281b59b5d4ca832a1a90fe21417108a2928df6a5563edc0fdeb1c57a4` → `f96b1c15237518259cc8229bfc4bd877b0e9756e83f79dd283b3067e24782fc8`.
+
+| File | Previous SHA-256 | New SHA-256 |
+|---|---|---|
+| `talonx_paperperf/post_delivery_collector.py` | `e21e7312758c30f1c4a1d2f625a2f4a76bc9421ab3af00e646a70ed335c969e0` | `922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd` |
+| `talonx_paperperf/post_delivery_markout.py` | `b969c8ac49fdfce0a6925b48b7525d29c3397fa9616f3a5ac6def7781bedcd51` | `31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e` |
+
+`post_delivery_acquisition.py` and `talonx_opportunity/delivery_trace.py` are unchanged. The corrected path adds no new
+module dependency.
+
+The study still uses two dependencies outside the integrity lock, as before:
+- `talonx_opportunity/phases.py` (XNYS calendar), which the calendar tests check;
+- `talonx_premarket/__main__._env` (credential loading).
+
+## Processing capacity: ESTIMATE and deadline risk
+
+Source: `pdm_v1_scheduler/capacity_estimate.py` → `CAPACITY_ESTIMATE_2026-10-09.json`. It drives the real `acquire()`
+and `AlpacaAcquirer` pacing, retry and budget code against a simulated clock and a mock transport. It is synthetic,
+not a provider measurement.
+
+**Per run** (900 s, 40/min, so at most about 600 requests and at least 4 requests per observation):
+
+| Transport scenario | Observations per run |
+|---|---|
+| Clean, 1 quote page | ~151 |
+| 5% transient 5xx errors | ~137 |
+| 2 quote pages | ~101 |
+| 2 quote pages and 5% 5xx | ~92 |
+
+**The binding limit is the 900 s budget at 40/min, not the 200.** The 200 is never reached.
+
+**Demand.** The last 7 sessions had 133–203 first deliveries per symbol per session (counts only), before
+eligibility and ambiguity exclusions.
+
+**Calendar replay** (20 sessions, daily runs, earliest deadline first, no study rule changed):
+- At 151 per run there are no expiries up to 170 per session.
+- At ~205 per session, 44 of 4,100 expire.
+- At 2 quote pages (101 per run), 535 of 3,400 expire at 170 per session.
+
+**Genuine deadline risk:** on busy sessions, or if quotes need more than one page, some selected observations would
+expire unattempted. Expiry is recorded as `EXPIRED` and never dropped. The ticker-neutral order makes the loss
+quasi-random rather than alphabetical.
+
+**Proposal (not implemented; owner decision).** Add a second off-hours daily trigger to the same task, for example
+06:30 London (05:30Z BST / 06:30Z GMT, outside R5).
+- Every per-run bound stays the same: 900 s, 40/min, retries, pages, 200.
+- This roughly doubles daily capacity (estimate ~184–300 observations per day).
+
+Alternatives:
+- raise `budget_s` to 1,500 s together with a 40-minute execution limit;
+- an off-hours rate above 40/min, which needs a shared-quota review first.

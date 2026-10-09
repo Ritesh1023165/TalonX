@@ -25,16 +25,43 @@
  "first_session": "2026-10-19",
  "delivery_trace_policy": "REQUIRED",
  "implementation_sha256": {
-  "talonx_paperperf/post_delivery_markout.py": "b969c8ac49fdfce0a6925b48b7525d29c3397fa9616f3a5ac6def7781bedcd51",
+  "talonx_paperperf/post_delivery_markout.py": "31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e",
   "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
-  "talonx_paperperf/post_delivery_collector.py": "e21e7312758c30f1c4a1d2f625a2f4a76bc9421ab3af00e646a70ed335c969e0",
+  "talonx_paperperf/post_delivery_collector.py": "922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd",
   "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
  },
  "collector": {
   "schedule": "daily 00:15 Europe/London (23:15Z BST / 00:15Z GMT)",
   "budget_s": 900,
   "max_observations_per_run": 200,
-  "provider_rate_per_min": 40
+  "provider_rate_per_min": 40,
+  "max_observations_semantics": "operational per-run processing budget, never a sample-size cap; unprocessed observations stay SELECTED_WAITING for later runs; authoritative here (CLI value must equal it or the run is refused)",
+  "processing_order": "earliest original deadline, fewest attempts, sha256(obs_id)"
  },
- "config_sha256_excluding_this_field": "d1b14b4281b59b5d4ca832a1a90fe21417108a2928df6a5563edc0fdeb1c57a4"
+ "lock_history": [
+  {
+   "at_utc": "2026-10-09T15:17:13+00:00",
+   "kind": "OPERATIONAL_CORRECTION (owner-authorised 2026-10-09; protocol, approval and study rules unchanged)",
+   "reason": "--max-observations was recorded but ignored (built-in 200 applied); now wired from this locked value; not-matured/budget-exhausted work no longer occupies the batch or counts as an attempt; ticker-neutral processing tiebreak",
+   "changed_files": [
+    "talonx_paperperf/post_delivery_collector.py",
+    "talonx_paperperf/post_delivery_markout.py"
+   ],
+   "previous_implementation_sha256": {
+    "talonx_paperperf/post_delivery_markout.py": "b969c8ac49fdfce0a6925b48b7525d29c3397fa9616f3a5ac6def7781bedcd51",
+    "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
+    "talonx_paperperf/post_delivery_collector.py": "e21e7312758c30f1c4a1d2f625a2f4a76bc9421ab3af00e646a70ed335c969e0",
+    "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
+   },
+   "previous_config_sha256": "d1b14b4281b59b5d4ca832a1a90fe21417108a2928df6a5563edc0fdeb1c57a4",
+   "new_implementation_sha256": {
+    "talonx_paperperf/post_delivery_markout.py": "31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e",
+    "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
+    "talonx_paperperf/post_delivery_collector.py": "922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd",
+    "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
+   },
+   "collection_started_before_change": false
+  }
+ ],
+ "config_sha256_excluding_this_field": "f96b1c15237518259cc8229bfc4bd877b0e9756e83f79dd283b3067e24782fc8"
 }

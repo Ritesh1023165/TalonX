@@ -1,0 +1,167 @@
+{
+ "label": "ESTIMATE (synthetic transport; not a measurement of the provider)",
+ "assumptions": {
+  "budget_s": 900,
+  "provider_rate_per_min": 40,
+  "retries": 2,
+  "max_quote_pages": 5,
+  "latency_s": 0.3,
+  "max_observations_per_run": 200
+ },
+ "per_run": {
+  "clean_1_quote_page": {
+   "processed": 151,
+   "measured": 150,
+   "requests": 601,
+   "deferred": 249,
+   "budget_exhausted": true,
+   "sim_elapsed_s": 900
+  },
+  "2_quote_pages": {
+   "processed": 101,
+   "measured": 100,
+   "requests": 601,
+   "deferred": 299,
+   "budget_exhausted": true,
+   "sim_elapsed_s": 900
+  },
+  "5pct_transient_5xx": {
+   "processed": 137,
+   "measured": 137,
+   "requests": 580,
+   "deferred": 263,
+   "budget_exhausted": true,
+   "sim_elapsed_s": 900
+  },
+  "2_quote_pages_and_5pct_5xx": {
+   "processed": 92,
+   "measured": 91,
+   "requests": 580,
+   "deferred": 308,
+   "budget_exhausted": true,
+   "sim_elapsed_s": 900
+  }
+ },
+ "calendar": {
+  "92": [
+   {
+    "demand_per_session": 130,
+    "capacity_per_run": 92,
+    "attempted": 2512,
+    "expired_unprocessed": 88,
+    "total": 2600
+   },
+   {
+    "demand_per_session": 170,
+    "capacity_per_run": 92,
+    "attempted": 2640,
+    "expired_unprocessed": 760,
+    "total": 3400
+   },
+   {
+    "demand_per_session": 205,
+    "capacity_per_run": 92,
+    "attempted": 2668,
+    "expired_unprocessed": 1432,
+    "total": 4100
+   },
+   {
+    "demand_per_session": 250,
+    "capacity_per_run": 92,
+    "attempted": 2668,
+    "expired_unprocessed": 2332,
+    "total": 5000
+   }
+  ],
+  "101": [
+   {
+    "demand_per_session": 130,
+    "capacity_per_run": 101,
+    "attempted": 2600,
+    "expired_unprocessed": 0,
+    "total": 2600
+   },
+   {
+    "demand_per_session": 170,
+    "capacity_per_run": 101,
+    "attempted": 2865,
+    "expired_unprocessed": 535,
+    "total": 3400
+   },
+   {
+    "demand_per_session": 205,
+    "capacity_per_run": 101,
+    "attempted": 2929,
+    "expired_unprocessed": 1171,
+    "total": 4100
+   },
+   {
+    "demand_per_session": 250,
+    "capacity_per_run": 101,
+    "attempted": 2929,
+    "expired_unprocessed": 2071,
+    "total": 5000
+   }
+  ],
+  "137": [
+   {
+    "demand_per_session": 130,
+    "capacity_per_run": 137,
+    "attempted": 2600,
+    "expired_unprocessed": 0,
+    "total": 2600
+   },
+   {
+    "demand_per_session": 170,
+    "capacity_per_run": 137,
+    "attempted": 3400,
+    "expired_unprocessed": 0,
+    "total": 3400
+   },
+   {
+    "demand_per_session": 205,
+    "capacity_per_run": 137,
+    "attempted": 3832,
+    "expired_unprocessed": 268,
+    "total": 4100
+   },
+   {
+    "demand_per_session": 250,
+    "capacity_per_run": 137,
+    "attempted": 3925,
+    "expired_unprocessed": 1075,
+    "total": 5000
+   }
+  ],
+  "151": [
+   {
+    "demand_per_session": 130,
+    "capacity_per_run": 151,
+    "attempted": 2600,
+    "expired_unprocessed": 0,
+    "total": 2600
+   },
+   {
+    "demand_per_session": 170,
+    "capacity_per_run": 151,
+    "attempted": 3400,
+    "expired_unprocessed": 0,
+    "total": 3400
+   },
+   {
+    "demand_per_session": 205,
+    "capacity_per_run": 151,
+    "attempted": 4056,
+    "expired_unprocessed": 44,
+    "total": 4100
+   },
+   {
+    "demand_per_session": 250,
+    "capacity_per_run": 151,
+    "attempted": 4275,
+    "expired_unprocessed": 725,
+    "total": 5000
+   }
+  ]
+ }
+}

@@ -520,35 +520,73 @@ def _store_part(store, obs_id, part, res, now):
                               "(?,?,?,?,?)", (obs_id, part, res["outcome"], str(res.get("detail"))[:300], iso(now)))
 
 
-def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = 200) -> dict:
+DEFAULT_MAX_OBSERVATIONS = 200                     # operational per-run PROCESSING budget -- never a sample-size cap
+_BUDGET_OUTCOME = "BUDGET_EXHAUSTED"                  # post_delivery_acquisition.BUDGET (run budget, not a provider error)
+
+
+def processing_key(o) -> tuple:
+    """Deterministic per-run processing order: earliest ORIGINAL deadline first, then fewest attempts (no starvation by
+    repeatedly failing work), then sha256(obs_id). Within a session every observation shares maturity and deadline, and
+    obs_id embeds the ticker, so a plain obs_id tiebreak would make any capacity shortfall fall alphabetically; the
+    hash is a fixed, outcome-independent pseudo-random order instead. Never used for selection."""
+    return o["deadline_utc"], o["attempts"], hashlib.sha256(o["obs_id"].encode()).hexdigest()
+
+
+def validate_max_observations(v) -> int:
+    if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+        raise ValueError(f"max_observations must be an integer >= 1 (got {v!r})")
+    return v
+
+
+def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = DEFAULT_MAX_OBSERVATIONS) -> dict:
     """Request ONLY missing parts of matured, non-terminal, selected observations, inside the acquirer's permitted
-    window. Never requests anything for excluded/terminal observations or outside the activated population."""
-    out = {"requested": 0, "errors": 0, "skipped_not_matured": 0, "skipped_window": 0}
+    window. Never requests anything for excluded/terminal observations or outside the activated population.
+
+    ``max_observations`` bounds how many DUE observations one run processes; it never caps the sample. Work not
+    reached stays durably SELECTED_WAITING for the next run (reported as ``deferred``). Due = matured, before its
+    original deadline. Order: ``processing_key``. Selection happened earlier and never depends on this order.
+    When the run's time budget is exhausted the run stops: nothing more is requested, no error is recorded and no
+    attempt is counted for observations that made no request."""
+    max_observations = validate_max_observations(max_observations)
     if acquirer is None:
         return {"acquirer": "NOT_CONFIGURED"}
-    for o in store.q("SELECT * FROM observations WHERE state=? ORDER BY matures_utc, obs_id LIMIT ?",
-                     (SELECTED_WAITING, max_observations)):
-        if now < ts(o["matures_utc"]):
-            out["skipped_not_matured"] += 1
-            continue
-        if not acquirer.permitted(now):
-            out["skipped_window"] += 1
-            continue
+    waiting = sorted(store.q("SELECT * FROM observations WHERE state=?", (SELECTED_WAITING,)), key=processing_key)
+    due = [o for o in waiting if ts(o["matures_utc"]) <= now < ts(o["deadline_utc"])]
+    out = {"requested": 0, "errors": 0, "skipped_not_matured": sum(now < ts(o["matures_utc"]) for o in waiting),
+           "skipped_window": 0, "due": len(due), "processed": 0, "deferred": 0, "budget_exhausted": False,
+           "max_observations": max_observations}
+    if due and not acquirer.permitted(now):
+        out["skipped_window"] = out["deferred"] = len(due)
+        return out
+    for i, o in enumerate(due):
+        if i >= max_observations or out["budget_exhausted"]:
+            out["deferred"] = len(due) - i
+            break
         have = {r["part"] for r in store.q("SELECT part FROM inputs WHERE obs_id=? AND outcome='RETRIEVED'",
                                           (o["obs_id"],))}
         e, x = ts(o["entry_utc"]), ts(o["exit_utc"])
         wants = {"entry_bar": ("bar", e), "exit_bar": ("bar", x - timedelta(minutes=1)),
                  "entry_quote": ("quote", e), "exit_quote": ("quote", x)}
+        made = False
         for part, (kind, t) in wants.items():
             if part in have:
                 continue
             res = acquirer.bar(o["symbol"], t) if kind == "bar" else acquirer.quote(o["symbol"], t)
+            if res["outcome"] == _BUDGET_OUTCOME:
+                out["budget_exhausted"] = True
+                break
+            made = True
             out["requested"] += 1
             out["errors"] += res["outcome"] != "RETRIEVED"
             _store_part(store, o["obs_id"], part, res, now)
-        with store.con:
-            store.con.execute("UPDATE observations SET attempts=attempts+1, updated_utc=? WHERE obs_id=?",
-                              (iso(now), o["obs_id"]))
+        if made:
+            out["processed"] += 1
+            with store.con:
+                store.con.execute("UPDATE observations SET attempts=attempts+1, updated_utc=? WHERE obs_id=?",
+                                  (iso(now), o["obs_id"]))
+        elif out["budget_exhausted"]:
+            out["deferred"] = len(due) - i
+            break
         _finalise(store, store.q("SELECT * FROM observations WHERE obs_id=?", (o["obs_id"],))[0], now)
     return out
 
@@ -704,10 +742,12 @@ def final_report(store: Store, act: dict, now: datetime, *, outbox_path: Path, p
 # ============================================================================================ entry point
 def run(env=None, *, store_root: Path | None = None, acquirer=None, now: datetime | None = None,
         outbox_path: Path | None = None, promotion_path: Path | None = None, trace_lookup=None,
-        require_integrity: bool = False, repo: Path = REPO) -> dict:
+        require_integrity: bool = False, repo: Path = REPO,
+        max_observations: int = DEFAULT_MAX_OBSERVATIONS) -> dict:
     """Disabled by default. When enabled with an approved config: reconcile deadlines FIRST, then register/select,
     then acquire (bounded), then reconcile again. Never touches anything when disabled or unapproved."""
     env = os.environ if env is None else env
+    max_observations = validate_max_observations(max_observations)
     if str(env.get(ENABLE_ENV, "")).strip() != "1":
         return {"state": "DISABLED"}
     now = now or datetime.now(UTC)
@@ -725,7 +765,8 @@ def run(env=None, *, store_root: Path | None = None, acquirer=None, now: datetim
     reg = register(store, act=act, outbox_path=outbox_path or opp / "promotion_signal_notifications.db",
                    promotion_path=promotion_path or opp / "promotion.db", now=now, trace_lookup=trace_lookup)
     # at/after the endpoint: reconcile + status only -- never a late fetch, never a reopened observation
-    acq = {"skipped": "AFTER_ENDPOINT"} if now >= act["endpoint_utc"] else acquire(store, acquirer, now)
+    acq = {"skipped": "AFTER_ENDPOINT"} if now >= act["endpoint_utc"] else acquire(
+        store, acquirer, now, max_observations=max_observations)
     expired_after = reconcile_deadlines(store, now)
     summary = {"state": "ENABLED", "expired_before": expired_first, **reg, "acquisition": acq,
                "expired_after": expired_after, "health": health(store, act, now)}

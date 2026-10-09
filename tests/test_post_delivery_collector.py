@@ -82,7 +82,8 @@ def test_changed_implementation_is_refused(tmp_path):
 def cfg(tmp_path, **over):
     d = {"approved": True, "approved_by": "owner", "approved_utc": "2026-10-10T12:00:00Z",
          "protocol_fingerprint": M.PDM_V1.fingerprint(), "first_session": "2026-10-12",
-         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(), **over}
+         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(),
+         "collector": {"max_observations_per_run": 50}, **over}
     p = tmp_path / "cfg.json"
     p.write_text(json.dumps(d), encoding="utf-8")
     return p
