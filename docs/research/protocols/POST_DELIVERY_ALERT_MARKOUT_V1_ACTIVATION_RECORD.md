@@ -120,3 +120,33 @@ Tracing can stay; it never affects delivery. To remove it, revert `Promoter._dra
 call and make a declared promotion restart.
 
 None of this pauses review alerts, replays messages, resumes VR, alters other studies or deletes collected evidence.
+
+## Delivery tracing: deployment and natural verification (2026-10-09)
+
+**Deployments.** Both were component-specific declared restarts of promotion only.
+- 13:36:12Z (14:36 BST): commit `4a4826d`, declaration #48, v`466ddff305d7`.
+- 13:46:00Z (14:46 BST): commit `507f8c0`, declaration #49, v`02df848a2940`. This added `delivery_trace.py` to the
+  promotion version hash; the running code was unchanged.
+
+Routing, content, parse mode, retry limits, dedup, the 600 cap, the rate limit and the VR interruption are all unchanged.
+Old rows were not replayed and no historical trace was fabricated.
+
+**Natural verification.** 6 natural review alerts, 13:50–13:56Z, were checked read-only by `verify_natural_traces.py`.
+Evidence: `NATURAL_TRACE_VERIFICATION_2026-10-09.json` (sanitised: no message IDs, chat identifiers or payloads).
+- **Correlation:** each outbox `SENT` row has exactly one trace (payload SHA-256), and the study lookup returns
+  `TRACE_OK`.
+- **Ordering:**
+  - send start ≤ response, by 733–1098 ms;
+  - outbox `sent_at` is 8–25 ms after the response;
+  - row created ≤ send start.
+- **Server timestamp:** 1 s precision. Server − response ranges from −1.034 s to −0.264 s, consistent with truncation
+  and inside the package's existing 2.0 s tolerance.
+- Message ID present; destination stored only as a 12-character hash.
+- **Retries:** 0 network, 0 rate-limit and 0 definite; outbox attempts = 1. The wrapper's retry observation of the
+  real client is proven by test.
+- No duplicated dedup key and no untraced `SENT` row.
+- VR entry control: `BLOCKED`.
+- **Clock:** w32tm reports source time.windows.com, stratum 5, root dispersion 0.27 s, against the package tolerance of
+  2.0 s.
+
+No alert was paired with bars or quotes, and no synthetic message was sent.
