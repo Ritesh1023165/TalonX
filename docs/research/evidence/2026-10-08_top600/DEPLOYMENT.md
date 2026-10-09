@@ -138,3 +138,21 @@ scope. They stay fetched for management and are not admissible. The initial moni
 
 **Status:** *published membership active*. Consumer admission under the cap starts at discovery's 08:00Z premarket
 scan (below).
+
+### Observed 2026-10-09 08:02–08:06Z: consumers active under the cap
+
+**Discovery.** The first PREMARKET scan with usable data (**08:02:56Z**, 09:02 BST) reported policy `DTU_V3_TOP600`,
+**admissible 600**, admission `SNAPSHOT`, applied. The 08:00:55 and 08:01:56 scans were `PROVIDER_STALE` (normal SIP
+lag) and made no admission decision.
+
+**Ingestion.** The active set was cycle-written under fingerprint `2849da5594f272db`:
+
+| Cycle | Effective active | Breakdown |
+|---|---|---|
+| 08:02:25Z | 959 | includes setups carried over from 10-08 |
+| 08:05:26Z | **603** | 564 Core + 39 V2/operator scope (3 of the V2 names lie outside the 600); protected 0; no fallback |
+
+**New candidates.** At the time of the check there were 0 new candidate identities for 2026-10-09, and **none outside
+the admitted 600**.
+
+**Status:** **cap active for new-opportunity admission from window 2026-10-09.**
