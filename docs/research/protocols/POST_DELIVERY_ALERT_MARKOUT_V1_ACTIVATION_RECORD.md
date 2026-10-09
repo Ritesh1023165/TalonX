@@ -242,3 +242,208 @@ quasi-random rather than alphabetical.
 Alternatives:
 - raise `budget_s` to 1,500 s together with a 40-minute execution limit;
 - an off-hours rate above 40/min, which needs a shared-quota review first.
+
+## Operational amendment: second daily trigger and calendar integrity (2026-10-09, before any collection)
+
+**Owner approval.** One existing task, `\TalonX\PDM_V1_Collector`, now has two daily triggers: 00:15 and 06:30
+Europe/London. Both run the same collector, configuration, store and singleton lock.
+
+**Unchanged:**
+- 200 observations per invocation, the 900 s budget, 40 requests/min and the retry policy;
+- deadlines;
+- population, sampling, timing, costs and reporting;
+- the 20 sessions from 2026-10-19 to 2026-11-13, and the endpoint, 2026-11-17 22:00Z.
+
+This is a capacity change only. It neither extends the study nor permits early collection.
+
+### Schedule
+
+| Trigger | Local boundaries (Europe/London) | UTC under BST (to 2026-10-24) | UTC under GMT (from 2026-10-26) |
+|---|---|---|---|
+| 00:15 | 2026-10-20 00:15 to 2026-11-18 12:00 | 23:15Z the previous day | 00:15Z |
+| 06:30 | 2026-10-20 06:30 to 2026-11-17 12:00 | 05:30Z | 06:30Z |
+
+- **First invocations:** 2026-10-19 23:15Z, after session 1 closes + 60 min (21:00Z), and 2026-10-20 05:30Z. Nothing
+  runs before 2026-10-19.
+  - The previous first instant, 2026-10-18 23:15Z, was a pre-boundary no-op and has been removed.
+- **Last 06:30 invocation:** 2026-11-17 06:30Z, before the endpoint.
+- **Last permitted invocation:** 2026-11-18 00:15Z, reconcile only. No 06:30 run follows it.
+- **Task expiry:** 2026-11-18 12:00 London (12:00Z), the latest possible late start. It is R5-permitted (07:00 ET).
+- **R5:** every instant is outside the America/New_York R5 rule and its fixed-UTC form across the 2026-10-25 UK and
+  2026-11-01 US changes (tested).
+- **Chances per session:** at least 4 triggers fall between each session's maturity and its original deadline (tested).
+- **Overlap:** a missed trigger that overlaps the next cannot start a concurrent fetcher. The scheduler setting
+  `IgnoreNew` and the collector lock both prevent it.
+- **Late invocations:**
+  - every invocation re-checks integrity, calendar, activation and endpoint before any request;
+  - a late start inside R5 makes no request;
+  - a run that reaches R5 mid-way stops and defers the rest, with no errors or attempts recorded;
+  - missed trigger slots are logged (`missed_slots`);
+  - the study period never expands.
+
+### Calendar integrity binding
+
+**Bound local code.** These files determine session dates, open/close and deadline arithmetic:
+- `talonx_opportunity/phases.py` (`trading_window`, `window_at`, `phase_at`);
+- `talonx_premarket/session.py` (`_xnys`, `is_session`).
+
+`talonx_premarket/config.py` is imported by `session.py`, but the functions on this path don't use its values, so it is
+not bound.
+
+**Enforced result check.** `calendar_sha256` = `65d1d40d8298c492fd400439dce40d4d42384ee01b41c902b208075dc8ce6c96`. It covers session, open, close, maturity and
+deadline for the 20 sessions, which `calendar_table` stores in the config.
+- The deployed environment reproduces the approved table.
+- A changed bound file, a different calendar result, or a missing calendar package refuses the run
+  (`INTEGRITY_FAILED`) before any request.
+
+**Recorded provenance (not enforced):**
+- exchange_calendars 4.13.2;
+- tzdata 2026.3 (`zoneinfo.TZPATH` is empty, so the tzdata package is the source);
+- pandas 3.0.5;
+- Python 3.12.10.
+
+**Operational consequence.** `phases.py` is also an engine runtime file. Any edit to it, or to `session.py`, before
+2026-11-18 makes the collector refuse until it is re-locked with this procedure.
+
+**Bound vs not bound.**
+- *Bound:* source code and the calendar result.
+- *Not bound:*
+  - **secret configuration** (Alpaca credentials loaded from `.env` by `talonx_premarket.__main__._env`), which is never
+    hashed, printed or persisted;
+  - Python packages other than through the calendar result.
+
+### Lock update
+
+Previous records are preserved in `lock_history[0]`.
+
+Config SHA-256: `f96b1c15237518259cc8229bfc4bd877b0e9756e83f79dd283b3067e24782fc8` → `6c4512675f685bacdbb6a8ddf2e9e88bb0595da01866cc544b2855c4d487ed14`. Protocol fingerprint
+`c812a3e65e4018a5` is unchanged.
+
+| File | Previous SHA-256 | New SHA-256 |
+|---|---|---|
+| `talonx_paperperf/post_delivery_markout.py` | `31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e` | `7ddcb760e72f0d8dca8aa95b2f055b94b53ffbe4cab4fd7f8e77473bc5a993b1` |
+| `talonx_paperperf/post_delivery_acquisition.py` | `5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52` | `5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52` |
+| `talonx_paperperf/post_delivery_collector.py` | `922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd` | `d81a501b642d5777f58425f7d3c83104d9c2f843e7222fa88ad47eed0c40e263` |
+| `talonx_opportunity/delivery_trace.py` | `41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519` | `41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519` |
+| `talonx_opportunity/phases.py` | `— (newly bound)` | `1a0c330d106cce1e1ef730174f9d612d5de0f8567d42cbe7422e50ab5029f42a` |
+| `talonx_premarket/session.py` | `— (newly bound)` | `4bda535a1d6f273649262c5a6b0296665df3f8dd581384382292955348f2486a` |
+
+### Capacity: ESTIMATE, one trigger vs two
+
+Source: `pdm_v1_scheduler/capacity_two_triggers.py` → `CAPACITY_TWO_TRIGGERS_2026-10-09.json`.
+
+**What it drives.** The real `run()`: deadline reconciliation, registration, selection, the `processing_key` order and
+`acquire()`. Each trigger fires at its actual UTC instant, and the store persists across invocations, as a restart
+would.
+
+**Per invocation:** a fresh `AlpacaAcquirer` with a 900 s budget, 40/min, 2 retries, ≤ 5 quote pages and a cap of 200.
+
+**Demand:** 133, 170, 203 or 205 eligible selected deliveries per session, spread across each session.
+
+**Miss scenarios:**
+- *missed run:* the 2026-10-27 00:15Z trigger is skipped;
+- *missed day:* both 2026-11-04 triggers are skipped.
+
+**Not modelled:**
+- latency variance (fixed 0.3 s per request) and provider 429s;
+- machine sleep or late starts;
+- trace exclusions;
+- production disk speed.
+
+The study store ran with `synchronous=OFF` in the simulation. Local work before the first request does not consume the
+900 s budget, because the acquirer is created lazily; the maximum local wall time measured was about 42 s per
+invocation.
+
+**Not a provider measurement.**
+
+| Transport | Demand/session | Schedule | Missed | Measured | Expired | Max due at a trigger | Max backlog after a run | Max maturity→measured (h) |
+|---|---|---|---|---|---|---|---|---|
+| clean_1_quote_page | 133 | one trigger | none | 2660 / 2660 | **0** | 133 | 0 | 3.2 |
+| clean_1_quote_page | 133 | two triggers | none | 2660 / 2660 | **0** | 133 | 0 | 3.2 |
+| clean_1_quote_page | 133 | two triggers | missed run | 2660 / 2660 | **0** | 133 | 0 | 9.5 |
+| clean_1_quote_page | 133 | two triggers | missed day | 2660 / 2660 | **0** | 266 | 116 | 26.2 |
+| clean_1_quote_page | 170 | one trigger | none | 3400 / 3400 | **0** | 249 | 99 | 27.2 |
+| clean_1_quote_page | 170 | two triggers | none | 3400 / 3400 | **0** | 170 | 20 | 9.5 |
+| clean_1_quote_page | 170 | two triggers | missed run | 3400 / 3400 | **0** | 190 | 40 | 27.2 |
+| clean_1_quote_page | 170 | two triggers | missed day | 3400 / 3400 | **0** | 340 | 190 | 32.5 |
+| clean_1_quote_page | 203 | one trigger | none | 4028 / 4060 | **32** | 406 | 256 | 51.2 |
+| clean_1_quote_page | 203 | two triggers | none | 4060 / 4060 | **0** | 203 | 53 | 9.5 |
+| clean_1_quote_page | 203 | two triggers | missed run | 4060 / 4060 | **0** | 256 | 106 | 27.2 |
+| clean_1_quote_page | 203 | two triggers | missed day | 4060 / 4060 | **0** | 406 | 256 | 32.5 |
+| clean_1_quote_page | 205 | one trigger | none | 4044 / 4100 | **56** | 410 | 260 | 51.2 |
+| clean_1_quote_page | 205 | two triggers | none | 4100 / 4100 | **0** | 205 | 55 | 9.5 |
+| clean_1_quote_page | 205 | two triggers | missed run | 4100 / 4100 | **0** | 260 | 110 | 27.2 |
+| clean_1_quote_page | 205 | two triggers | missed day | 4100 / 4100 | **0** | 410 | 260 | 32.5 |
+| 2_quote_pages | 133 | one trigger | none | 2660 / 2660 | **0** | 265 | 165 | 51.2 |
+| 2_quote_pages | 133 | two triggers | none | 2660 / 2660 | **0** | 133 | 33 | 9.5 |
+| 2_quote_pages | 133 | two triggers | missed run | 2660 / 2660 | **0** | 166 | 66 | 27.2 |
+| 2_quote_pages | 133 | two triggers | missed day | 2660 / 2660 | **0** | 266 | 166 | 32.5 |
+| 2_quote_pages | 170 | one trigger | none | 2844 / 3400 | **556** | 340 | 240 | 75.2 |
+| 2_quote_pages | 170 | two triggers | none | 3400 / 3400 | **0** | 170 | 70 | 9.5 |
+| 2_quote_pages | 170 | two triggers | missed run | 3400 / 3400 | **0** | 240 | 140 | 27.2 |
+| 2_quote_pages | 170 | two triggers | missed day | 3400 / 3400 | **0** | 340 | 240 | 32.5 |
+| 2_quote_pages | 203 | one trigger | none | 2904 / 4060 | **1156** | 406 | 306 | 99.2 |
+| 2_quote_pages | 203 | two triggers | none | 4060 / 4060 | **0** | 214 | 114 | 27.2 |
+| 2_quote_pages | 203 | two triggers | missed run | 4060 / 4060 | **0** | 314 | 214 | 33.5 |
+| 2_quote_pages | 203 | two triggers | missed day | 4051 / 4060 | **9** | 406 | 306 | 50.2 |
+| 2_quote_pages | 205 | one trigger | none | 2904 / 4100 | **1196** | 410 | 310 | 99.2 |
+| 2_quote_pages | 205 | two triggers | none | 4100 / 4100 | **0** | 224 | 124 | 27.2 |
+| 2_quote_pages | 205 | two triggers | missed run | 4100 / 4100 | **0** | 324 | 224 | 33.5 |
+| 2_quote_pages | 205 | two triggers | missed day | 4085 / 4100 | **15** | 410 | 310 | 50.2 |
+| 5pct_transient_5xx | 133 | one trigger | none | 2660 / 2660 | **0** | 134 | 1 | 26.2 |
+| 5pct_transient_5xx | 133 | two triggers | none | 2660 / 2660 | **0** | 133 | 1 | 8.5 |
+| 5pct_transient_5xx | 133 | two triggers | missed run | 2660 / 2660 | **0** | 133 | 1 | 9.5 |
+| 5pct_transient_5xx | 133 | two triggers | missed day | 2660 / 2660 | **0** | 266 | 127 | 26.2 |
+| 5pct_transient_5xx | 170 | one trigger | none | 3400 / 3400 | **0** | 300 | 163 | 75.2 |
+| 5pct_transient_5xx | 170 | two triggers | none | 3400 / 3400 | **0** | 171 | 35 | 26.2 |
+| 5pct_transient_5xx | 170 | two triggers | missed run | 3400 / 3400 | **0** | 203 | 65 | 27.2 |
+| 5pct_transient_5xx | 170 | two triggers | missed day | 3400 / 3400 | **0** | 340 | 204 | 32.5 |
+| 5pct_transient_5xx | 203 | one trigger | none | 3845 / 4060 | **215** | 406 | 270 | 51.2 |
+| 5pct_transient_5xx | 203 | two triggers | none | 4060 / 4060 | **0** | 203 | 68 | 9.5 |
+| 5pct_transient_5xx | 203 | two triggers | missed run | 4060 / 4060 | **0** | 268 | 135 | 27.2 |
+| 5pct_transient_5xx | 203 | two triggers | missed day | 4060 / 4060 | **0** | 406 | 268 | 32.5 |
+| 5pct_transient_5xx | 205 | one trigger | none | 3854 / 4100 | **246** | 410 | 276 | 74.2 |
+| 5pct_transient_5xx | 205 | two triggers | none | 4100 / 4100 | **0** | 205 | 73 | 26.2 |
+| 5pct_transient_5xx | 205 | two triggers | missed run | 4100 / 4100 | **0** | 276 | 138 | 27.2 |
+| 5pct_transient_5xx | 205 | two triggers | missed day | 4100 / 4100 | **0** | 410 | 271 | 32.5 |
+| 2_quote_pages_and_5pct_5xx | 133 | one trigger | none | 2551 / 2660 | **109** | 266 | 177 | 51.2 |
+| 2_quote_pages_and_5pct_5xx | 133 | two triggers | none | 2660 / 2660 | **0** | 134 | 45 | 27.2 |
+| 2_quote_pages_and_5pct_5xx | 133 | two triggers | missed run | 2660 / 2660 | **0** | 175 | 80 | 27.2 |
+| 2_quote_pages_and_5pct_5xx | 133 | two triggers | missed day | 2660 / 2660 | **0** | 266 | 178 | 32.5 |
+| 2_quote_pages_and_5pct_5xx | 170 | one trigger | none | 2642 / 3400 | **758** | 340 | 251 | 75.2 |
+| 2_quote_pages_and_5pct_5xx | 170 | two triggers | none | 3400 / 3400 | **0** | 171 | 81 | 26.2 |
+| 2_quote_pages_and_5pct_5xx | 170 | two triggers | missed run | 3400 / 3400 | **0** | 248 | 156 | 27.2 |
+| 2_quote_pages_and_5pct_5xx | 170 | two triggers | missed day | 3400 / 3400 | **0** | 340 | 247 | 32.5 |
+| 2_quote_pages_and_5pct_5xx | 203 | one trigger | none | 2681 / 4060 | **1379** | 406 | 317 | 99.2 |
+| 2_quote_pages_and_5pct_5xx | 203 | two triggers | none | 4060 / 4060 | **0** | 276 | 184 | 32.5 |
+| 2_quote_pages_and_5pct_5xx | 203 | two triggers | missed run | 4060 / 4060 | **0** | 360 | 269 | 33.5 |
+| 2_quote_pages_and_5pct_5xx | 203 | two triggers | missed day | 4003 / 4060 | **57** | 406 | 316 | 50.2 |
+| 2_quote_pages_and_5pct_5xx | 205 | one trigger | none | 2691 / 4100 | **1409** | 410 | 320 | 99.2 |
+| 2_quote_pages_and_5pct_5xx | 205 | two triggers | none | 4100 / 4100 | **0** | 291 | 199 | 33.5 |
+| 2_quote_pages_and_5pct_5xx | 205 | two triggers | missed run | 4100 / 4100 | **0** | 378 | 285 | 51.2 |
+| 2_quote_pages_and_5pct_5xx | 205 | two triggers | missed day | 4045 / 4100 | **55** | 410 | 319 | 50.2 |
+
+**Findings:**
+- **One trigger:** observations expire whenever demand reaches about 170 per session with 2-page quotes, or about 203
+  with a clean transport.
+- **Two triggers, no missed runs:** no expiries in any scenario.
+- **Two triggers, one missed run:** no expiries.
+- **Two triggers, one missed full day:** 9–57 expiries in the 2-quote-page scenarios at 203–205 per session.
+- The 200 cap never binds; the 900 s budget does.
+
+**This does not guarantee complete coverage.** Real latency, 429s, multi-day outages or higher demand can still expire
+observations.
+- Expired observations stay in coverage reporting with their acquisition histories and reasons.
+- The hash order removes alphabetical preference. It does not establish that missingness is random.
+- No budget, trigger, deadline or selection rule was changed to close the residual risk.
+
+### Rollback
+
+Restore the one-trigger task and the previous config binding together:
+1. Disable the task.
+2. Re-import the task definition from commit `0804485`
+   (`docs/research/protocols/pdm_v1_scheduler/PDM_V1_Collector.task.xml`).
+3. Restore the config, collector and markout files from `0804485`, then verify integrity.
+4. Re-enable the task.
+
+The study store, ops logs and all evidence are kept. Observation deadlines are unchanged.

@@ -29,14 +29,26 @@ from zoneinfo import ZoneInfo
 UTC = timezone.utc
 LONDON = ZoneInfo("Europe/London")
 REPO = Path(__file__).resolve().parents[1]
-SCHEDULE_LOCAL = dtime(0, 15)               # Europe/London; = 23:15Z (BST) / 00:15Z (GMT)
+# Europe/London triggers (owner-approved 2026-10-09): 00:15 = 23:15Z (BST) / 00:15Z (GMT);
+#                                                     06:30 = 05:30Z (BST) / 06:30Z (GMT)
+SCHEDULE_LOCAL_TIMES = (dtime(0, 15), dtime(6, 30))
+
+
+def slots_between(a: datetime, b: datetime) -> list[datetime]:
+    """Scheduled trigger instants s with a < s <= b (UTC), in order."""
+    out, d = [], a.astimezone(LONDON).date() - timedelta(days=1)
+    while d <= b.astimezone(LONDON).date():
+        for tm in SCHEDULE_LOCAL_TIMES:
+            s = datetime.combine(d, tm, tzinfo=LONDON).astimezone(UTC)
+            if a < s <= b:
+                out.append(s)
+        d += timedelta(days=1)
+    return out
 
 
 def scheduled_for(now: datetime) -> datetime:
-    """The scheduled run instant this invocation belongs to (the most recent 00:15 London at or before now)."""
-    loc = now.astimezone(LONDON)
-    d = loc.date() if loc.time() >= SCHEDULE_LOCAL else loc.date() - timedelta(days=1)
-    return datetime.combine(d, SCHEDULE_LOCAL, tzinfo=LONDON).astimezone(UTC)
+    """The scheduled trigger this invocation belongs to (the most recent trigger instant at or before now)."""
+    return slots_between(now - timedelta(days=2), now)[-1]
 
 
 class Lock:
@@ -76,6 +88,28 @@ class Lock:
                 self.path.unlink()
             except OSError:
                 pass
+
+
+def missed_slots(log_path: Path, now: datetime) -> list[str]:
+    """Trigger instants that passed with no recorded run between the previous run and this one (lateness of THIS run
+    is reported separately as late_s)."""
+    last = _last_actual(log_path)
+    if last is None:
+        return []
+    prev = scheduled_for(last)
+    return [s.isoformat() for s in slots_between(prev, scheduled_for(now))[:-1]]
+
+
+def _last_actual(log_path: Path):
+    if not log_path.exists():
+        return None
+    last = None
+    for line in log_path.read_text(encoding="utf-8").splitlines():
+        try:
+            last = json.loads(line).get("actual_utc") or last
+        except ValueError:
+            continue
+    return datetime.fromisoformat(last) if last else None
 
 
 def missed_days(log_path: Path, now: datetime) -> list[str]:
@@ -122,7 +156,8 @@ def collect(*, config: Path, enable: bool, store: Path, budget_s: float, max_obs
     lock = Lock(ops / "collector.lock")
     sched = scheduled_for(now)
     rec = {"scheduled_utc": sched.isoformat(), "actual_utc": now.isoformat(),
-           "late_s": round((now - sched).total_seconds(), 1), "missed_days": missed_days(ops / "runs.jsonl", now)}
+           "late_s": round((now - sched).total_seconds(), 1), "missed_days": missed_days(ops / "runs.jsonl", now),
+           "missed_slots": missed_slots(ops / "runs.jsonl", now)}
     if not lock.acquire(alive=lock_alive):
         rec["state"] = "REFUSED_OVERLAP"
         _log(ops, rec)
@@ -200,7 +235,7 @@ def main(argv=None) -> int:
     rec = collect(config=Path(a.config), enable=a.enable, store=Path(a.store), budget_s=a.budget_s,
                   max_observations=a.max_observations)
     print(json.dumps({k: rec.get(k) for k in ("state", "reason", "scheduled_utc", "actual_utc", "late_s",
-                                              "missed_days", "max_observations")}, default=str))
+                                              "missed_days", "missed_slots", "max_observations")}, default=str))
     return 0 if rec.get("state") in ("ENABLED", "DISABLED", "BEFORE_ACTIVATION") else 3
 
 

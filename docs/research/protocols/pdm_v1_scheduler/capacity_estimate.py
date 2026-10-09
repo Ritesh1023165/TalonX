@@ -83,12 +83,12 @@ def per_run(*, budget_s=900, latency_s=0.3, quote_pages=1, fail_rate=0.0, limit=
 
 
 def calendar_backlog(demand: int, capacity: int):
-    """EDF over the approved sessions; runs at 00:15 London daily; deadline = 2nd subsequent close + 60 min."""
+    """EDF over the approved sessions; ONE-trigger baseline (00:15 London daily; see capacity_two_triggers.py); deadline = 2nd subsequent close + 60 min."""
     sessions = M.study_sessions(date(2026, 10, 19), 20)
     queue, expired, measured = [], 0, 0                       # entries: [deadline, remaining]
     d = date(2026, 10, 19)
     while d <= date(2026, 11, 18):
-        run = datetime.combine(d, C.SCHEDULE_LOCAL, tzinfo=C.LONDON).astimezone(UTC)
+        run = datetime.combine(d, C.SCHEDULE_LOCAL_TIMES[0], tzinfo=C.LONDON).astimezone(UTC)
         expired += sum(r for dl, r in queue if dl <= run)
         queue = [[dl, r] for dl, r in queue if dl > run]
         for w in sessions:

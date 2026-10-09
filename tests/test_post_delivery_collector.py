@@ -35,11 +35,11 @@ def test_approved_period_is_twenty_xnys_sessions_and_the_deadline_is_calendar_de
 def test_daily_schedule_is_after_close_plus_60_and_outside_both_r5_forms_across_uk_and_us_dst():
     sessions = M.study_sessions(date(2026, 10, 19), 20)
     runs = []
-    d = date(2026, 10, 19)
-    while d <= date(2026, 11, 19):
-        runs.append(datetime.combine(d, C.SCHEDULE_LOCAL, tzinfo=C.LONDON).astimezone(UTC))
+    d = date(2026, 10, 20)
+    while d <= date(2026, 11, 18):
+        runs.append(datetime.combine(d, C.SCHEDULE_LOCAL_TIMES[0], tzinfo=C.LONDON).astimezone(UTC))
         d += timedelta(days=1)
-    assert runs[0] == datetime(2026, 10, 18, 23, 15, tzinfo=UTC)                   # BST: 00:15 London = 23:15Z
+    assert runs[0] == datetime(2026, 10, 19, 23, 15, tzinfo=UTC)                   # BST: 00:15 London = 23:15Z
     assert datetime(2026, 10, 26, 0, 15, tzinfo=UTC) in runs                       # after the UK change (25 Oct)
     for r in runs:
         assert Q.r5_permitted(r) and r5_fixed_utc_form(r)
@@ -83,7 +83,8 @@ def cfg(tmp_path, **over):
     d = {"approved": True, "approved_by": "owner", "approved_utc": "2026-10-10T12:00:00Z",
          "protocol_fingerprint": M.PDM_V1.fingerprint(), "first_session": "2026-10-12",
          "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(),
-         "collector": {"max_observations_per_run": 50}, **over}
+         "collector": {"max_observations_per_run": 50}, "calendar_sha256": M.calendar_fingerprint("2026-10-12"),
+         **over}
     p = tmp_path / "cfg.json"
     p.write_text(json.dumps(d), encoding="utf-8")
     return p

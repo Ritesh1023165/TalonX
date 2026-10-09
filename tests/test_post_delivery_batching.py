@@ -278,7 +278,8 @@ def test_final_report_refused_while_deferred_observations_or_sources_are_pending
 def locked_cfg(tmp_path, value):
     d = json.loads(LOCKED.read_text(encoding="utf-8"))
     d = {**d, "first_session": "2026-10-12", "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED",
-         "implementation_sha256": M.implementation_hashes(), "collector": {**d["collector"]}}
+         "implementation_sha256": M.implementation_hashes(), "collector": {**d["collector"]},
+         "calendar_sha256": M.calendar_fingerprint("2026-10-12")}
     if value is None:
         d["collector"].pop("max_observations_per_run")
     else:

@@ -260,7 +260,10 @@ class NotApproved(Exception):
 
 
 IMPLEMENTATION_FILES = ("talonx_paperperf/post_delivery_markout.py", "talonx_paperperf/post_delivery_acquisition.py",
-                        "talonx_paperperf/post_delivery_collector.py", "talonx_opportunity/delivery_trace.py")
+                        "talonx_paperperf/post_delivery_collector.py", "talonx_opportunity/delivery_trace.py",
+                        # result-relevant market calendar (session dates, open/close, deadline arithmetic):
+                        "talonx_opportunity/phases.py", "talonx_premarket/session.py")
+CALENDAR_PACKAGES = ("exchange_calendars", "tzdata", "pandas")
 
 
 def implementation_hashes(repo: Path = REPO) -> dict:
@@ -272,13 +275,47 @@ def implementation_hashes(repo: Path = REPO) -> dict:
     return out
 
 
+def calendar_table(first: str | date, cfg: PDMConfig = PDM_V1) -> list[list[str]]:
+    """The approved sessions as the DEPLOYED environment computes them: window, open, close, maturity, deadline."""
+    first = date.fromisoformat(first) if isinstance(first, str) else first
+    return [[w.window_id, iso(w.open_utc), iso(w.close_utc), iso(maturity(w, cfg)), iso(deadline(w, cfg))]
+            for w in study_sessions(first, cfg.observation_sessions)]
+
+
+def calendar_fingerprint(first: str | date, cfg: PDMConfig = PDM_V1) -> str:
+    return hashlib.sha256(json.dumps(calendar_table(first, cfg)).encode()).hexdigest()
+
+
+def calendar_provenance() -> dict:
+    """Recorded (not enforced) package/timezone-data versions; the enforced check is calendar_fingerprint."""
+    import importlib.metadata as md
+    import sys
+    out = {"python": sys.version.split()[0]}
+    for p in CALENDAR_PACKAGES:
+        try:
+            out[p] = md.version(p)
+        except md.PackageNotFoundError:
+            out[p] = None
+    return out
+
+
 def verify_integrity(d: dict, repo: Path = REPO) -> list[str]:
-    """Problems ([] = OK): the locked implementation hashes must match the files that will run."""
+    """Problems ([] = OK): the locked implementation hashes must match the files that will run, and the deployed
+    calendar must reproduce the locked session/open/close/deadline table."""
     locked = d.get("implementation_sha256")
     if not isinstance(locked, dict) or set(locked) != set(IMPLEMENTATION_FILES):
         return ["IMPLEMENTATION_HASHES_NOT_LOCKED"]
     now = implementation_hashes(repo)
-    return [f"IMPLEMENTATION_CHANGED:{k}" for k in IMPLEMENTATION_FILES if locked.get(k) != now.get(k)]
+    bad = [f"IMPLEMENTATION_CHANGED:{k}" for k in IMPLEMENTATION_FILES if locked.get(k) != now.get(k)]
+    if bad:
+        return bad                                     # never execute changed calendar code to fingerprint it
+    if not d.get("calendar_sha256"):
+        return ["CALENDAR_NOT_LOCKED"]
+    try:
+        cal = calendar_fingerprint(d["first_session"])
+    except Exception as exc:                           # noqa: BLE001 - any calendar failure refuses the run
+        return [f"CALENDAR_UNAVAILABLE:{exc.__class__.__name__}"]
+    return [] if cal == d["calendar_sha256"] else ["CALENDAR_CHANGED"]
 
 
 def load_activation(path: str | Path | None, cfg: PDMConfig = PDM_V1, now: datetime | None = None,
@@ -522,6 +559,7 @@ def _store_part(store, obs_id, part, res, now):
 
 DEFAULT_MAX_OBSERVATIONS = 200                     # operational per-run PROCESSING budget -- never a sample-size cap
 _BUDGET_OUTCOME = "BUDGET_EXHAUSTED"                  # post_delivery_acquisition.BUDGET (run budget, not a provider error)
+_R5_OUTCOME = "R5_REFUSED"                            # post_delivery_acquisition.R5 (a late run crossed into R5 hours)
 
 
 def processing_key(o) -> tuple:
@@ -545,8 +583,8 @@ def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = DE
     ``max_observations`` bounds how many DUE observations one run processes; it never caps the sample. Work not
     reached stays durably SELECTED_WAITING for the next run (reported as ``deferred``). Due = matured, before its
     original deadline. Order: ``processing_key``. Selection happened earlier and never depends on this order.
-    When the run's time budget is exhausted the run stops: nothing more is requested, no error is recorded and no
-    attempt is counted for observations that made no request."""
+    When the run's time budget is exhausted -- or a late-started run reaches R5 hours -- the run stops: nothing more
+    is requested, no error is recorded and no attempt is counted for observations that made no request."""
     max_observations = validate_max_observations(max_observations)
     if acquirer is None:
         return {"acquirer": "NOT_CONFIGURED"}
@@ -554,12 +592,12 @@ def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = DE
     due = [o for o in waiting if ts(o["matures_utc"]) <= now < ts(o["deadline_utc"])]
     out = {"requested": 0, "errors": 0, "skipped_not_matured": sum(now < ts(o["matures_utc"]) for o in waiting),
            "skipped_window": 0, "due": len(due), "processed": 0, "deferred": 0, "budget_exhausted": False,
-           "max_observations": max_observations}
+           "r5_stopped": False, "max_observations": max_observations}
     if due and not acquirer.permitted(now):
         out["skipped_window"] = out["deferred"] = len(due)
         return out
     for i, o in enumerate(due):
-        if i >= max_observations or out["budget_exhausted"]:
+        if i >= max_observations or out["budget_exhausted"] or out["r5_stopped"]:
             out["deferred"] = len(due) - i
             break
         have = {r["part"] for r in store.q("SELECT part FROM inputs WHERE obs_id=? AND outcome='RETRIEVED'",
@@ -572,8 +610,8 @@ def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = DE
             if part in have:
                 continue
             res = acquirer.bar(o["symbol"], t) if kind == "bar" else acquirer.quote(o["symbol"], t)
-            if res["outcome"] == _BUDGET_OUTCOME:
-                out["budget_exhausted"] = True
+            if res["outcome"] in (_BUDGET_OUTCOME, _R5_OUTCOME):
+                out["budget_exhausted" if res["outcome"] == _BUDGET_OUTCOME else "r5_stopped"] = True
                 break
             made = True
             out["requested"] += 1
@@ -584,7 +622,7 @@ def acquire(store: Store, acquirer, now: datetime, *, max_observations: int = DE
             with store.con:
                 store.con.execute("UPDATE observations SET attempts=attempts+1, updated_utc=? WHERE obs_id=?",
                                   (iso(now), o["obs_id"]))
-        elif out["budget_exhausted"]:
+        elif out["budget_exhausted"] or out["r5_stopped"]:
             out["deferred"] = len(due) - i
             break
         _finalise(store, store.q("SELECT * FROM observations WHERE obs_id=?", (o["obs_id"],))[0], now)

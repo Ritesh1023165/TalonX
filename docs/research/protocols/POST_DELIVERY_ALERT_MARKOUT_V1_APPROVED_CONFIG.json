@@ -25,18 +25,24 @@
  "first_session": "2026-10-19",
  "delivery_trace_policy": "REQUIRED",
  "implementation_sha256": {
-  "talonx_paperperf/post_delivery_markout.py": "31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e",
+  "talonx_paperperf/post_delivery_markout.py": "7ddcb760e72f0d8dca8aa95b2f055b94b53ffbe4cab4fd7f8e77473bc5a993b1",
   "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
-  "talonx_paperperf/post_delivery_collector.py": "922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd",
-  "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
+  "talonx_paperperf/post_delivery_collector.py": "d81a501b642d5777f58425f7d3c83104d9c2f843e7222fa88ad47eed0c40e263",
+  "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519",
+  "talonx_opportunity/phases.py": "1a0c330d106cce1e1ef730174f9d612d5de0f8567d42cbe7422e50ab5029f42a",
+  "talonx_premarket/session.py": "4bda535a1d6f273649262c5a6b0296665df3f8dd581384382292955348f2486a"
  },
  "collector": {
-  "schedule": "daily 00:15 Europe/London (23:15Z BST / 00:15Z GMT)",
+  "schedule": "one task, two daily triggers: 00:15 Europe/London (23:15Z BST / 00:15Z GMT) 2026-10-20..2026-11-18 and 06:30 Europe/London (05:30Z BST / 06:30Z GMT) 2026-10-20..2026-11-17; last permitted invocation 2026-11-18 00:15 London (reconcile only)",
   "budget_s": 900,
   "max_observations_per_run": 200,
   "provider_rate_per_min": 40,
   "max_observations_semantics": "operational per-run processing budget, never a sample-size cap; unprocessed observations stay SELECTED_WAITING for later runs; authoritative here (CLI value must equal it or the run is refused)",
-  "processing_order": "earliest original deadline, fewest attempts, sha256(obs_id)"
+  "processing_order": "earliest original deadline, fewest attempts, sha256(obs_id)",
+  "triggers_local": [
+   "00:15",
+   "06:30"
+  ]
  },
  "lock_history": [
   {
@@ -61,7 +67,190 @@
     "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
    },
    "collection_started_before_change": false
+  },
+  {
+   "at_utc": "2026-10-09T15:54:03+00:00",
+   "kind": "OPERATIONAL_AMENDMENT (owner-approved 2026-10-09; protocol, approval, sessions, deadlines, sampling, costs, budgets and reporting unchanged)",
+   "reason": "second daily trigger 06:30 Europe/London for processing capacity (same task, collector, config, store, lock); market-calendar code (phases.py, session.py) bound to integrity + locked calendar_sha256; late run reaching R5 stops cleanly; missed trigger slots recorded",
+   "changed_files": [
+    "talonx_opportunity/phases.py",
+    "talonx_paperperf/post_delivery_collector.py",
+    "talonx_paperperf/post_delivery_markout.py",
+    "talonx_premarket/session.py"
+   ],
+   "added_files": [
+    "talonx_opportunity/phases.py",
+    "talonx_premarket/session.py"
+   ],
+   "previous_implementation_sha256": {
+    "talonx_paperperf/post_delivery_markout.py": "31a2c95877ce0b5dbe346e60faf9e3a65013248f9462d0ad4dd1f19a3d8d174e",
+    "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
+    "talonx_paperperf/post_delivery_collector.py": "922675f2a53f338e8e2e0efc4a0c7d9a91f9cbc96725a44c695cdd2592ef30fd",
+    "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
+   },
+   "previous_config_sha256": "f96b1c15237518259cc8229bfc4bd877b0e9756e83f79dd283b3067e24782fc8",
+   "new_implementation_sha256": {
+    "talonx_paperperf/post_delivery_markout.py": "7ddcb760e72f0d8dca8aa95b2f055b94b53ffbe4cab4fd7f8e77473bc5a993b1",
+    "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
+    "talonx_paperperf/post_delivery_collector.py": "d81a501b642d5777f58425f7d3c83104d9c2f843e7222fa88ad47eed0c40e263",
+    "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519",
+    "talonx_opportunity/phases.py": "1a0c330d106cce1e1ef730174f9d612d5de0f8567d42cbe7422e50ab5029f42a",
+    "talonx_premarket/session.py": "4bda535a1d6f273649262c5a6b0296665df3f8dd581384382292955348f2486a"
+   },
+   "calendar_sha256": "65d1d40d8298c492fd400439dce40d4d42384ee01b41c902b208075dc8ce6c96",
+   "collection_started_before_change": false
   }
  ],
- "config_sha256_excluding_this_field": "f96b1c15237518259cc8229bfc4bd877b0e9756e83f79dd283b3067e24782fc8"
+ "calendar_sha256": "65d1d40d8298c492fd400439dce40d4d42384ee01b41c902b208075dc8ce6c96",
+ "calendar_table": [
+  [
+   "2026-10-19",
+   "2026-10-19T13:30:00+00:00",
+   "2026-10-19T20:00:00+00:00",
+   "2026-10-19T21:00:00+00:00",
+   "2026-10-21T21:00:00+00:00"
+  ],
+  [
+   "2026-10-20",
+   "2026-10-20T13:30:00+00:00",
+   "2026-10-20T20:00:00+00:00",
+   "2026-10-20T21:00:00+00:00",
+   "2026-10-22T21:00:00+00:00"
+  ],
+  [
+   "2026-10-21",
+   "2026-10-21T13:30:00+00:00",
+   "2026-10-21T20:00:00+00:00",
+   "2026-10-21T21:00:00+00:00",
+   "2026-10-23T21:00:00+00:00"
+  ],
+  [
+   "2026-10-22",
+   "2026-10-22T13:30:00+00:00",
+   "2026-10-22T20:00:00+00:00",
+   "2026-10-22T21:00:00+00:00",
+   "2026-10-26T21:00:00+00:00"
+  ],
+  [
+   "2026-10-23",
+   "2026-10-23T13:30:00+00:00",
+   "2026-10-23T20:00:00+00:00",
+   "2026-10-23T21:00:00+00:00",
+   "2026-10-27T21:00:00+00:00"
+  ],
+  [
+   "2026-10-26",
+   "2026-10-26T13:30:00+00:00",
+   "2026-10-26T20:00:00+00:00",
+   "2026-10-26T21:00:00+00:00",
+   "2026-10-28T21:00:00+00:00"
+  ],
+  [
+   "2026-10-27",
+   "2026-10-27T13:30:00+00:00",
+   "2026-10-27T20:00:00+00:00",
+   "2026-10-27T21:00:00+00:00",
+   "2026-10-29T21:00:00+00:00"
+  ],
+  [
+   "2026-10-28",
+   "2026-10-28T13:30:00+00:00",
+   "2026-10-28T20:00:00+00:00",
+   "2026-10-28T21:00:00+00:00",
+   "2026-10-30T21:00:00+00:00"
+  ],
+  [
+   "2026-10-29",
+   "2026-10-29T13:30:00+00:00",
+   "2026-10-29T20:00:00+00:00",
+   "2026-10-29T21:00:00+00:00",
+   "2026-11-02T22:00:00+00:00"
+  ],
+  [
+   "2026-10-30",
+   "2026-10-30T13:30:00+00:00",
+   "2026-10-30T20:00:00+00:00",
+   "2026-10-30T21:00:00+00:00",
+   "2026-11-03T22:00:00+00:00"
+  ],
+  [
+   "2026-11-02",
+   "2026-11-02T14:30:00+00:00",
+   "2026-11-02T21:00:00+00:00",
+   "2026-11-02T22:00:00+00:00",
+   "2026-11-04T22:00:00+00:00"
+  ],
+  [
+   "2026-11-03",
+   "2026-11-03T14:30:00+00:00",
+   "2026-11-03T21:00:00+00:00",
+   "2026-11-03T22:00:00+00:00",
+   "2026-11-05T22:00:00+00:00"
+  ],
+  [
+   "2026-11-04",
+   "2026-11-04T14:30:00+00:00",
+   "2026-11-04T21:00:00+00:00",
+   "2026-11-04T22:00:00+00:00",
+   "2026-11-06T22:00:00+00:00"
+  ],
+  [
+   "2026-11-05",
+   "2026-11-05T14:30:00+00:00",
+   "2026-11-05T21:00:00+00:00",
+   "2026-11-05T22:00:00+00:00",
+   "2026-11-09T22:00:00+00:00"
+  ],
+  [
+   "2026-11-06",
+   "2026-11-06T14:30:00+00:00",
+   "2026-11-06T21:00:00+00:00",
+   "2026-11-06T22:00:00+00:00",
+   "2026-11-10T22:00:00+00:00"
+  ],
+  [
+   "2026-11-09",
+   "2026-11-09T14:30:00+00:00",
+   "2026-11-09T21:00:00+00:00",
+   "2026-11-09T22:00:00+00:00",
+   "2026-11-11T22:00:00+00:00"
+  ],
+  [
+   "2026-11-10",
+   "2026-11-10T14:30:00+00:00",
+   "2026-11-10T21:00:00+00:00",
+   "2026-11-10T22:00:00+00:00",
+   "2026-11-12T22:00:00+00:00"
+  ],
+  [
+   "2026-11-11",
+   "2026-11-11T14:30:00+00:00",
+   "2026-11-11T21:00:00+00:00",
+   "2026-11-11T22:00:00+00:00",
+   "2026-11-13T22:00:00+00:00"
+  ],
+  [
+   "2026-11-12",
+   "2026-11-12T14:30:00+00:00",
+   "2026-11-12T21:00:00+00:00",
+   "2026-11-12T22:00:00+00:00",
+   "2026-11-16T22:00:00+00:00"
+  ],
+  [
+   "2026-11-13",
+   "2026-11-13T14:30:00+00:00",
+   "2026-11-13T21:00:00+00:00",
+   "2026-11-13T22:00:00+00:00",
+   "2026-11-17T22:00:00+00:00"
+  ]
+ ],
+ "calendar_provenance": {
+  "python": "3.12.10",
+  "exchange_calendars": "4.13.2",
+  "tzdata": "2026.3",
+  "pandas": "3.0.5",
+  "calendar": "exchange_calendars XNYS via talonx_premarket.session._xnys; tz data from the tzdata package (zoneinfo TZPATH empty)",
+  "enforced": "calendar_sha256 (session, open, close, maturity, deadline for the 20 sessions) + bound local calendar code; package versions recorded, not enforced"
+ },
+ "config_sha256_excluding_this_field": "6c4512675f685bacdbb6a8ddf2e9e88bb0595da01866cc544b2855c4d487ed14"
 }

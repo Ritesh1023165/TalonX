@@ -139,10 +139,18 @@ def sources(tmp_path, rows):
     return tmp_path / "outbox.db", tmp_path / "promotion.db"
 
 
+def _cal(first):
+    try:
+        return M.calendar_fingerprint(first)
+    except ValueError:                                     # an invalid first_session is refused by load_activation
+        return None
+
+
 def activation(tmp_path, **over):
     d = {"approved": True, "approved_by": "owner", "approved_utc": "2026-10-10T12:00:00Z",
          "protocol_fingerprint": M.PDM_V1.fingerprint(), "first_session": FIRST,
-         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(), **over}
+         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(),
+         "calendar_sha256": _cal(over.get("first_session", FIRST)), **over}
     p = tmp_path / "act.json"
     p.write_text(json.dumps(d), encoding="utf-8")
     return p

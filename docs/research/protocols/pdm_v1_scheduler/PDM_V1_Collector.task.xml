@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>POST_DELIVERY_ALERT_MARKOUT_V1 collector: one bounded off-hours run daily 00:15 Europe/London (23:15Z BST / 00:15Z GMT). Study 2026-10-19..2026-11-13; endpoint 2026-11-17 22:00Z. Locked config docs/research/protocols/POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json.</Description>
+    <Description>POST_DELIVERY_ALERT_MARKOUT_V1 collector (one logical task, two owner-approved daily triggers): 00:15 Europe/London (23:15Z BST / 00:15Z GMT) 2026-10-20..2026-11-18 and 06:30 Europe/London (05:30Z BST / 06:30Z GMT) 2026-10-20..2026-11-17. Study 2026-10-19..2026-11-13; endpoint 2026-11-17 22:00Z; last permitted invocation 2026-11-18 00:15 London (reconcile only). Locked config docs/research/protocols/POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json.</Description>
     <URI>\TalonX\PDM_V1_Collector</URI>
   </RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
-      <StartBoundary>2026-10-19T00:15:00</StartBoundary>
+      <StartBoundary>2026-10-20T00:15:00</StartBoundary>
       <EndBoundary>2026-11-18T12:00:00</EndBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+    <CalendarTrigger>
+      <StartBoundary>2026-10-20T06:30:00</StartBoundary>
+      <EndBoundary>2026-11-17T12:00:00</EndBoundary>
       <Enabled>true</Enabled>
       <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
     </CalendarTrigger>
