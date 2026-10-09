@@ -1,0 +1,1798 @@
+{
+ "cutoff_utc": "2026-10-09T16:15:00+00:00",
+ "selection": "SENT RESEARCH_OPPORTUNITY, sent_at<=cutoff, window>=2026-10-09 (DTU_V3_TOP600), ORDER BY sent_at DESC, event_id; first 20",
+ "universe_policy": "DTU_V3_TOP600",
+ "universe_policy_effective_from_window": "2026-10-09",
+ "alerts": 20,
+ "distinct_symbols": 20,
+ "windows": [
+  "2026-10-09"
+ ],
+ "sent_range_utc": [
+  "2026-10-09T14:32:47.799217+00:00",
+  "2026-10-09T16:10:31.160127+00:00"
+ ],
+ "partial_session": true,
+ "items": [
+  {
+   "ref": "fc993d24d2",
+   "symbol": "AKAM",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_173",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 AKAM · BULLISH setup\n⭐ Score 65.9\n💵 Ref $104.32\n🕒 Signal 16:10Z · REGULAR · data 15:54Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.393657086223989,
+    "prev_close": 100.9,
+    "prev_high": 104.27,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.05198043540808328,
+    "trend5_pct": -5.6392032170578865,
+    "atr20_pct": 6.210787908820614,
+    "window_to_date_volume_sh": 1355892.0,
+    "window_to_date_dollars": 139444289.80585,
+    "window_to_date_valid_1min_bars": 193,
+    "volume_fraction_of_adv20": 0.22598627490703366
+   },
+   "score": {
+    "total": 65.93,
+    "parts": {
+     "gap": 10.93,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.39% = 0.5x its 20d ATR (6.21%)",
+     "pre-market volume 1,355,892 sh = 22.6% of 20d ADV",
+     "pre-market dollar volume $139,444,290",
+     "price above prev high by 0.05%; 5d trend -5.6%",
+     "catalyst none",
+     "193 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 104.3242,
+    "last_bar_start_utc": "2026-10-09T15:53:00Z",
+    "data_as_of_utc": "2026-10-09T15:54:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T15:54:00+00:00",
+    "ingestion_cycle": "2026-10-09T16:09:39.798264+00:00",
+    "candidate_event": "2026-10-09T16:10:00.034363+00:00",
+    "promotion_queued": "2026-10-09T16:10:30.211183+00:00",
+    "outbox_created": "2026-10-09T16:10:30.226620+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T16:10:31.160127+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T16:10:30.249216+00:00",
+      "response_utc": "2026-10-09T16:10:31.147958+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 30.2,
+    "queued_to_ack": 0.9,
+    "data_to_ack": 991.2
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "c18cbc1067",
+   "symbol": "TWLO",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_85",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 TWLO · BULLISH setup\n⭐ Score 65.9\n💵 Ref $284.08\n🕒 Signal 16:05Z · REGULAR · data 15:48Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.015193820937734,
+    "prev_close": 275.77,
+    "prev_high": 280.53,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 1.267244145011226,
+    "trend5_pct": -8.464168353968205,
+    "atr20_pct": 5.5385937556659535,
+    "window_to_date_volume_sh": 640567.0,
+    "window_to_date_dollars": 180492595.273261,
+    "window_to_date_valid_1min_bars": 138,
+    "volume_fraction_of_adv20": 0.1397100448463776
+   },
+   "score": {
+    "total": 65.89,
+    "parts": {
+     "gap": 10.89,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.02% = 0.5x its 20d ATR (5.54%)",
+     "pre-market volume 640,567 sh = 14.0% of 20d ADV",
+     "pre-market dollar volume $180,492,595",
+     "price above prev high by 1.27%; 5d trend -8.5%",
+     "catalyst none",
+     "138 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 284.085,
+    "last_bar_start_utc": "2026-10-09T15:47:00Z",
+    "data_as_of_utc": "2026-10-09T15:48:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T15:48:00+00:00",
+    "ingestion_cycle": "2026-10-09T16:03:41.690301+00:00",
+    "candidate_event": "2026-10-09T16:05:00.041831+00:00",
+    "promotion_queued": "2026-10-09T16:05:36.716935+00:00",
+    "outbox_created": "2026-10-09T16:05:36.733277+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T16:05:38.730685+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T16:05:37.854800+00:00",
+      "response_utc": "2026-10-09T16:05:38.720997+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.0,
+    "event_to_queued": 36.7,
+    "queued_to_ack": 2.0,
+    "data_to_ack": 1058.7
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "32ef9ba3ec",
+   "symbol": "APO",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_336",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 APO · BULLISH setup\n⭐ Score 74.2\n💵 Ref $118.76\n🕒 Signal 16:05Z · REGULAR · data 15:48Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.000867302688648,
+    "prev_close": 115.3,
+    "prev_high": 116.04,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.3440193036883716,
+    "trend5_pct": 0.839601189435002,
+    "atr20_pct": 3.1313746747614917,
+    "window_to_date_volume_sh": 1110387.0,
+    "window_to_date_dollars": 130271964.47011401,
+    "window_to_date_valid_1min_bars": 137,
+    "volume_fraction_of_adv20": 0.356186929371289
+   },
+   "score": {
+    "total": 74.17,
+    "parts": {
+     "gap": 19.17,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.00% = 1.0x its 20d ATR (3.13%)",
+     "pre-market volume 1,110,387 sh = 35.6% of 20d ADV",
+     "pre-market dollar volume $130,271,964",
+     "price above prev high by 2.34%; 5d trend +0.8%",
+     "catalyst none",
+     "137 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 118.76,
+    "last_bar_start_utc": "2026-10-09T15:47:00Z",
+    "data_as_of_utc": "2026-10-09T15:48:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T15:48:00+00:00",
+    "ingestion_cycle": "2026-10-09T16:03:41.690301+00:00",
+    "candidate_event": "2026-10-09T16:05:00.041831+00:00",
+    "promotion_queued": "2026-10-09T16:05:36.716935+00:00",
+    "outbox_created": "2026-10-09T16:05:36.724970+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T16:05:37.845456+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T16:05:36.735675+00:00",
+      "response_utc": "2026-10-09T16:05:37.839760+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.0,
+    "event_to_queued": 36.7,
+    "queued_to_ack": 1.1,
+    "data_to_ack": 1057.8
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "c0ae02fa30",
+   "symbol": "OKTA",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_158",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 OKTA · BULLISH setup\n⭐ Score 69.5\n💵 Ref $227.36\n🕒 Signal 16:00Z · REGULAR · data 15:43Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.248035965669138,
+    "prev_close": 220.21,
+    "prev_high": 225.53,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.8125304837493852,
+    "trend5_pct": 3.564877957014545,
+    "atr20_pct": 4.467020117160892,
+    "window_to_date_volume_sh": 804145.0,
+    "window_to_date_dollars": 180668400.92204002,
+    "window_to_date_valid_1min_bars": 163,
+    "volume_fraction_of_adv20": 0.21128145686873023
+   },
+   "score": {
+    "total": 69.54,
+    "parts": {
+     "gap": 14.54,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.25% = 0.7x its 20d ATR (4.47%)",
+     "pre-market volume 804,145 sh = 21.1% of 20d ADV",
+     "pre-market dollar volume $180,668,401",
+     "price above prev high by 0.81%; 5d trend +3.6%",
+     "catalyst none",
+     "163 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 227.3625,
+    "last_bar_start_utc": "2026-10-09T15:42:00Z",
+    "data_as_of_utc": "2026-10-09T15:43:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T15:43:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:58:48.897009+00:00",
+    "candidate_event": "2026-10-09T16:00:00.938928+00:00",
+    "promotion_queued": "2026-10-09T16:00:43.937804+00:00",
+    "outbox_created": "2026-10-09T16:00:43.953749+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T16:00:45.004404+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T16:00:43.973692+00:00",
+      "response_utc": "2026-10-09T16:00:44.990713+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.9,
+    "event_to_queued": 43.0,
+    "queued_to_ack": 1.1,
+    "data_to_ack": 1065.0
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 1,
+    "latest_earlier_window": "2026-10-08",
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "e8f526a0e4",
+   "symbol": "HL",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_167",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 HL · BULLISH setup\n⭐ Score 66.9\n💵 Ref $17.23\n🕒 Signal 15:20Z · REGULAR · data 15:04Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0185295875672313,
+    "prev_close": 16.73,
+    "prev_high": 16.77,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.7728085867620766,
+    "trend5_pct": -1.5882352941176459,
+    "atr20_pct": 5.087895995218171,
+    "window_to_date_volume_sh": 5434654.0,
+    "window_to_date_dollars": 93267458.476238,
+    "window_to_date_valid_1min_bars": 167,
+    "volume_fraction_of_adv20": 0.13959568251021337
+   },
+   "score": {
+    "total": 66.87,
+    "parts": {
+     "gap": 11.87,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.02% = 0.6x its 20d ATR (5.09%)",
+     "pre-market volume 5,434,654 sh = 14.0% of 20d ADV",
+     "pre-market dollar volume $93,267,458",
+     "price above prev high by 2.77%; 5d trend -1.6%",
+     "catalyst none",
+     "167 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 17.235,
+    "last_bar_start_utc": "2026-10-09T15:03:00Z",
+    "data_as_of_utc": "2026-10-09T15:04:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T15:04:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:19:28.518624+00:00",
+    "candidate_event": "2026-10-09T15:20:00.037934+00:00",
+    "promotion_queued": "2026-10-09T15:20:39.965176+00:00",
+    "outbox_created": "2026-10-09T15:20:39.973357+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:20:41.279396+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:20:39.973357+00:00",
+      "response_utc": "2026-10-09T15:20:41.275514+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 39.9,
+    "queued_to_ack": 1.3,
+    "data_to_ack": 1001.3
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "a4e7d43bed",
+   "symbol": "DOCN",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_375",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 DOCN · BULLISH setup\n⭐ Score 68.0\n💵 Ref $129.75\n🕒 Signal 15:16Z · REGULAR · data 14:59Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 4.721549636803868,
+    "prev_close": 123.9,
+    "prev_high": 129.23,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.4023833475199412,
+    "trend5_pct": -11.373390557939922,
+    "atr20_pct": 7.2612913640032275,
+    "window_to_date_volume_sh": 264256.0,
+    "window_to_date_dollars": 33651877.346645,
+    "window_to_date_valid_1min_bars": 96,
+    "volume_fraction_of_adv20": 0.10449535947337274
+   },
+   "score": {
+    "total": 68.0,
+    "parts": {
+     "gap": 13.0,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +4.72% = 0.7x its 20d ATR (7.26%)",
+     "pre-market volume 264,256 sh = 10.4% of 20d ADV",
+     "pre-market dollar volume $33,651,877",
+     "price above prev high by 0.40%; 5d trend -11.4%",
+     "catalyst none",
+     "96 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 129.75,
+    "last_bar_start_utc": "2026-10-09T14:58:00Z",
+    "data_as_of_utc": "2026-10-09T14:59:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:59:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:14:49.720349+00:00",
+    "candidate_event": "2026-10-09T15:15:00.047403+00:00",
+    "promotion_queued": "2026-10-09T15:15:19.087862+00:00",
+    "outbox_created": "2026-10-09T15:16:07.022192+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:16:08.098877+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:16:07.048379+00:00",
+      "response_utc": "2026-10-09T15:16:08.090244+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 19.0,
+    "queued_to_ack": 49.0,
+    "data_to_ack": 1028.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "c881340021",
+   "symbol": "GME",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_528",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 GME · BULLISH setup\n⭐ Score 71.4\n💵 Ref $26.07\n🕒 Signal 15:15Z · REGULAR · data 14:59Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.125,
+    "prev_close": 25.28,
+    "prev_high": 25.82,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.968241673121617,
+    "trend5_pct": 4.852758191621742,
+    "atr20_pct": 3.8021756329113905,
+    "window_to_date_volume_sh": 3151714.0,
+    "window_to_date_dollars": 81136495.383959,
+    "window_to_date_valid_1min_bars": 155,
+    "volume_fraction_of_adv20": 0.3075714569334732
+   },
+   "score": {
+    "total": 71.44,
+    "parts": {
+     "gap": 16.44,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.12% = 0.8x its 20d ATR (3.80%)",
+     "pre-market volume 3,151,714 sh = 30.8% of 20d ADV",
+     "pre-market dollar volume $81,136,495",
+     "price above prev high by 0.97%; 5d trend +4.9%",
+     "catalyst none",
+     "155 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 26.07,
+    "last_bar_start_utc": "2026-10-09T14:58:00Z",
+    "data_as_of_utc": "2026-10-09T14:59:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:59:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:14:49.720349+00:00",
+    "candidate_event": "2026-10-09T15:15:00.047403+00:00",
+    "promotion_queued": "2026-10-09T15:15:19.087862+00:00",
+    "outbox_created": "2026-10-09T15:15:19.103071+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:15:21.146715+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:15:20.066283+00:00",
+      "response_utc": "2026-10-09T15:15:21.120265+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 19.0,
+    "queued_to_ack": 2.1,
+    "data_to_ack": 981.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 1,
+    "latest_earlier_window": "2026-10-08",
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "12b4f90a64",
+   "symbol": "PANW",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_41",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 PANW · BULLISH setup\n⭐ Score 72.5\n💵 Ref $410.57\n🕒 Signal 15:15Z · REGULAR · data 14:59Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0293601003764214,
+    "prev_close": 398.5,
+    "prev_high": 411.8899,
+    "range_position": "INSIDE_PREV_RANGE",
+    "range_distance_pct": 0.0,
+    "trend5_pct": 0.5678233438485725,
+    "atr20_pct": 4.471496863237141,
+    "window_to_date_volume_sh": 853747.0,
+    "window_to_date_dollars": 347416610.216313,
+    "window_to_date_valid_1min_bars": 129,
+    "volume_fraction_of_adv20": 0.13905479494012069
+   },
+   "score": {
+    "total": 72.55,
+    "parts": {
+     "gap": 13.55,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 9.0,
+     "structure": 5.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.03% = 0.7x its 20d ATR (4.47%)",
+     "pre-market volume 853,747 sh = 13.9% of 20d ADV",
+     "pre-market dollar volume $347,416,610",
+     "price inside prev range; 5d trend +0.6%",
+     "catalyst other",
+     "129 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "1 other SEC filing(s): 144",
+   "price": {
+    "reference_price": 410.572,
+    "last_bar_start_utc": "2026-10-09T14:58:00Z",
+    "data_as_of_utc": "2026-10-09T14:59:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:59:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:14:49.720349+00:00",
+    "candidate_event": "2026-10-09T15:15:00.047403+00:00",
+    "promotion_queued": "2026-10-09T15:15:19.087862+00:00",
+    "outbox_created": "2026-10-09T15:15:19.095999+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:15:20.059109+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:15:19.112655+00:00",
+      "response_utc": "2026-10-09T15:15:20.051454+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 19.0,
+    "queued_to_ack": 1.0,
+    "data_to_ack": 980.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "1738ea6b5e",
+   "symbol": "KOD",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_423",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 KOD · BULLISH setup\n⭐ Score 60.4\n💵 Ref $97.89\n🕒 Signal 15:10Z · REGULAR · data 14:53Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.8510502864417484,
+    "prev_close": 94.26,
+    "prev_high": 94.95,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 3.096366508688786,
+    "trend5_pct": -4.265691651432046,
+    "atr20_pct": 7.946345215361762,
+    "window_to_date_volume_sh": 310820.0,
+    "window_to_date_dollars": 30073410.305472,
+    "window_to_date_valid_1min_bars": 95,
+    "volume_fraction_of_adv20": 0.08292112762008934
+   },
+   "score": {
+    "total": 60.42,
+    "parts": {
+     "gap": 9.69,
+     "activity": 20.73,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.85% = 0.5x its 20d ATR (7.95%)",
+     "pre-market volume 310,820 sh = 8.3% of 20d ADV",
+     "pre-market dollar volume $30,073,410",
+     "price above prev high by 3.10%; 5d trend -4.3%",
+     "catalyst none",
+     "95 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 97.89,
+    "last_bar_start_utc": "2026-10-09T14:52:00Z",
+    "data_as_of_utc": "2026-10-09T14:53:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:53:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:08:57.107897+00:00",
+    "candidate_event": "2026-10-09T15:10:00.027680+00:00",
+    "promotion_queued": "2026-10-09T15:10:10.827702+00:00",
+    "outbox_created": "2026-10-09T15:10:53.995580+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:10:54.850441+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:10:54.011391+00:00",
+      "response_utc": "2026-10-09T15:10:54.830864+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.0,
+    "event_to_queued": 10.8,
+    "queued_to_ack": 44.0,
+    "data_to_ack": 1074.9
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "b2454ea57b",
+   "symbol": "TLN",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_367",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 TLN · BULLISH setup\n⭐ Score 63.2\n💵 Ref $370.08\n🕒 Signal 15:10Z · REGULAR · data 14:53Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0246088747842403,
+    "prev_close": 359.22,
+    "prev_high": 380.965,
+    "range_position": "INSIDE_PREV_RANGE",
+    "range_distance_pct": 0.0,
+    "trend5_pct": 11.182642607323046,
+    "atr20_pct": 4.581903847224541,
+    "window_to_date_volume_sh": 184086.0,
+    "window_to_date_dollars": 67656450.885306,
+    "window_to_date_valid_1min_bars": 88,
+    "volume_fraction_of_adv20": 0.17269192494562746
+   },
+   "score": {
+    "total": 63.2,
+    "parts": {
+     "gap": 13.2,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 5.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.02% = 0.7x its 20d ATR (4.58%)",
+     "pre-market volume 184,086 sh = 17.3% of 20d ADV",
+     "pre-market dollar volume $67,656,451",
+     "price inside prev range; 5d trend +11.2%",
+     "catalyst none",
+     "88 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 370.085,
+    "last_bar_start_utc": "2026-10-09T14:52:00Z",
+    "data_as_of_utc": "2026-10-09T14:53:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:53:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:08:57.107897+00:00",
+    "candidate_event": "2026-10-09T15:10:00.027680+00:00",
+    "promotion_queued": "2026-10-09T15:10:10.827702+00:00",
+    "outbox_created": "2026-10-09T15:10:10.847711+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:10:11.592645+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:10:10.866837+00:00",
+      "response_utc": "2026-10-09T15:10:11.569300+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.0,
+    "event_to_queued": 10.8,
+    "queued_to_ack": 0.8,
+    "data_to_ack": 1031.6
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "c5878d9fa3",
+   "symbol": "NU",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_99",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 NU · BULLISH setup\n⭐ Score 71.5\n💵 Ref $15.87\n🕒 Signal 15:05Z · REGULAR · data 14:49Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.1534460338101367,
+    "prev_close": 15.38,
+    "prev_high": 15.79,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.4749841671944255,
+    "trend5_pct": 15.726109857035375,
+    "atr20_pct": 3.8187581274382314,
+    "window_to_date_volume_sh": 14337768.0,
+    "window_to_date_dollars": 224215219.390304,
+    "window_to_date_valid_1min_bars": 165,
+    "volume_fraction_of_adv20": 0.16952173220742542
+   },
+   "score": {
+    "total": 71.52,
+    "parts": {
+     "gap": 16.52,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.15% = 0.8x its 20d ATR (3.82%)",
+     "pre-market volume 14,337,768 sh = 17.0% of 20d ADV",
+     "pre-market dollar volume $224,215,219",
+     "price above prev high by 0.47%; 5d trend +15.7%",
+     "catalyst none",
+     "165 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 15.865,
+    "last_bar_start_utc": "2026-10-09T14:48:00Z",
+    "data_as_of_utc": "2026-10-09T14:49:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:49:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:04:13.934144+00:00",
+    "candidate_event": "2026-10-09T15:05:00.032068+00:00",
+    "promotion_queued": "2026-10-09T15:05:15.491596+00:00",
+    "outbox_created": "2026-10-09T15:05:15.517172+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:05:17.051272+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:05:16.333198+00:00",
+      "response_utc": "2026-10-09T15:05:17.039487+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 15.5,
+    "queued_to_ack": 1.6,
+    "data_to_ack": 977.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "3f35c6c732",
+   "symbol": "XYZ",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_412",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 XYZ · BULLISH setup\n⭐ Score 85.7\n💵 Ref $77.50\n🕒 Signal 15:05Z · REGULAR · data 14:49Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0174132659843034,
+    "prev_close": 75.23,
+    "prev_high": 75.7,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.3778071334213946,
+    "trend5_pct": 1.6072393300918364,
+    "atr20_pct": 2.7800544995347587,
+    "window_to_date_volume_sh": 851197.0,
+    "window_to_date_dollars": 65211360.940924,
+    "window_to_date_valid_1min_bars": 85,
+    "volume_fraction_of_adv20": 0.20464119056779176
+   },
+   "score": {
+    "total": 85.71,
+    "parts": {
+     "gap": 21.71,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 9.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.02% = 1.1x its 20d ATR (2.78%)",
+     "pre-market volume 851,197 sh = 20.5% of 20d ADV",
+     "pre-market dollar volume $65,211,361",
+     "price above prev high by 2.38%; 5d trend +1.6%",
+     "catalyst other",
+     "85 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "1 other SEC filing(s): 144",
+   "price": {
+    "reference_price": 77.5,
+    "last_bar_start_utc": "2026-10-09T14:48:00Z",
+    "data_as_of_utc": "2026-10-09T14:49:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:49:00+00:00",
+    "ingestion_cycle": "2026-10-09T15:04:13.934144+00:00",
+    "candidate_event": "2026-10-09T15:05:00.032068+00:00",
+    "promotion_queued": "2026-10-09T15:05:15.491596+00:00",
+    "outbox_created": "2026-10-09T15:05:15.512577+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T15:05:16.333198+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T15:05:15.527789+00:00",
+      "response_utc": "2026-10-09T15:05:16.321958+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 15.5,
+    "queued_to_ack": 0.8,
+    "data_to_ack": 976.3
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "83e42869ef",
+   "symbol": "CPNG",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_551",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 CPNG · BULLISH setup\n⭐ Score 75.3\n💵 Ref $15.88\n🕒 Signal 14:55Z · REGULAR · data 14:39Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0175210902011695,
+    "prev_close": 15.41,
+    "prev_high": 15.485,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.5185663545366443,
+    "trend5_pct": 11.66666666666667,
+    "atr20_pct": 2.978325762491888,
+    "window_to_date_volume_sh": 3043302.0,
+    "window_to_date_dollars": 47934317.491638996,
+    "window_to_date_valid_1min_bars": 133,
+    "volume_fraction_of_adv20": 0.18815077137746972
+   },
+   "score": {
+    "total": 75.26,
+    "parts": {
+     "gap": 20.26,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.02% = 1.0x its 20d ATR (2.98%)",
+     "pre-market volume 3,043,302 sh = 18.8% of 20d ADV",
+     "pre-market dollar volume $47,934,317",
+     "price above prev high by 2.52%; 5d trend +11.7%",
+     "catalyst none",
+     "133 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 15.875,
+    "last_bar_start_utc": "2026-10-09T14:38:00Z",
+    "data_as_of_utc": "2026-10-09T14:39:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:39:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:54:48.606483+00:00",
+    "candidate_event": "2026-10-09T14:55:00.058078+00:00",
+    "promotion_queued": "2026-10-09T14:55:38.954199+00:00",
+    "outbox_created": "2026-10-09T14:55:38.968180+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:55:39.730817+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:55:38.968180+00:00",
+      "response_utc": "2026-10-09T14:55:39.710723+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.1,
+    "event_to_queued": 38.9,
+    "queued_to_ack": 0.8,
+    "data_to_ack": 999.7
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "836a90bcd1",
+   "symbol": "PBR",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_225",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 PBR · BULLISH setup\n⭐ Score 93.7\n💵 Ref $25.57\n🕒 Signal 14:50Z · REGULAR · data 14:34Z (age 16m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.543944916970432,
+    "prev_close": 24.69,
+    "prev_high": 24.85,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.8772635814889425,
+    "trend5_pct": 17.6835081029552,
+    "atr20_pct": 2.9850141757796695,
+    "window_to_date_volume_sh": 7504505.0,
+    "window_to_date_dollars": 189023939.608237,
+    "window_to_date_valid_1min_bars": 119,
+    "volume_fraction_of_adv20": 0.312781172560714
+   },
+   "score": {
+    "total": 93.74,
+    "parts": {
+     "gap": 23.74,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 15.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.54% = 1.2x its 20d ATR (2.99%)",
+     "pre-market volume 7,504,505 sh = 31.3% of 20d ADV",
+     "pre-market dollar volume $189,023,940",
+     "price above prev high by 2.88%; 5d trend +17.7%",
+     "catalyst strong",
+     "119 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "6-K filed 2026-10-08",
+   "price": {
+    "reference_price": 25.565,
+    "last_bar_start_utc": "2026-10-09T14:33:00Z",
+    "data_as_of_utc": "2026-10-09T14:34:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:34:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:49:08.461888+00:00",
+    "candidate_event": "2026-10-09T14:50:00.048434+00:00",
+    "promotion_queued": "2026-10-09T14:50:13.177023+00:00",
+    "outbox_created": "2026-10-09T14:50:13.177552+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:50:14.091383+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:50:13.191822+00:00",
+      "response_utc": "2026-10-09T14:50:14.084552+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 13.1,
+    "queued_to_ack": 0.9,
+    "data_to_ack": 974.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 1,
+    "latest_earlier_window": "2026-10-08",
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "f06b619b42",
+   "symbol": "COIN",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_54",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 COIN · BULLISH setup\n⭐ Score 69.0\n💵 Ref $180.07\n🕒 Signal 14:40Z · REGULAR · data 14:23Z (age 17m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 4.691860465116271,
+    "prev_close": 172.0,
+    "prev_high": 179.0549,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.5669210951501302,
+    "trend5_pct": -9.13413281208727,
+    "atr20_pct": 6.709558139534888,
+    "window_to_date_volume_sh": 2153183.0,
+    "window_to_date_dollars": 377497391.651799,
+    "window_to_date_valid_1min_bars": 224,
+    "volume_fraction_of_adv20": 0.21615394249553002
+   },
+   "score": {
+    "total": 68.99,
+    "parts": {
+     "gap": 13.99,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +4.69% = 0.7x its 20d ATR (6.71%)",
+     "pre-market volume 2,153,183 sh = 21.6% of 20d ADV",
+     "pre-market dollar volume $377,497,392",
+     "price above prev high by 0.57%; 5d trend -9.1%",
+     "catalyst none",
+     "224 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 180.07,
+    "last_bar_start_utc": "2026-10-09T14:22:00Z",
+    "data_as_of_utc": "2026-10-09T14:23:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:23:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:38:52.683137+00:00",
+    "candidate_event": "2026-10-09T14:40:00.059158+00:00",
+    "promotion_queued": "2026-10-09T14:40:08.181522+00:00",
+    "outbox_created": "2026-10-09T14:40:08.192707+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:40:09.085202+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:40:08.209260+00:00",
+      "response_utc": "2026-10-09T14:40:09.081169+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.1,
+    "event_to_queued": 8.1,
+    "queued_to_ack": 0.9,
+    "data_to_ack": 1029.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "9aa8cf8682",
+   "symbol": "VKTX",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_403",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 VKTX · BULLISH setup\n⭐ Score 61.5\n💵 Ref $28.61\n🕒 Signal 14:38Z · REGULAR · data 14:19Z (age 19m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.1554273350162365,
+    "prev_close": 27.73,
+    "prev_high": 28.49,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 0.40365040365040183,
+    "trend5_pct": -9.111766633890529,
+    "atr20_pct": 9.791110710421924,
+    "window_to_date_volume_sh": 1200552.0,
+    "window_to_date_dollars": 33775371.205714,
+    "window_to_date_valid_1min_bars": 128,
+    "volume_fraction_of_adv20": 0.13128225639196608
+   },
+   "score": {
+    "total": 61.45,
+    "parts": {
+     "gap": 6.45,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.16% = 0.3x its 20d ATR (9.79%)",
+     "pre-market volume 1,200,552 sh = 13.1% of 20d ADV",
+     "pre-market dollar volume $33,775,371",
+     "price above prev high by 0.40%; 5d trend -9.1%",
+     "catalyst none",
+     "128 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 28.605,
+    "last_bar_start_utc": "2026-10-09T14:18:00Z",
+    "data_as_of_utc": "2026-10-09T14:19:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:19:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:34:11.496040+00:00",
+    "candidate_event": "2026-10-09T14:35:00.053818+00:00",
+    "promotion_queued": "2026-10-09T14:35:28.644330+00:00",
+    "outbox_created": "2026-10-09T14:38:07.343817+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:38:08.847377+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:38:08.124575+00:00",
+      "response_utc": "2026-10-09T14:38:08.813241+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.1,
+    "event_to_queued": 28.6,
+    "queued_to_ack": 160.2,
+    "data_to_ack": 1148.8
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "dd6d68233d",
+   "symbol": "AFRM",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_450",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 AFRM · BULLISH setup\n⭐ Score 71.0\n💵 Ref $79.69\n🕒 Signal 14:38Z · REGULAR · data 14:19Z (age 19m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.2922877511341486,
+    "prev_close": 77.15,
+    "prev_high": 77.185,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 3.245449245319687,
+    "trend5_pct": 9.541388612807044,
+    "atr20_pct": 4.104653272845107,
+    "window_to_date_volume_sh": 554126.0,
+    "window_to_date_dollars": 43519908.168968,
+    "window_to_date_valid_1min_bars": 85,
+    "volume_fraction_of_adv20": 0.1393731079969674
+   },
+   "score": {
+    "total": 71.04,
+    "parts": {
+     "gap": 16.04,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.29% = 0.8x its 20d ATR (4.10%)",
+     "pre-market volume 554,126 sh = 13.9% of 20d ADV",
+     "pre-market dollar volume $43,519,908",
+     "price above prev high by 3.25%; 5d trend +9.5%",
+     "catalyst none",
+     "85 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 79.69,
+    "last_bar_start_utc": "2026-10-09T14:18:00Z",
+    "data_as_of_utc": "2026-10-09T14:19:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:19:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:34:11.496040+00:00",
+    "candidate_event": "2026-10-09T14:35:00.053818+00:00",
+    "promotion_queued": "2026-10-09T14:35:28.644330+00:00",
+    "outbox_created": "2026-10-09T14:38:07.316725+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:38:08.124575+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:38:07.353755+00:00",
+      "response_utc": "2026-10-09T14:38:08.092919+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.1,
+    "event_to_queued": 28.6,
+    "queued_to_ack": 159.5,
+    "data_to_ack": 1148.1
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "a8a4b0fc77",
+   "symbol": "CF",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_428",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 CF · BULLISH setup\n⭐ Score 61.0\n💵 Ref $117.00\n🕒 Signal 14:32Z · REGULAR · data 14:03Z (age 29m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0110935023771823,
+    "prev_close": 113.58,
+    "prev_high": 117.33,
+    "range_position": "INSIDE_PREV_RANGE",
+    "range_distance_pct": 0.0,
+    "trend5_pct": -0.8381351492928291,
+    "atr20_pct": 3.769484064095789,
+    "window_to_date_volume_sh": 730721.0,
+    "window_to_date_dollars": 84879783.972795,
+    "window_to_date_valid_1min_bars": 35,
+    "volume_fraction_of_adv20": 0.2881065847810878
+   },
+   "score": {
+    "total": 60.98,
+    "parts": {
+     "gap": 15.98,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 0.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.01% = 0.8x its 20d ATR (3.77%)",
+     "pre-market volume 730,721 sh = 28.8% of 20d ADV",
+     "pre-market dollar volume $84,879,784",
+     "price inside prev range; 5d trend -0.8%",
+     "catalyst none",
+     "35 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 117.0,
+    "last_bar_start_utc": "2026-10-09T14:02:00Z",
+    "data_as_of_utc": "2026-10-09T14:03:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:03:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:18:48.753493+00:00",
+    "candidate_event": "2026-10-09T14:20:00.059498+00:00",
+    "promotion_queued": "2026-10-09T14:20:43.983234+00:00",
+    "outbox_created": "2026-10-09T14:32:47.149735+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:32:49.296021+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:32:48.488564+00:00",
+      "response_utc": "2026-10-09T14:32:49.265799+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 1020.1,
+    "event_to_queued": 43.9,
+    "queued_to_ack": 725.3,
+    "data_to_ack": 1789.3
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "807d05a7bc",
+   "symbol": "ALNY",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_402",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 ALNY · BULLISH setup\n⭐ Score 62.8\n💵 Ref $231.37\n🕒 Signal 14:32Z · REGULAR · data 14:09Z (age 23m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0463635148977986,
+    "prev_close": 224.53,
+    "prev_high": 225.9,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.42142540947321,
+    "trend5_pct": -2.8765464140496633,
+    "atr20_pct": 4.105366766133703,
+    "window_to_date_volume_sh": 96357.0,
+    "window_to_date_dollars": 22137488.973244,
+    "window_to_date_valid_1min_bars": 45,
+    "volume_fraction_of_adv20": 0.07179096734076107
+   },
+   "score": {
+    "total": 62.79,
+    "parts": {
+     "gap": 14.84,
+     "activity": 17.95,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.05% = 0.7x its 20d ATR (4.11%)",
+     "pre-market volume 96,357 sh = 7.2% of 20d ADV",
+     "pre-market dollar volume $22,137,489",
+     "price above prev high by 2.42%; 5d trend -2.9%",
+     "catalyst none",
+     "45 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 231.37,
+    "last_bar_start_utc": "2026-10-09T14:08:00Z",
+    "data_as_of_utc": "2026-10-09T14:09:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:09:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:24:37.574098+00:00",
+    "candidate_event": "2026-10-09T14:25:00.037915+00:00",
+    "promotion_queued": "2026-10-09T14:25:42.278460+00:00",
+    "outbox_created": "2026-10-09T14:32:47.146685+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:32:48.476734+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:32:47.799217+00:00",
+      "response_utc": "2026-10-09T14:32:48.473093+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 42.2,
+    "queued_to_ack": 426.2,
+    "data_to_ack": 1428.5
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  },
+  {
+   "ref": "599d51b1a1",
+   "symbol": "ASST",
+   "family": "GAP_UP",
+   "window_id": "2026-10-09",
+   "universe_state": "ACTIVE_CORE",
+   "universe_reason": "ADV20_RANK_512",
+   "rendered_message": "🔎 TALONX — RESEARCH OPPORTUNITY\n⚠️ UNVALIDATED — not a buy instruction\n\n🟢 ASST · BULLISH setup\n⭐ Score 64.3\n💵 Ref $29.08\n🕒 Signal 14:32Z · REGULAR · data 14:09Z (age 23m)\n⏱ Horizon INTRADAY / SAME_DAY\n🧪 Policy OPPORTUNITY_PROMOTION_V1 (Opportunity Engine)\n📉 Research verdict: NEGATIVE: this policy's evaluated paper results were negative after costs (VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)\n\nFor review only · not a trade event · no order placed",
+   "trigger": {
+    "event_type": "UPGRADE",
+    "from_state": "WATCH",
+    "to_state": "BULLISH_SETUP",
+    "reason": "upgraded from WATCH",
+    "gap_pct_vs_prev_close": 3.0109812256464696,
+    "prev_close": 28.23,
+    "prev_high": 28.36,
+    "range_position": "ABOVE_PREV_HIGH",
+    "range_distance_pct": 2.538787023977429,
+    "trend5_pct": -6.24377283294586,
+    "atr20_pct": 6.456942968473254,
+    "window_to_date_volume_sh": 1466603.0,
+    "window_to_date_dollars": 42203575.210443996,
+    "window_to_date_valid_1min_bars": 151,
+    "volume_fraction_of_adv20": 0.1710441096676934
+   },
+   "score": {
+    "total": 64.33,
+    "parts": {
+     "gap": 9.33,
+     "activity": 25.0,
+     "liquidity": 15.0,
+     "catalyst": 0.0,
+     "structure": 10.0,
+     "data_confidence": 5.0
+    },
+    "why_as_generated": [
+     "gap +3.01% = 0.5x its 20d ATR (6.46%)",
+     "pre-market volume 1,466,603 sh = 17.1% of 20d ADV",
+     "pre-market dollar volume $42,203,575",
+     "price above prev high by 2.54%; 5d trend -6.2%",
+     "catalyst none",
+     "151 pre-market 1-min bars"
+    ]
+   },
+   "catalyst_as_generated": "none found",
+   "price": {
+    "reference_price": 29.08,
+    "last_bar_start_utc": "2026-10-09T14:08:00Z",
+    "data_as_of_utc": "2026-10-09T14:09:00+00:00",
+    "feed": "sip",
+    "provider_delay_min": 15
+   },
+   "timing_utc": {
+    "data_as_of": "2026-10-09T14:09:00+00:00",
+    "ingestion_cycle": "2026-10-09T14:24:37.574098+00:00",
+    "candidate_event": "2026-10-09T14:25:00.037915+00:00",
+    "promotion_queued": "2026-10-09T14:25:42.278460+00:00",
+    "outbox_created": "2026-10-09T14:32:47.130302+00:00",
+    "api_acknowledged_sent_at": "2026-10-09T14:32:47.799217+00:00",
+    "trace": [
+     {
+      "send_start_utc": "2026-10-09T14:32:47.161698+00:00",
+      "response_utc": "2026-10-09T14:32:47.783457+00:00",
+      "network_retries": 0,
+      "rate_limit_retries": 0,
+      "trace_state": "TRACE_OK"
+     }
+    ]
+   },
+   "delays_s": {
+    "data_to_event": 960.0,
+    "event_to_queued": 42.2,
+    "queued_to_ack": 425.5,
+    "data_to_ack": 1427.8
+   },
+   "horizons": [
+    "INTRADAY",
+    "SAME_DAY"
+   ],
+   "processing_phase": "REGULAR",
+   "data_phase": "REGULAR",
+   "policy_version": "OPPORTUNITY_PROMOTION_V1",
+   "repeat": {
+    "earlier_review_alerts_for_symbol": 0,
+    "latest_earlier_window": null,
+    "earlier_in_same_window": 0
+   },
+   "outbox_attempts": 1
+  }
+ ]
+}
