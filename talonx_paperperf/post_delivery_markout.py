@@ -348,8 +348,10 @@ def classify_delivery(row: dict, trace: dict | None, trace_policy: str, cfg: PDM
         return AMBIGUOUS, f"worker attempts={row.get('attempts')} last_error={bool(row.get('last_error'))}"
     if trace is None:
         if trace_policy == "REQUIRED":
-            return AMBIGUOUS, "no delivery trace (hidden client retries cannot be excluded)"
+            return AMBIGUOUS, "TRACE_MISSING (hidden client retries cannot be excluded)"
         return "DELIVERED_CLEAN", "trace not available (owner-accepted limitation)"
+    if trace.get("trace_state", "TRACE_OK") != "TRACE_OK":
+        return AMBIGUOUS, f"{trace.get('trace_state')} (incomplete delivery trace)"
     if trace.get("hidden_retries", 0) > 0 or trace.get("ambiguous_prior_attempt"):
         return AMBIGUOUS, f"client-level retries={trace.get('hidden_retries')} (a timed-out send may have delivered)"
     try:

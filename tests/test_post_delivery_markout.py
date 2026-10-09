@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from talonx_paperperf import delivery_trace as T
+from talonx_opportunity import delivery_trace as T
 from talonx_paperperf import post_delivery_acquisition as Q
 from talonx_paperperf import post_delivery_markout as M
 
@@ -411,7 +411,10 @@ def test_package_is_not_registered_or_imported_by_any_runtime():
     for pkg in ("talonx_opportunity", "talonx_ops", "talonx_v2", "talonx_dispatch", "talonx_ingest", "scripts"):
         for p in (REPO / pkg).rglob("*.py"):
             txt = p.read_text(encoding="utf-8", errors="ignore")
-            assert "post_delivery_markout" not in txt and "delivery_trace" not in txt, p
+            assert "post_delivery_markout" not in txt and "post_delivery_acquisition" not in txt, p
+            if "delivery_trace" in txt:                                       # tracing is wired ONLY into promotion
+                assert p.relative_to(REPO).as_posix() in ("talonx_opportunity/promotion.py",
+                                                          "talonx_opportunity/delivery_trace.py"), p
 
 
 # ============================================================================================ acquisition transport

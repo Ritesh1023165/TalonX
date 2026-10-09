@@ -158,6 +158,10 @@ def signal_delivery_control(root=None) -> dict | None:
         return None
 
 
+def trace_path(root=None) -> Path:
+    return root_dir(root) / "promotion_delivery_trace.db"
+
+
 def mode_from_env(env=None) -> str:
     m = str((env if env is not None else os.environ).get(MODE_ENV, SHADOW)).strip().upper() or SHADOW
     if m not in (SHADOW, PAPER_SIGNAL):
@@ -474,7 +478,26 @@ class Promoter:
             return self._drain(self.outbox)
         from talonx_ops.notify import TRADE_EVENT
         from talonx_ops.notify.worker import drain
-        return drain(self.outbox, destination=TRADE_EVENT)
+        return drain(self.outbox, destination=TRADE_EVENT, client=self._traced_client())
+
+    def _traced_client(self):
+        """2026-10-09 (POST_DELIVERY_ALERT_MARKOUT_V1 delivery tracing): the SAME client the worker would resolve,
+        wrapped by TracedTransport (records message id / server date / client-internal retries in a sidecar store).
+        None -- the worker's own unchanged default path -- whenever the destination is disabled or tracing cannot be
+        set up; tracing never changes routing, content, retries or deduplication."""
+        try:
+            from talonx_ops.notify import TRADE_EVENT, resolve_destination_config, telegram_client_for
+            if not resolve_destination_config(TRADE_EVENT).enabled:
+                return None
+            base = telegram_client_for(TRADE_EVENT)
+            if base is None:
+                return None
+            from talonx_opportunity.delivery_trace import TracedTransport, TraceStore
+            if getattr(self, "_trace_store", None) is None:
+                self._trace_store = TraceStore(trace_path(self.root))
+            return TracedTransport(base, self._trace_store)
+        except Exception:  # noqa: BLE001 -- tracing is optional; delivery never depends on it
+            return None
 
     # -- paper outcomes (long only; reference = the causal data time + price of the promoted event) --------------------
     def _outcomes(self, now: datetime) -> dict:
