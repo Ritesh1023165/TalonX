@@ -221,7 +221,8 @@ def render_review(p: dict, now: datetime, policy: str) -> str:
 # (the worker sends parse_mode=None). Missing evidence renders as UNKNOWN (or the optional Repeat line is omitted).
 # Previous wording: ``render_review`` (kept unchanged for rollback). Detailed score arithmetic stays in the
 # candidate_events record (score_json) and the deployment evidence.
-REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_COMPACT_V1"
+REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_COMPACT_V2"   # V1 2026-10-09 16:53Z; V2 = approved visual layout (icons,
+#                                                          bullets, direction from the RECORDED change vs prior close)
 _ET = ZoneInfo("America/New_York")
 _FORM_WORDS = {"144": "Form 144 proposed-sale notice", "3": "Form 3 initial ownership report",
                "4": "Form 4 insider transaction report", "5": "Form 5 annual insider report"}
@@ -263,7 +264,23 @@ def _sec_context(cat) -> str:
     return f"SEC context: {'; '.join(found)}{tail}. Connection to the move unverified; news not checked."
 
 
+def _direction(gap) -> str:
+    """Observed movement vs the prior close (never a forecast; never derived from the score or a setup label)."""
+    g = _num(gap)
+    if g is None or g in (float("inf"), float("-inf")):
+        return "❔ DIRECTION UNKNOWN"
+    if g == 0:
+        return "⚪ ▬ UNCHANGED 0.00%"
+    if abs(g) < 0.005:                                     # nonzero but below display precision: never "0.00%"
+        return "🟢 ▲ UP <0.01%" if g > 0 else "🔴 ▼ DOWN <0.01%"
+    return f"🟢 ▲ UP +{g:.2f}%" if g > 0 else f"🔴 ▼ DOWN −{abs(g):.2f}%"
+
+
 def _why(f: dict) -> str:
+    return "Why flagged: " + " · ".join(_why_items(f))
+
+
+def _why_items(f: dict) -> list[str]:
     out = []
     gap, atr = _num(f.get("gap_pct")), _num(f.get("atr20_pct"))
     out.append(f"move = {abs(gap) / atr:.1f}× its 20-day average true range ({atr:.2f}% of price)"
@@ -282,27 +299,26 @@ def _why(f: dict) -> str:
         out.append(f"{d:.2f}% below prior-day low {_ref(pl)}")
     else:
         out.append("position vs prior-day high UNKNOWN")
-    return "Why flagged: " + " · ".join(out)
+    return out
 
 
 def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
     """The deployed research-review alert (REVIEW_TEMPLATE_VERSION). ``ctx``: {"event": candidate_events row or None,
     "close_utc": window close or None, "prior_delivery_date": ET date of the latest earlier CONFIRMED delivery for the
-    symbol or None, "universe": policy name or None}. Never raises on missing evidence."""
+    symbol or None, "universe": policy name or None}. Never raises on missing evidence. Plain text (parse_mode=None)."""
     ctx = ctx or {}
     ev = ctx.get("event") or {}
     try:
         f = json.loads(ev.get("features_json") or "{}")
     except (TypeError, ValueError):
         f = {}
+    f = f if isinstance(f, dict) else {}
     try:
         prov = json.loads(ev.get("provenance_json") or "{}")
     except (TypeError, ValueError):
         prov = {}
-    gap = _num(f.get("gap_pct"))
+    prov = prov if isinstance(prov, dict) else {}
     pc = _num(f.get("prev_close"))
-    move = (f"price {'up' if gap >= 0 else 'down'} {abs(gap):.2f}% from prior close {_ref(pc)}"
-            if gap is not None and pc else "price move vs prior close UNKNOWN")
     asof = p.get("data_as_of_utc")
     try:
         age = f"{int((now - _ts(asof)).total_seconds() // 60)} min"
@@ -313,26 +329,51 @@ def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None 
     score = _num(p.get("score"))
     lines = [
         "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
-        f"{p.get('symbol') or 'UNKNOWN'} · {move}",
+        f"{p.get('symbol') or 'UNKNOWN'} · {_direction(f.get('gap_pct'))}",
+        f"Previous close: {_ref(pc) if pc else 'UNKNOWN'}",
         "",
-        _why(f) if f else "Why flagged: UNKNOWN (generation record unavailable)",
+        "📊 Why flagged",
+        *([f"• {x[:1].upper()}{x[1:]}" for x in _why_items(f)] if f else ["• UNKNOWN (generation record unavailable)"]),
         "",
-        f"Historical price: {_ref(ref) if ref else 'UNKNOWN'} at {_et(asof)}",
-        f"{f'{delay}-min delayed feed' if delay else 'Delayed feed'} · data {age} old when written · not a live quote",
-        f"Detected {_et(p.get('event_utc'))} · written {_et(now)}",
+        f"💵 Historical price: {_ref(ref) if ref else 'UNKNOWN'} at {_et(asof)}",
+        f"• {f'{delay}-min delayed feed' if delay else 'Delayed feed'} · not a live quote",
         "",
-        _sec_context(ev.get("catalyst") if ev else None),
+        f"🕒 Data {age} old when written",
+        f"• Detected {_et(p.get('event_utc'))} · written {_et(now)}",
         "",
-        f"Scope: Today’s session, closing {_et(ctx.get('close_utc'))}. No entry, exit or holding rule.",
-        f"Rule score: {score:.1f}/100; not a probability." if score is not None else "Rule score: UNKNOWN.",
+        "📄 " + _sec_context(ev.get("catalyst") if ev else None),
+        "",
+        f"⏱️ Scope: Today’s session, closing {_et(ctx.get('close_utc'))}. No entry, exit or holding rule.",
+        f"🧮 Rule score: {score:.1f}/100; not a probability." if score is not None else "🧮 Rule score: UNKNOWN.",
     ]
     if ctx.get("prior_delivery_date"):
-        lines.append(f"Repeat: earlier alert for {p.get('symbol')} delivered {ctx['prior_delivery_date']}")
+        lines.append(f"🔁 Earlier alert for {p.get('symbol')} delivered {ctx['prior_delivery_date']}")
     lines += ["",
               "⚠️ This policy’s evaluated paper results were negative after costs.",
               "For review only · not a buy instruction · no order placed",
-              f"Policy {policy} · universe {ctx.get('universe') or 'UNKNOWN'} · reference {p.get('promotion_id')}"]
+              "",
+              f"🏷️ Policy {policy}",
+              f"🌐 Universe {ctx.get('universe') or 'UNKNOWN'}",
+              f"🔖 Reference {p.get('promotion_id') or 'UNKNOWN'}"]
     return "\n".join(lines)
+
+
+def render_review_minimal(p: dict, policy: str) -> str:
+    """Last-resort fallback (no evidence lookups, no arithmetic): every essential warning, nothing else."""
+    sym = p.get("symbol") if isinstance(p, dict) else None
+    ref = p.get("promotion_id") if isinstance(p, dict) else None
+    return "\n".join([
+        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        f"{sym or 'UNKNOWN'} · ❔ DIRECTION UNKNOWN",
+        "",
+        "💵 Historical price: UNKNOWN · delayed feed · not a live quote",
+        "🧮 Rule score: UNKNOWN; not a probability.",
+        "",
+        "⚠️ This policy’s evaluated paper results were negative after costs.",
+        "For review only · not a buy instruction · no order placed",
+        "",
+        f"🏷️ Policy {policy}",
+        f"🔖 Reference {ref or 'UNKNOWN'}"])
 
 
 def render(p: dict) -> str:
@@ -638,7 +679,10 @@ class Promoter:
         try:
             return render_review_compact(q, now, self.policy.version, self._review_context(s, q))
         except Exception:  # noqa: BLE001 -- a presentation fault must never block a release: evidence-free form
-            return render_review_compact(q, now, self.policy.version, None)
+            try:
+                return render_review_compact(q, now, self.policy.version, None)
+            except Exception:  # noqa: BLE001 -- last resort keeps every essential warning
+                return render_review_minimal(q, self.policy.version)
 
     def _drain_signal(self):
         if self.mode != PAPER_SIGNAL or self.outbox is None:
