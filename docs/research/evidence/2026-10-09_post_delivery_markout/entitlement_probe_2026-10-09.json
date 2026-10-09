@@ -1,0 +1,42 @@
+{
+ "probed_utc": "2026-10-09T09:35:07.871282+00:00",
+ "r5_permitted_now": true,
+ "symbol": "SPY (capability probe, not a study observation)",
+ "target_utc": "2026-10-08T15:00:00+00:00",
+ "bar": {
+  "outcome": "RETRIEVED",
+  "records": 1,
+  "scope": {
+   "kind": "bar",
+   "symbol": "SPY",
+   "start": "2026-10-08T15:00:00Z",
+   "end": "2026-10-08T15:00:59Z",
+   "timeframe": "1Min",
+   "feed": "sip",
+   "adjustment": "raw"
+  },
+  "detail": null
+ },
+ "quote": {
+  "outcome": "RETRIEVED",
+  "records": 50,
+  "scope": {
+   "kind": "quote",
+   "symbol": "SPY",
+   "start": "2026-10-08T14:59:00Z",
+   "end": "2026-10-08T15:00:00Z",
+   "feed": "sip",
+   "sort": "desc",
+   "pages": 1
+  },
+  "detail": null
+ },
+ "requests": 2,
+ "quote_order_check": {
+  "first_t": "2026-10-08T14:59:59.995911223Z",
+  "last_t": "2026-10-08T14:59:59.326697588Z",
+  "descending": true,
+  "n": 50,
+  "outcome": "RETRIEVED"
+ }
+}
