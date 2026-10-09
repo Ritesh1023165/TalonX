@@ -142,7 +142,7 @@ def sources(tmp_path, rows):
 def activation(tmp_path, **over):
     d = {"approved": True, "approved_by": "owner", "approved_utc": "2026-10-10T12:00:00Z",
          "protocol_fingerprint": M.PDM_V1.fingerprint(), "first_session": FIRST,
-         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", **over}
+         "delivery_trace_policy": "NOT_AVAILABLE_ACCEPTED", "implementation_sha256": M.implementation_hashes(), **over}
     p = tmp_path / "act.json"
     p.write_text(json.dumps(d), encoding="utf-8")
     return p
@@ -397,10 +397,10 @@ def test_endpoint_waits_for_final_session_maturity_and_refuses_early_reports(tmp
     ob, pc = sources(tmp_path, [dict(id="L1", sym="AAA", sent=datetime(2026, 11, 6, 15, 0, tzinfo=UTC))])
     run(tmp_path, ob, pc, None, datetime(2026, 11, 6, 22, 30, tzinfo=UTC))
     s = M.Store(tmp_path / "pdm")
-    assert M.final_report(s, act, datetime(2026, 11, 7, tzinfo=UTC))["status"] == "NOT_AVAILABLE_BEFORE_ENDPOINT"
+    assert M.final_report(s, act, datetime(2026, 11, 7, tzinfo=UTC), outbox_path=ob, promotion_path=pc)["status"] ==         "NOT_AVAILABLE_BEFORE_ENDPOINT"
     acq = FakeAcq(*good_data("AAA", datetime(2026, 11, 6, 15, 0, tzinfo=UTC)))
     run(tmp_path, ob, pc, acq, datetime(2026, 11, 9, 23, 0, tzinfo=UTC))   # delayed completion inside the expiry
-    rep = M.final_report(s, act, act["endpoint_utc"])
+    rep = M.final_report(s, act, act["endpoint_utc"], outbox_path=ob, promotion_path=pc)
     seg = next(iter(rep.values()))
     assert seg["gross_measured"] == 1 and seg["cost_adjusted_measured"] == 1 and "NOT portfolio" in seg["note"]
 
@@ -414,7 +414,12 @@ def test_package_is_not_registered_or_imported_by_any_runtime():
             assert "post_delivery_markout" not in txt and "post_delivery_acquisition" not in txt, p
             if "delivery_trace" in txt:                                       # tracing is wired ONLY into promotion
                 assert p.relative_to(REPO).as_posix() in ("talonx_opportunity/promotion.py",
-                                                          "talonx_opportunity/delivery_trace.py"), p
+                                                          "talonx_opportunity/delivery_trace.py",
+                                                          "talonx_opportunity/runtime.py"), p
+    # runtime.py names it only in the promotion VERSION HASH sources -- never imported there
+    assert "import" not in "".join(l for l in (REPO / "talonx_opportunity/runtime.py").read_text(encoding="utf-8")
+                                   .splitlines() if "delivery_trace" in l)
+    assert "talonx_opportunity/delivery_trace.py" in runtime.component_sources("promotion")
 
 
 # ============================================================================================ acquisition transport

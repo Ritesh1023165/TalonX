@@ -1,7 +1,10 @@
 # POST_DELIVERY_ALERT_MARKOUT_V1: protocol revision 2 (exact targets)
 
-**Status: `IMPLEMENTED_INACTIVE`, awaiting owner activation approval.** Protocol fingerprint: `c812a3e65e4018a5`
-(`talonx_paperperf.post_delivery_markout.PDM_V1`).
+**Status (2026-10-09): owner-APPROVED, configuration LOCKED, collection NOT STARTED.** Protocol fingerprint:
+`c812a3e65e4018a5` (`talonx_paperperf.post_delivery_markout.PDM_V1`), unchanged. Approval, calendar (2026-10-19 to
+2026-11-13, final deadline 2026-11-17 22:00Z), R5 finding, schedule, final-report gating and rollback:
+[`POST_DELIVERY_ALERT_MARKOUT_V1_ACTIVATION_RECORD.md`](POST_DELIVERY_ALERT_MARKOUT_V1_ACTIVATION_RECORD.md).
+Sections 8 and 9 below are the pre-approval text, kept for history.
 
 **Output name.** *Post-delivery price markout under stated cost assumptions*. It is descriptive. It is **not**
 executable profit, a paper-trading portfolio or a strategy profitability verdict.

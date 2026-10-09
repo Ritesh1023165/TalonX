@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>POST_DELIVERY_ALERT_MARKOUT_V1 collector: one bounded off-hours run daily 00:15 Europe/London (23:15Z BST / 00:15Z GMT). Study 2026-10-19..2026-11-13; endpoint 2026-11-17 22:00Z. Locked config docs/research/protocols/POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json.</Description>
+    <URI>\TalonX\PDM_V1_Collector</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-10-19T00:15:00</StartBoundary>
+      <EndBoundary>2026-11-18T12:00:00</EndBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>false</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT30M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\workspace\TalonX\.venv\Scripts\python.exe</Command>
+      <Arguments>-m talonx_paperperf.post_delivery_collector --config C:\workspace\TalonX\docs\research\protocols\POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json --enable --budget-s 900</Arguments>
+      <WorkingDirectory>C:\workspace\TalonX</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

@@ -1,0 +1,40 @@
+{
+ "study": "POST_DELIVERY_ALERT_MARKOUT_V1",
+ "protocol_revision": 2,
+ "label": "Post-delivery price markout under stated cost assumptions (not an executable fill, realised P&L or portfolio return)",
+ "approved": true,
+ "approved_by": "owner (activation-preparation instruction, 2026-10-09)",
+ "approved_utc": "2026-10-09T13:39:35+00:00",
+ "protocol_fingerprint": "c812a3e65e4018a5",
+ "protocol_parameters": {
+  "version": "POST_DELIVERY_ALERT_MARKOUT_V1",
+  "revision": 2,
+  "anchor": "API-acceptance acknowledgement time: local, timezone-aware time recorded after a successful Telegram API response (outbox sent_at_utc; trace response_utc when deployed)",
+  "reaction_delay_s": 300,
+  "horizon_min": 30,
+  "quote_max_age_s": 60,
+  "assumed_additional_cost": 0.0005,
+  "maturity_lag_min": 60,
+  "expiry_sessions": 2,
+  "observation_sessions": 20,
+  "clock_tolerance_s": 2.0,
+  "price_adjustment": "raw",
+  "feed": "sip",
+  "label": "Post-delivery price markout under stated cost assumptions"
+ },
+ "first_session": "2026-10-19",
+ "delivery_trace_policy": "REQUIRED",
+ "implementation_sha256": {
+  "talonx_paperperf/post_delivery_markout.py": "b969c8ac49fdfce0a6925b48b7525d29c3397fa9616f3a5ac6def7781bedcd51",
+  "talonx_paperperf/post_delivery_acquisition.py": "5a7f41759aa2ccd3225398afadd701f2bb4a8b5dc945cf92aca64fc9a4d15a52",
+  "talonx_paperperf/post_delivery_collector.py": "e21e7312758c30f1c4a1d2f625a2f4a76bc9421ab3af00e646a70ed335c969e0",
+  "talonx_opportunity/delivery_trace.py": "41712a78015d78c678c2553a23eda192a22ae617f1afbd32f5a04a1ef5590519"
+ },
+ "collector": {
+  "schedule": "daily 00:15 Europe/London (23:15Z BST / 00:15Z GMT)",
+  "budget_s": 900,
+  "max_observations_per_run": 200,
+  "provider_rate_per_min": 40
+ },
+ "config_sha256_excluding_this_field": "d1b14b4281b59b5d4ca832a1a90fe21417108a2928df6a5563edc0fdeb1c57a4"
+}

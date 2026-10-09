@@ -1,5 +1,9 @@
 # POST_DELIVERY_ALERT_MARKOUT_V1: activation preflight (nothing here has been executed)
 
+> **Superseded 2026-10-09.** The owner approved; the real locked config is
+> `POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json` and the record is
+> `POST_DELIVERY_ALERT_MARKOUT_V1_ACTIVATION_RECORD.md`. This file remains as the pre-approval checklist.
+
 **Package state.** Disabled. There is no store, no schedule and no wiring. `run()` returns `DISABLED` unless
 `TALONX_PDM_ENABLED=1` **and** `TALONX_PDM_CONFIG` points to an approved config that passes `load_activation`.
 

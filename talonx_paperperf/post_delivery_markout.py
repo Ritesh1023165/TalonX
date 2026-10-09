@@ -259,7 +259,30 @@ class NotApproved(Exception):
     pass
 
 
-def load_activation(path: str | Path | None, cfg: PDMConfig = PDM_V1, now: datetime | None = None) -> dict:
+IMPLEMENTATION_FILES = ("talonx_paperperf/post_delivery_markout.py", "talonx_paperperf/post_delivery_acquisition.py",
+                        "talonx_paperperf/post_delivery_collector.py", "talonx_opportunity/delivery_trace.py")
+
+
+def implementation_hashes(repo: Path = REPO) -> dict:
+    """sha256 of each implementation file, LF-normalised (a CRLF checkout and the git blob agree)."""
+    out = {}
+    for rel in IMPLEMENTATION_FILES:
+        f = Path(repo) / rel
+        out[rel] = hashlib.sha256(f.read_bytes().replace(b"\r\n", b"\n")).hexdigest() if f.exists() else "MISSING"
+    return out
+
+
+def verify_integrity(d: dict, repo: Path = REPO) -> list[str]:
+    """Problems ([] = OK): the locked implementation hashes must match the files that will run."""
+    locked = d.get("implementation_sha256")
+    if not isinstance(locked, dict) or set(locked) != set(IMPLEMENTATION_FILES):
+        return ["IMPLEMENTATION_HASHES_NOT_LOCKED"]
+    now = implementation_hashes(repo)
+    return [f"IMPLEMENTATION_CHANGED:{k}" for k in IMPLEMENTATION_FILES if locked.get(k) != now.get(k)]
+
+
+def load_activation(path: str | Path | None, cfg: PDMConfig = PDM_V1, now: datetime | None = None,
+                    *, require_integrity: bool = False, repo: Path = REPO) -> dict:
     """The owner-approved activation config. Required keys: approved (true), approved_by, approved_utc (aware),
     protocol_fingerprint (== this code), first_session (a future XNYS session, approved before its window opens),
     delivery_trace_policy (REQUIRED | NOT_AVAILABLE_ACCEPTED)."""
@@ -273,6 +296,10 @@ def load_activation(path: str | Path | None, cfg: PDMConfig = PDM_V1, now: datet
                           f"{cfg.fingerprint()})")
     if d.get("delivery_trace_policy") not in ("REQUIRED", "NOT_AVAILABLE_ACCEPTED"):
         raise NotApproved("DELIVERY_TRACE_POLICY_MISSING")
+    if require_integrity:
+        bad = verify_integrity(d, repo)
+        if bad:
+            raise NotApproved("INTEGRITY_FAILED: " + ", ".join(bad))
     approved = ts(d["approved_utc"])
     first = date.fromisoformat(d["first_session"])
     w = _window(first)
@@ -585,16 +612,60 @@ def health(store: Store, act: dict, now: datetime) -> dict:
             "endpoint_utc": iso(act["endpoint_utc"]), "complete": study_complete(store, act, now)}
 
 
-def study_complete(store: Store, act: dict, now: datetime) -> bool:
-    if now < act["endpoint_utc"]:
-        return False
-    return not store.q("SELECT 1 FROM observations WHERE state=? LIMIT 1", (SELECTED_WAITING,))
+def source_reconciliation(store: Store, act: dict, outbox_path: Path, promotion_path: Path) -> dict:
+    """Every in-scope source delivery must be in the study ledger; no in-scope row may still be in flight."""
+    ob, pc = _ro(outbox_path), _ro(promotion_path)
+    if ob is None or pc is None:
+        return {"reconciled": False, "reason": "SOURCE_STORE_MISSING"}
+    sessions = set(act["sessions"])
+    rows = ob.execute("SELECT event_id, state FROM ops_notification_outbox WHERE event_type=? AND created_at_utc>=?",
+                      (EVENT_TYPE, iso(act["boundary_utc"]))).fetchall()
+    ob.close()
+    in_scope, pending, unregistered = 0, [], []
+    for eid, st in rows:
+        p = pc.execute("SELECT window_id FROM promotions WHERE signal_event_id=?", (eid,)).fetchone()
+        if p is None or p[0] not in sessions:
+            continue
+        in_scope += 1
+        if st in ("PENDING", "RETRY", "HELD"):
+            pending.append(eid)
+        elif st in DELIVERED_STATES and not store.q("SELECT 1 FROM deliveries WHERE event_id=?", (eid,)):
+            unregistered.append(eid)
+    pc.close()
+    return {"reconciled": not pending and not unregistered, "in_scope_source_rows": in_scope,
+            "pending_source_rows": len(pending), "unregistered_deliveries": len(unregistered)}
 
 
-def final_report(store: Store, act: dict, now: datetime) -> dict:
-    """Descriptive outcome report -- REFUSED before the fixed endpoint (no rolling judgements)."""
-    if not study_complete(store, act, now):
-        return {"status": "NOT_AVAILABLE_BEFORE_ENDPOINT", "endpoint_utc": iso(act["endpoint_utc"])}
+def completion_checks(store: Store, act: dict, now: datetime, *, outbox_path: Path, promotion_path: Path,
+                      repo: Path = REPO) -> dict:
+    """ALL must hold before any outcome readout (never merely 'the 20th session closed')."""
+    last = _window(date.fromisoformat(act["last_session"]))
+    recon = source_reconciliation(store, act, outbox_path, promotion_path)
+    checks = {
+        "collection_period_ended": now >= last.close_utc,
+        "final_deadline_passed": now >= act["endpoint_utc"],
+        "sources_reconciled": recon["reconciled"],
+        "all_selected_terminal": not store.q("SELECT 1 FROM observations WHERE state=? LIMIT 1", (SELECTED_WAITING,)),
+        "integrity_ok": not verify_integrity(act, repo),
+        "protocol_fingerprint_ok": act.get("protocol_fingerprint") == PDM_V1.fingerprint(),
+    }
+    return {"complete": all(checks.values()), "checks": checks, "reconciliation": recon}
+
+
+def study_complete(store: Store, act: dict, now: datetime, **kw) -> bool:
+    if "outbox_path" not in kw:                     # operational shortcut used by health(): endpoint + no waiting
+        return now >= act["endpoint_utc"] and not store.q("SELECT 1 FROM observations WHERE state=? LIMIT 1",
+                                                          (SELECTED_WAITING,))
+    return completion_checks(store, act, now, **kw)["complete"]
+
+
+def final_report(store: Store, act: dict, now: datetime, *, outbox_path: Path, promotion_path: Path,
+                 repo: Path = REPO) -> dict:
+    """Descriptive outcome report -- REFUSED unless every completion check passes (no rolling judgements)."""
+    cc = completion_checks(store, act, now, outbox_path=outbox_path, promotion_path=promotion_path, repo=repo)
+    if not cc["complete"]:
+        return {"status": "INCOMPLETE" if now >= act["endpoint_utc"] else "NOT_AVAILABLE_BEFORE_ENDPOINT",
+                "endpoint_utc": iso(act["endpoint_utc"]), **cc}
     out = {}
     for seg in [r["segment"] for r in store.q("SELECT DISTINCT segment FROM observations")]:
         obs = store.q("SELECT * FROM observations WHERE segment=?", (seg,))
@@ -632,7 +703,8 @@ def final_report(store: Store, act: dict, now: datetime) -> dict:
 
 # ============================================================================================ entry point
 def run(env=None, *, store_root: Path | None = None, acquirer=None, now: datetime | None = None,
-        outbox_path: Path | None = None, promotion_path: Path | None = None, trace_lookup=None) -> dict:
+        outbox_path: Path | None = None, promotion_path: Path | None = None, trace_lookup=None,
+        require_integrity: bool = False, repo: Path = REPO) -> dict:
     """Disabled by default. When enabled with an approved config: reconcile deadlines FIRST, then register/select,
     then acquire (bounded), then reconcile again. Never touches anything when disabled or unapproved."""
     env = os.environ if env is None else env
@@ -640,7 +712,7 @@ def run(env=None, *, store_root: Path | None = None, acquirer=None, now: datetim
         return {"state": "DISABLED"}
     now = now or datetime.now(UTC)
     try:
-        act = load_activation(env.get(CONFIG_ENV))
+        act = load_activation(env.get(CONFIG_ENV), require_integrity=require_integrity, repo=repo)
     except NotApproved as exc:
         return {"state": "NOT_APPROVED", "reason": str(exc)}
     if now < act["boundary_utc"]:
@@ -652,7 +724,8 @@ def run(env=None, *, store_root: Path | None = None, acquirer=None, now: datetim
     expired_first = reconcile_deadlines(store, now)
     reg = register(store, act=act, outbox_path=outbox_path or opp / "promotion_signal_notifications.db",
                    promotion_path=promotion_path or opp / "promotion.db", now=now, trace_lookup=trace_lookup)
-    acq = acquire(store, acquirer, now)
+    # at/after the endpoint: reconcile + status only -- never a late fetch, never a reopened observation
+    acq = {"skipped": "AFTER_ENDPOINT"} if now >= act["endpoint_utc"] else acquire(store, acquirer, now)
     expired_after = reconcile_deadlines(store, now)
     summary = {"state": "ENABLED", "expired_before": expired_first, **reg, "acquisition": acq,
                "expired_after": expired_after, "health": health(store, act, now)}

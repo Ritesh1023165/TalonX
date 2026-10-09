@@ -89,9 +89,10 @@ COMPONENT_SOURCES: dict[str, list[str]] = {
                  "talonx_ops/notify/outbox.py", "talonx_ops/notify/worker.py"],
     # 2026-09-28 (F-M1): promotion had NO own sources (hash = shared modules only; its change was caught solely by the
     # promotion_src config fingerprint). Now every module that decides or renders a Signal is hashed.
+    # 2026-10-09: + delivery_trace.py (TracedTransport now wraps the promotion review-alert send).
     "promotion": [_P + "promotion.py", _P + "store.py", "talonx_ops/notify/__init__.py", "talonx_ops/notify/outbox.py",
                   "talonx_ops/notify/worker.py", "talonx_ops/operator_control/gates.py",
-                  "talonx_premarket/alpaca_data.py"],
+                  "talonx_premarket/alpaca_data.py", _P + "delivery_trace.py"],
     "outcomes": [_P + "outcome_tracker.py", "talonx_premarket/outcomes.py", "talonx_premarket/alpaca_data.py"],
     "reporting": [_P + "reporting.py"],
     "sentinel": ["talonx_ops/operator_control/__init__.py", "talonx_ops/operator_control/commands.py",
