@@ -1,0 +1,1438 @@
+{
+  "assessed_utc": "2026-10-10T19:09:47.420257+00:00",
+  "decision": "PARTIAL_SHUTDOWN_ONLY",
+  "baseline_commit": "41375bb3477c926be53f3a571408fe5069dec9a3",
+  "remote_verified_same": true,
+  "branch": "feature/continuous-opportunity-engine",
+  "stops": {
+    "requested_utc": "2026-10-10T19:03:37.980940+00:00",
+    "method": "documented request_stop + wait_stopped, no force kill",
+    "components": {
+      "evaluator:INTRADAY": {
+        "stopped": true,
+        "verified_utc": "2026-10-10T19:03:42.994459+00:00",
+        "stop_flag": "C:\\workspace\\TalonX\\results\\opportunity\\control\\evaluator_INTRADAY.stop"
+      },
+      "evaluator:SAME_DAY": {
+        "stopped": true,
+        "verified_utc": "2026-10-10T19:03:42.994459+00:00",
+        "stop_flag": "C:\\workspace\\TalonX\\results\\opportunity\\control\\evaluator_SAME_DAY.stop"
+      },
+      "evaluator:SHORT_TERM": {
+        "stopped": true,
+        "verified_utc": "2026-10-10T19:03:42.994459+00:00",
+        "stop_flag": "C:\\workspace\\TalonX\\results\\opportunity\\control\\evaluator_SHORT_TERM.stop"
+      },
+      "evaluator:LONG_TERM": {
+        "stopped": true,
+        "verified_utc": "2026-10-10T19:03:42.994459+00:00",
+        "stop_flag": "C:\\workspace\\TalonX\\results\\opportunity\\control\\evaluator_LONG_TERM.stop"
+      }
+    }
+  },
+  "processes_before": [
+    {
+      "ProcessId": 7136,
+      "ParentProcessId": 7632,
+      "CreationDate": "2026-10-04T23:12:26.102599+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_ops.supervisor run"
+    },
+    {
+      "ProcessId": 5316,
+      "ParentProcessId": 7136,
+      "CreationDate": "2026-10-04T23:12:26.10885+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_ops.supervisor run"
+    },
+    {
+      "ProcessId": 2480,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-04T23:12:26.385317+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe run_talonx.py"
+    },
+    {
+      "ProcessId": 21044,
+      "ParentProcessId": 2480,
+      "CreationDate": "2026-10-04T23:12:26.394227+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" run_talonx.py"
+    },
+    {
+      "ProcessId": 10872,
+      "ParentProcessId": 7632,
+      "CreationDate": "2026-10-04T23:12:28.107306+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_v2.run --mode live --form4-source insider --db C:\\workspace\\TalonX\\v2_release_rc1.db --status-path C:\\workspace\\TalonX\\v2_release_rc1_status.json --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --pricing-mode sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+    },
+    {
+      "ProcessId": 720,
+      "ParentProcessId": 10872,
+      "CreationDate": "2026-10-04T23:12:28.115825+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_v2.run --mode live --form4-source insider --db C:\\workspace\\TalonX\\v2_release_rc1.db --status-path C:\\workspace\\TalonX\\v2_release_rc1_status.json --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --pricing-mode sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+    },
+    {
+      "ProcessId": 17316,
+      "ParentProcessId": 340,
+      "CreationDate": "2026-10-04T23:25:21.668788+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "\"C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe\" -u -m talonx_opportunity up --deliver --supervise "
+    },
+    {
+      "ProcessId": 336,
+      "ParentProcessId": 17316,
+      "CreationDate": "2026-10-04T23:25:21.706794+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -u -m talonx_opportunity up --deliver --supervise "
+    },
+    {
+      "ProcessId": 12880,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.792766+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:INTRADAY"
+    },
+    {
+      "ProcessId": 9748,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.799152+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:SAME_DAY"
+    },
+    {
+      "ProcessId": 15000,
+      "ParentProcessId": 12880,
+      "CreationDate": "2026-10-04T23:25:21.802107+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component evaluator:INTRADAY"
+    },
+    {
+      "ProcessId": 14084,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.806487+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:SHORT_TERM"
+    },
+    {
+      "ProcessId": 18292,
+      "ParentProcessId": 9748,
+      "CreationDate": "2026-10-04T23:25:21.813698+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component evaluator:SAME_DAY"
+    },
+    {
+      "ProcessId": 15928,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.816727+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:LONG_TERM"
+    },
+    {
+      "ProcessId": 20724,
+      "ParentProcessId": 14084,
+      "CreationDate": "2026-10-04T23:25:21.821442+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component evaluator:SHORT_TERM"
+    },
+    {
+      "ProcessId": 3540,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.823865+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component notifier"
+    },
+    {
+      "ProcessId": 10172,
+      "ParentProcessId": 15928,
+      "CreationDate": "2026-10-04T23:25:21.830409+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component evaluator:LONG_TERM"
+    },
+    {
+      "ProcessId": 13672,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.834973+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component outcomes"
+    },
+    {
+      "ProcessId": 18144,
+      "ParentProcessId": 3540,
+      "CreationDate": "2026-10-04T23:25:21.842601+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component notifier"
+    },
+    {
+      "ProcessId": 776,
+      "ParentProcessId": 13672,
+      "CreationDate": "2026-10-04T23:25:21.858845+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component outcomes"
+    },
+    {
+      "ProcessId": 20136,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.875127+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component sentinel"
+    },
+    {
+      "ProcessId": 11140,
+      "ParentProcessId": 20136,
+      "CreationDate": "2026-10-04T23:25:21.901508+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component sentinel"
+    },
+    {
+      "ProcessId": 3344,
+      "ParentProcessId": 19592,
+      "CreationDate": "2026-10-05T07:40:18.136634+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\bin\\bash.exe\" results/ops_restore_20261004/tracker_v2_forward_v2.sh "
+    },
+    {
+      "ProcessId": 7184,
+      "ParentProcessId": 3344,
+      "CreationDate": "2026-10-05T07:40:18.185315+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\bin\\..\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\bin\\..\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_v2_forward_v2.sh "
+    },
+    {
+      "ProcessId": 24096,
+      "ParentProcessId": 7184,
+      "CreationDate": "2026-10-06T07:00:00.040808+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" docs/research/evidence/2026-09-30_v2_validation/forward_daily_v2.sh"
+    },
+    {
+      "ProcessId": 6612,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-07T09:29:32.078012+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_ingest.intelligence.service poll --with-backfill"
+    },
+    {
+      "ProcessId": 14388,
+      "ParentProcessId": 6612,
+      "CreationDate": "2026-10-07T09:29:32.098365+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_ingest.intelligence.service poll --with-backfill"
+    },
+    {
+      "ProcessId": 18004,
+      "ParentProcessId": 16612,
+      "CreationDate": "2026-10-07T23:41:49.801704+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_vr.sh"
+    },
+    {
+      "ProcessId": 19580,
+      "ParentProcessId": 18004,
+      "CreationDate": "2026-10-07T23:41:49.817664+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_vr.sh"
+    },
+    {
+      "ProcessId": 18688,
+      "ParentProcessId": 19580,
+      "CreationDate": "2026-10-07T23:41:49.83108+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -u -m talonx_paperperf.vr_live run --until 2026-10-16"
+    },
+    {
+      "ProcessId": 21460,
+      "ParentProcessId": 18688,
+      "CreationDate": "2026-10-07T23:41:49.839865+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -u -m talonx_paperperf.vr_live run --until 2026-10-16"
+    },
+    {
+      "ProcessId": 10816,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T12:01:50.617883+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component reporting"
+    },
+    {
+      "ProcessId": 21720,
+      "ParentProcessId": 10816,
+      "CreationDate": "2026-10-08T12:01:50.640628+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component reporting"
+    },
+    {
+      "ProcessId": 16872,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-08T12:01:52.786378+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe dashboard_web.py"
+    },
+    {
+      "ProcessId": 332,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T21:06:41.711918+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component ingestion"
+    },
+    {
+      "ProcessId": 14916,
+      "ParentProcessId": 332,
+      "CreationDate": "2026-10-08T21:06:41.725236+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component ingestion"
+    },
+    {
+      "ProcessId": 15492,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T21:07:45.7986+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component discovery"
+    },
+    {
+      "ProcessId": 15008,
+      "ParentProcessId": 15492,
+      "CreationDate": "2026-10-08T21:07:45.810133+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component discovery"
+    },
+    {
+      "ProcessId": 20388,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-09T21:30:41.791533+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component promotion"
+    },
+    {
+      "ProcessId": 23548,
+      "ParentProcessId": 20388,
+      "CreationDate": "2026-10-09T21:30:41.807289+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component promotion"
+    },
+    {
+      "ProcessId": 21732,
+      "ParentProcessId": 24096,
+      "CreationDate": "2026-10-10T07:03:49.137014+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" docs/research/evidence/2026-09-30_v2_validation/forward_daily_v2.sh"
+    },
+    {
+      "ProcessId": 23280,
+      "ParentProcessId": 21732,
+      "CreationDate": "2026-10-10T07:03:49.148951+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_paperperf.forward_runner sleep-to-next-slot"
+    },
+    {
+      "ProcessId": 17276,
+      "ParentProcessId": 23280,
+      "CreationDate": "2026-10-10T07:03:49.160181+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_paperperf.forward_runner sleep-to-next-slot"
+    }
+  ],
+  "processes_after": [
+    {
+      "ProcessId": 7136,
+      "ParentProcessId": 7632,
+      "CreationDate": "2026-10-04T23:12:26.102599+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_ops.supervisor run"
+    },
+    {
+      "ProcessId": 5316,
+      "ParentProcessId": 7136,
+      "CreationDate": "2026-10-04T23:12:26.10885+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_ops.supervisor run"
+    },
+    {
+      "ProcessId": 2480,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-04T23:12:26.385317+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe run_talonx.py"
+    },
+    {
+      "ProcessId": 21044,
+      "ParentProcessId": 2480,
+      "CreationDate": "2026-10-04T23:12:26.394227+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" run_talonx.py"
+    },
+    {
+      "ProcessId": 10872,
+      "ParentProcessId": 7632,
+      "CreationDate": "2026-10-04T23:12:28.107306+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_v2.run --mode live --form4-source insider --db C:\\workspace\\TalonX\\v2_release_rc1.db --status-path C:\\workspace\\TalonX\\v2_release_rc1_status.json --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --pricing-mode sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+    },
+    {
+      "ProcessId": 720,
+      "ParentProcessId": 10872,
+      "CreationDate": "2026-10-04T23:12:28.115825+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_v2.run --mode live --form4-source insider --db C:\\workspace\\TalonX\\v2_release_rc1.db --status-path C:\\workspace\\TalonX\\v2_release_rc1_status.json --tick-seconds 150 --heartbeat-seconds 30 --live-lookback-days 45 --pricing-mode sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+    },
+    {
+      "ProcessId": 17316,
+      "ParentProcessId": 340,
+      "CreationDate": "2026-10-04T23:25:21.668788+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "\"C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe\" -u -m talonx_opportunity up --deliver --supervise "
+    },
+    {
+      "ProcessId": 336,
+      "ParentProcessId": 17316,
+      "CreationDate": "2026-10-04T23:25:21.706794+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -u -m talonx_opportunity up --deliver --supervise "
+    },
+    {
+      "ProcessId": 3540,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.823865+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component notifier"
+    },
+    {
+      "ProcessId": 13672,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.834973+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component outcomes"
+    },
+    {
+      "ProcessId": 18144,
+      "ParentProcessId": 3540,
+      "CreationDate": "2026-10-04T23:25:21.842601+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component notifier"
+    },
+    {
+      "ProcessId": 776,
+      "ParentProcessId": 13672,
+      "CreationDate": "2026-10-04T23:25:21.858845+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component outcomes"
+    },
+    {
+      "ProcessId": 20136,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-04T23:25:21.875127+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component sentinel"
+    },
+    {
+      "ProcessId": 11140,
+      "ParentProcessId": 20136,
+      "CreationDate": "2026-10-04T23:25:21.901508+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component sentinel"
+    },
+    {
+      "ProcessId": 3344,
+      "ParentProcessId": 19592,
+      "CreationDate": "2026-10-05T07:40:18.136634+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\bin\\bash.exe\" results/ops_restore_20261004/tracker_v2_forward_v2.sh "
+    },
+    {
+      "ProcessId": 7184,
+      "ParentProcessId": 3344,
+      "CreationDate": "2026-10-05T07:40:18.185315+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\bin\\..\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\bin\\..\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_v2_forward_v2.sh "
+    },
+    {
+      "ProcessId": 24096,
+      "ParentProcessId": 7184,
+      "CreationDate": "2026-10-06T07:00:00.040808+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" docs/research/evidence/2026-09-30_v2_validation/forward_daily_v2.sh"
+    },
+    {
+      "ProcessId": 6612,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-07T09:29:32.078012+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_ingest.intelligence.service poll --with-backfill"
+    },
+    {
+      "ProcessId": 14388,
+      "ParentProcessId": 6612,
+      "CreationDate": "2026-10-07T09:29:32.098365+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_ingest.intelligence.service poll --with-backfill"
+    },
+    {
+      "ProcessId": 18004,
+      "ParentProcessId": 16612,
+      "CreationDate": "2026-10-07T23:41:49.801704+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_vr.sh"
+    },
+    {
+      "ProcessId": 19580,
+      "ParentProcessId": 18004,
+      "CreationDate": "2026-10-07T23:41:49.817664+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" results/ops_restore_20261004/tracker_vr.sh"
+    },
+    {
+      "ProcessId": 18688,
+      "ParentProcessId": 19580,
+      "CreationDate": "2026-10-07T23:41:49.83108+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -u -m talonx_paperperf.vr_live run --until 2026-10-16"
+    },
+    {
+      "ProcessId": 21460,
+      "ParentProcessId": 18688,
+      "CreationDate": "2026-10-07T23:41:49.839865+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -u -m talonx_paperperf.vr_live run --until 2026-10-16"
+    },
+    {
+      "ProcessId": 10816,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T12:01:50.617883+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component reporting"
+    },
+    {
+      "ProcessId": 21720,
+      "ParentProcessId": 10816,
+      "CreationDate": "2026-10-08T12:01:50.640628+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component reporting"
+    },
+    {
+      "ProcessId": 16872,
+      "ParentProcessId": 5316,
+      "CreationDate": "2026-10-08T12:01:52.786378+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe dashboard_web.py"
+    },
+    {
+      "ProcessId": 332,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T21:06:41.711918+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component ingestion"
+    },
+    {
+      "ProcessId": 14916,
+      "ParentProcessId": 332,
+      "CreationDate": "2026-10-08T21:06:41.725236+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component ingestion"
+    },
+    {
+      "ProcessId": 15492,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-08T21:07:45.7986+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component discovery"
+    },
+    {
+      "ProcessId": 15008,
+      "ParentProcessId": 15492,
+      "CreationDate": "2026-10-08T21:07:45.810133+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component discovery"
+    },
+    {
+      "ProcessId": 20388,
+      "ParentProcessId": 336,
+      "CreationDate": "2026-10-09T21:30:41.791533+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component promotion"
+    },
+    {
+      "ProcessId": 23548,
+      "ParentProcessId": 20388,
+      "CreationDate": "2026-10-09T21:30:41.807289+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_opportunity component promotion"
+    },
+    {
+      "ProcessId": 21732,
+      "ParentProcessId": 24096,
+      "CreationDate": "2026-10-10T07:03:49.137014+01:00",
+      "ExecutablePath": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+      "CommandLine": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" docs/research/evidence/2026-09-30_v2_validation/forward_daily_v2.sh"
+    },
+    {
+      "ProcessId": 23280,
+      "ParentProcessId": 21732,
+      "CreationDate": "2026-10-10T07:03:49.148951+01:00",
+      "ExecutablePath": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "CommandLine": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_paperperf.forward_runner sleep-to-next-slot"
+    },
+    {
+      "ProcessId": 17276,
+      "ParentProcessId": 23280,
+      "CreationDate": "2026-10-10T07:03:49.160181+01:00",
+      "ExecutablePath": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe",
+      "CommandLine": "\"C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe\" -m talonx_paperperf.forward_runner sleep-to-next-slot"
+    }
+  ],
+  "database_health_and_notification_counts": {
+    "C:\\workspace\\TalonX\\notifications.db": {
+      "health": "ok",
+      "counts": {
+        "ops_notification_outbox": [
+          [
+            "EXPIRED",
+            1
+          ],
+          [
+            "SENT",
+            11
+          ]
+        ]
+      }
+    },
+    "C:\\workspace\\TalonX\\operator_control.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\v2_lane.db": {
+      "health": "ok",
+      "counts": {
+        "positions": [],
+        "pending_entry_intents": [],
+        "v2_alert_outbox": []
+      }
+    },
+    "C:\\workspace\\TalonX\\v2_release_rc1.db": {
+      "health": "ok",
+      "counts": {
+        "positions": [],
+        "pending_entry_intents": [],
+        "v2_alert_outbox": []
+      }
+    },
+    "C:\\workspace\\TalonX\\v2_release_rc1_notifications.db": {
+      "health": "ok",
+      "counts": {
+        "ops_notification_outbox": [
+          [
+            "EXPIRED",
+            2
+          ],
+          [
+            "FAILED",
+            1
+          ],
+          [
+            "SENT",
+            57
+          ]
+        ]
+      }
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_intraday.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_same_day.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\market.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\notification.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\opportunity.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\opportunity_research_notifications.db": {
+      "health": "ok",
+      "counts": {
+        "ops_notification_outbox": [
+          [
+            "SENT",
+            2559
+          ]
+        ]
+      }
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\outcomes.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\promotion.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\promotion_delivery_trace.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\promotion_signal_notifications.db": {
+      "health": "ok",
+      "counts": {
+        "ops_notification_outbox": [
+          [
+            "SENT",
+            1449
+          ]
+        ]
+      }
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\runtime.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\vr_paper\\vr_live.db": {
+      "health": "ok",
+      "counts": {
+        "trades": [
+          [
+            "EXITED",
+            300
+          ],
+          [
+            "PAPER_ENTRY_PENDING",
+            1
+          ],
+          [
+            "SKIPPED",
+            1425
+          ]
+        ]
+      }
+    },
+    "C:\\workspace\\TalonX\\results\\vr_paper\\vr_paper_notifications.db": {
+      "health": "ok",
+      "counts": {
+        "ops_notification_outbox": [
+          [
+            "SENT",
+            334
+          ]
+        ]
+      }
+    },
+    "C:\\Users\\rites\\.talonx\\brain.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\core_state.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\dispatch_audit.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\eod_reconciliation.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\exp_alerts.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\ingestion_ledger.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\paper_trading.db": {
+      "health": "ok",
+      "counts": {
+        "long_term_positions": 0,
+        "positions": 0
+      }
+    },
+    "C:\\Users\\rites\\.talonx\\quant.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\watchlist.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\Users\\rites\\.talonx\\watchlist.task84wa_20260830T232941582269Z.backup.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_short_term.db": {
+      "health": "ok",
+      "counts": {}
+    },
+    "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_long_term.db": {
+      "health": "ok",
+      "counts": {}
+    }
+  },
+  "backups": {
+    "at_utc": "2026-10-10T19:02:25.076058+00:00",
+    "method": "SQLite online backup API from mode=ro connections, includes committed WAL state; files are local only",
+    "files": [
+      {
+        "source": "C:\\workspace\\TalonX\\notifications.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\notifications.db",
+        "sha256": "1d4a151478deb37bcdea1f1707ec56f60d15606e4ff9780d15f0a992ea731048",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\operator_control.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\operator_control.db",
+        "sha256": "b4bf7e0b258f4f5db09c64abc1533dd8285a985e538400b40e712f194eda2bce",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\v2_lane.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\v2_lane.db",
+        "sha256": "3ab6a2cd34981ad76531b5b629f13a454f9550782022691c5608fd69aa647052",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\v2_release_rc1.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\v2_release_rc1.db",
+        "sha256": "00b37892691f5feca8d753977e218e5b8816f3f50d7871a02f0ecce0400832d2",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\v2_release_rc1_notifications.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\v2_release_rc1_notifications.db",
+        "sha256": "cc17de16e1aa98d98849f08e1d27e248394d43a43dbc595440bbab5758b2361c",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_intraday.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\evaluator_intraday.db",
+        "sha256": "394b32bfe219ed463bdbbb1ec7c443389f276f3be3b0e32250d4f30f6ae19210",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_same_day.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\evaluator_same_day.db",
+        "sha256": "2455fc8247845e6151ca6f91d2ad1e3aee30a8f73ad3c2c5c56e8132b319ef37",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\market.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\market.db",
+        "sha256": "23be2170ccee5eb66808dc3ca851be1a8985cec3a757371163d7bd581bca5a5f",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\notification.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\notification.db",
+        "sha256": "4d1ba38858035d95ec845ff6de131bcc47708302580ec79f0b0dc20878f4a974",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\opportunity.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\opportunity.db",
+        "sha256": "2ccca7ca4ace70bb528f7ae8c4bfd05d75704b9d6a1ac66e768a54fd48b0d25e",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\opportunity_research_notifications.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\opportunity_research_notifications.db",
+        "sha256": "ebdb04329599d493d052fdb13d0f95c51411f6473613b76102417a8b7415f222",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\outcomes.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\outcomes.db",
+        "sha256": "44f7d2f923d25b628fc300f9562faf31d1997d35553857f0c4141298a40330d8",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\promotion.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\promotion.db",
+        "sha256": "97edf8081b3f6643d27024185d6d750d807fa75f01cd01a821586a2e1cec8346",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\promotion_delivery_trace.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\promotion_delivery_trace.db",
+        "sha256": "0eaff008f44e3cf5fea2614ba78076a90bf82c06630db4d61a5e7956cc16c997",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\promotion_signal_notifications.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\promotion_signal_notifications.db",
+        "sha256": "36d37504e4a817d9d53a0129e7a38b32b7e55d3b7b9c861f77bef4aecdb03433",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\runtime.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\opportunity\\runtime.db",
+        "sha256": "cb5bca4234e5ba4cd6f0a6edb4be42c83a1b6bd5f9fa69f421d6f8d17dd53273",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\vr_paper\\vr_live.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\vr_paper\\vr_live.db",
+        "sha256": "62b6e30062c9afca96d17cc0a316e0da67e0b853a568a6b58f116b7a632ca5db",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\vr_paper\\vr_paper_notifications.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_\\results\\vr_paper\\vr_paper_notifications.db",
+        "sha256": "18d8d9a545bcad90497c76fdd6fdb768fd2b7313b26521499f38960d133a32b2",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\brain.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\brain.db",
+        "sha256": "64de77527ae87899272ca755a713b15d7e720628cb2a58dc6f8504e51e1809cc",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\core_state.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\core_state.db",
+        "sha256": "05f126f052d423a071b0ab8b65e794b3322c2cfb3af32915b5fb9ddfa9e0a680",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\dispatch_audit.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\dispatch_audit.db",
+        "sha256": "5367e956d930147db274882b85bfe9a3c0cc85e86b1a6f5ba9040cc14aeca215",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\eod_reconciliation.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\eod_reconciliation.db",
+        "sha256": "d0554b387ba326c816da48cf4639d5fcd3a686b7d58d6e158070f96a0141086f",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\exp_alerts.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\exp_alerts.db",
+        "sha256": "a2e9200b15954b25f4738e1321678c8832ac9eaf30ee5f33b7780af53706fe89",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\ingestion_ledger.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\ingestion_ledger.db",
+        "sha256": "8232bd8d03950d34a878dc40893d31d1b3fe41eaa8866d1ac7b7192946b9469a",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\paper_trading.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\paper_trading.db",
+        "sha256": "4491af77611e8d288383ed3db00d3d622698eb4f127ddccdcdaddf4825ae4306",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\quant.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\quant.db",
+        "sha256": "23e0d1874c72f0d402bb18add6ce914c587a0870708251b7fd3b277e0304ed15",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\Users\\rites\\.talonx\\watchlist.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\home_\\watchlist.db",
+        "sha256": "a3e4de1a63437ea5d6afe037415cc9cb0fcd8e100ab2628dcf1c54dad73fd94c",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "docs/research/evidence/forward_alpha_validation.md",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\docs\\research\\evidence\\forward_alpha_validation.md",
+        "sha256": "b1c886baf34d00fde4eece73e927c500432581bc6040f38c0549df3cdcfd7936",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/opportunity/control/dtu_policy_schedule.json",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\opportunity\\control\\dtu_policy_schedule.json",
+        "sha256": "9f0c07a542b5f7b86e40150f28416c2df531b3fa63d5d8c211184a129947db95",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/opportunity/control/promotion_signal_delivery.json",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\opportunity\\control\\promotion_signal_delivery.json",
+        "sha256": "f0589fb141c50e64abc39072a7645f53ca8bf5d210d345d6c10fce06d8217141",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/vr_paper/entry_control.json",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\vr_paper\\entry_control.json",
+        "sha256": "bd10edf6b4fd467f7c9fd490a0c786969f336f8b449c74883d85a30bf1410d82",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/vr_paper/ARM_INTERRUPTION_2026-10-07.json",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\vr_paper\\ARM_INTERRUPTION_2026-10-07.json",
+        "sha256": "477e20d63f3d09ad4f9fb22491eea74dea25a62e4413e645a75ca6fa595758b4",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "docs/research/protocols/POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\docs\\research\\protocols\\POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json",
+        "sha256": "f7f012fde50cf736b1a5b8bfe991d9d23b09fc7233a0316c747e7cdad8f2d48c",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/ops_restore_20261004/tracker_v2_forward_v2.sh",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\ops_restore_20261004\\tracker_v2_forward_v2.sh",
+        "sha256": "e5331df789b8baeeb3069bda710ecb85a2e909e25b82c83bcd906e6049d937d1",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "results/ops_restore_20261004/tracker_vr.sh",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\results\\ops_restore_20261004\\tracker_vr.sh",
+        "sha256": "6ff19c2bd1d297943087cbcb5528b5e692cf96c12f6eee69e074e8b681ef0d8f",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "v2_release_rc1.db.startlock",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\config\\v2_release_rc1.db.startlock",
+        "sha256": "24f1d0d7231167186b0437631f690f543509beb2004e56ddf8094dfc7be5d105",
+        "backup_sha256_verified": true
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_short_term.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_results\\opportunity\\evaluator_short_term.db",
+        "sha256": "6687b558612d5ef6d9ba5339ceaa44e55d9456c7a1c21828b8fcddb28e466c8d",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      },
+      {
+        "source": "C:\\workspace\\TalonX\\results\\opportunity\\evaluator_long_term.db",
+        "backup": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\repo_results\\opportunity\\evaluator_long_term.db",
+        "sha256": "31635d69b83221ffe2a6edb5773fcc044ce72666a3c119c4dbb75c8e30e0e8dd",
+        "backup_sha256_verified": true,
+        "backup_health": "ok"
+      }
+    ]
+  },
+  "controls": [
+    {
+      "source": "docs/research/evidence/forward_alpha_validation.md",
+      "sha256": "b1c886baf34d00fde4eece73e927c500432581bc6040f38c0549df3cdcfd7936",
+      "unchanged": true
+    },
+    {
+      "source": "results/opportunity/control/dtu_policy_schedule.json",
+      "sha256": "9f0c07a542b5f7b86e40150f28416c2df531b3fa63d5d8c211184a129947db95",
+      "unchanged": true
+    },
+    {
+      "source": "results/opportunity/control/promotion_signal_delivery.json",
+      "sha256": "f0589fb141c50e64abc39072a7645f53ca8bf5d210d345d6c10fce06d8217141",
+      "unchanged": true
+    },
+    {
+      "source": "results/vr_paper/entry_control.json",
+      "sha256": "bd10edf6b4fd467f7c9fd490a0c786969f336f8b449c74883d85a30bf1410d82",
+      "unchanged": true
+    },
+    {
+      "source": "results/vr_paper/ARM_INTERRUPTION_2026-10-07.json",
+      "sha256": "477e20d63f3d09ad4f9fb22491eea74dea25a62e4413e645a75ca6fa595758b4",
+      "unchanged": true
+    },
+    {
+      "source": "docs/research/protocols/POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json",
+      "sha256": "f7f012fde50cf736b1a5b8bfe991d9d23b09fc7233a0316c747e7cdad8f2d48c",
+      "unchanged": true
+    },
+    {
+      "source": "results/ops_restore_20261004/tracker_v2_forward_v2.sh",
+      "sha256": "e5331df789b8baeeb3069bda710ecb85a2e909e25b82c83bcd906e6049d937d1",
+      "unchanged": true
+    },
+    {
+      "source": "results/ops_restore_20261004/tracker_vr.sh",
+      "sha256": "6ff19c2bd1d297943087cbcb5528b5e692cf96c12f6eee69e074e8b681ef0d8f",
+      "unchanged": true
+    },
+    {
+      "source": "v2_release_rc1.db.startlock",
+      "sha256": "24f1d0d7231167186b0437631f690f543509beb2004e56ddf8094dfc7be5d105",
+      "unchanged": true
+    }
+  ],
+  "components": [
+    {
+      "name": "ingestion",
+      "pid": 14916,
+      "state": "RUNNING",
+      "version": "dc5d119072a4",
+      "commit_sha": "7715b844a148-dirty",
+      "started_utc": "2026-10-08T20:06:42.507944+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:43.594169+00:00",
+      "config_fps_json": "{\"DTU\": \"65f3285f8181c552\", \"DTU_SCHEDULE\": \"[{\\\"effective_from_window\\\": \\\"2026-10-09\\\", \\\"policy\\\": \\\"DTU_V3_TOP600\\\"}]\"}"
+    },
+    {
+      "name": "evaluator:INTRADAY",
+      "pid": 15000,
+      "state": "STOPPED",
+      "version": "364f2071525f",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:22.673874+00:00",
+      "heartbeat_utc": "2026-10-10T19:03:42.755710+00:00",
+      "config_fps_json": "{\"authorized_strategies\": \"none\", \"phase_scope\": \"PREMARKET,REGULAR\"}"
+    },
+    {
+      "name": "evaluator:SAME_DAY",
+      "pid": 18292,
+      "state": "STOPPED",
+      "version": "364f2071525f",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.563481+00:00",
+      "heartbeat_utc": "2026-10-10T19:03:40.543109+00:00",
+      "config_fps_json": "{\"authorized_strategies\": \"none\", \"phase_scope\": \"OVERNIGHT,PREMARKET,REGULAR,AFTER_HOURS\"}"
+    },
+    {
+      "name": "discovery",
+      "pid": 15008,
+      "state": "RUNNING",
+      "version": "f10942d4e43c",
+      "commit_sha": "7715b844a148-dirty",
+      "started_utc": "2026-10-08T20:07:46.716190+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:44.910545+00:00",
+      "config_fps_json": "{\"CONTINUOUS_RESEARCH\": \"2ef115ee19f99574\", \"DTU\": \"65f3285f8181c552\", \"DTU_SCHEDULE\": \"[{\\\"effective_from_window\\\": \\\"2026-10-09\\\", \\\"policy\\\": \\\"DTU_V3_TOP600\\\"}]\", \"PREMARKET_RESEARCH_V1\": \"62ba413daf85e674\", \"SEC_CATALYST_CACHE\": \"BACKGROUND_REFRESH_V1\"}"
+    },
+    {
+      "name": "evaluator:SHORT_TERM",
+      "pid": 20724,
+      "state": "STOPPED",
+      "version": "364f2071525f",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.661446+00:00",
+      "heartbeat_utc": "2026-10-10T19:03:42.063135+00:00",
+      "config_fps_json": "{\"authorized_strategies\": \"none\", \"phase_scope\": \"AFTER_HOURS,OVERNIGHT\"}"
+    },
+    {
+      "name": "evaluator:LONG_TERM",
+      "pid": 10172,
+      "state": "STOPPED",
+      "version": "364f2071525f",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.668658+00:00",
+      "heartbeat_utc": "2026-10-10T19:03:42.772776+00:00",
+      "config_fps_json": "{\"authorized_strategies\": \"none\", \"phase_scope\": \"\"}"
+    },
+    {
+      "name": "notifier",
+      "pid": 18144,
+      "state": "RUNNING",
+      "version": "de94590ccb22",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.722259+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:42.428555+00:00",
+      "config_fps_json": "{\"LAB_DELIVERY_POLICY\": \"46a2c622a7856f88\", \"LAB_NOTIFY_POLICY\": \"dec8d1a865f25424\", \"deliver\": \"1\", \"reserve_phase_basis\": \"CAUSAL_DATA_PHASE_V1\"}"
+    },
+    {
+      "name": "outcomes",
+      "pid": 776,
+      "state": "RUNNING",
+      "version": "daa1d6bbea4d",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.768903+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:46.985651+00:00",
+      "config_fps_json": "{\"models\": \"PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1\", \"phase_basis\": \"CAUSAL_DATA_PHASE_V1\"}"
+    },
+    {
+      "name": "reporting",
+      "pid": 21720,
+      "state": "RUNNING",
+      "version": "cff3f73160ee",
+      "commit_sha": "7715b844a148-dirty",
+      "started_utc": "2026-10-08T11:01:51.027047+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:42.724756+00:00",
+      "config_fps_json": "{}"
+    },
+    {
+      "name": "promotion",
+      "pid": 23548,
+      "state": "RUNNING",
+      "version": "de24a9891031",
+      "commit_sha": "643c22aece4c-dirty",
+      "started_utc": "2026-10-09T20:30:42.441814+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:43.766701+00:00",
+      "config_fps_json": "{\"PROMOTION_POLICY\": \"4926c12e5eace04e\", \"mode\": \"PAPER_SIGNAL\", \"promotion_src\": \"dd3f6c78fa0f\", \"signal_delivery\": \"RESEARCH_REVIEW@2026-10-07T22:42:55+00:00\"}"
+    },
+    {
+      "name": "sentinel",
+      "pid": 11140,
+      "state": "RUNNING",
+      "version": "4dbd66f0b3e2",
+      "commit_sha": "ad62e9f482d5-dirty",
+      "started_utc": "2026-10-04T22:25:23.960701+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:40.758658+00:00",
+      "config_fps_json": "{\"destination\": \"SENTINEL\", \"enabled\": \"1\", \"mutation_mode\": \"DRY_RUN\"}"
+    },
+    {
+      "name": "supervisor",
+      "pid": 336,
+      "state": "RUNNING",
+      "version": null,
+      "commit_sha": null,
+      "started_utc": "2026-10-04T22:25:22.297873+00:00",
+      "heartbeat_utc": "2026-10-10T19:09:38.670900+00:00",
+      "config_fps_json": null
+    }
+  ],
+  "verification": {
+    "owner_locks": {
+      "ingestion": true,
+      "discovery": true,
+      "evaluator:INTRADAY": false,
+      "evaluator:SAME_DAY": false,
+      "evaluator:SHORT_TERM": false,
+      "evaluator:LONG_TERM": false,
+      "notifier": true,
+      "outcomes": true,
+      "reporting": true,
+      "promotion": true,
+      "sentinel": true
+    },
+    "retained_supervisor_lock": true,
+    "stopped_flags_present": {
+      "evaluator:INTRADAY": true,
+      "evaluator:SAME_DAY": true,
+      "evaluator:SHORT_TERM": true,
+      "evaluator:LONG_TERM": true
+    },
+    "pdm_task_definition_unchanged": true,
+    "dashboard_http_status": 200,
+    "startup_relaunch_entries": "No TalonX/tracker/forward Windows Startup commands found; recorded launcher parent PIDs no longer exist"
+  },
+  "scheduler_backups": [
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\ERM_NOMINEE_VALIDATION_B_GO_2026-10-06.task.xml",
+      "sha256": "49021691b5e09b27a481d9fc771a148f38e5aee8e22b6a48588142d73e31ffd6"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\ERM_NOMINEE_VALIDATION_B_OBSERVER_2026-10-06.task.xml",
+      "sha256": "428be77f34fcc563a9efff4a2418405947cd45b3cdfc3978cb1b71f7fa87df29"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\ERM_V1_PhaseD_2026-10-03.task.xml",
+      "sha256": "dbdc6bfbdf55ae57d96589176512b87d4a58d64e70f854a5a0db1b5a8bfe62f8"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\ERM_V1_PhaseD_rescore.task.xml",
+      "sha256": "5dba6d3c448bc0d97672d5a4a541154dd1cff3ecb8bc669ff46b7cbdf9ca115c"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\PDM_V1_Collector.task.xml",
+      "sha256": "f0111e6b0553d26e23f00fa539fde9e5379fdc835099c52b98dcc3eab60bd078"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\UniverseVerify_2026-10-05_build.task.xml",
+      "sha256": "ab4864b4a649d35f756610d5518e6b210747c22e6bb6dde4951caff4a571be9b"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\UniverseVerify_2026-10-05_morning.task.xml",
+      "sha256": "b6e41ea257dfebbb6bcfddf55048990038941082087de368665312cb760a1062"
+    },
+    {
+      "path": "C:\\workspace\\TalonX\\results\\weekend_shutdown_20261010\\backup\\UniverseVerify_2026-10-05_premarket.task.xml",
+      "sha256": "1d813c19e9d24ea51772660927903c047eb40086261a153547f0b8adb725599e"
+    }
+  ],
+  "schedules": [
+    {
+      "Name": "ERM_NOMINEE_VALIDATION_B_GO_2026-10-06",
+      "Path": "\\",
+      "State": "Ready",
+      "Execute": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "Arguments": "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\workspace\\TalonX-erm-val\\results\\erm_nominee_validation\\go_B\\launch_validation_B.ps1\"",
+      "NextRun": null,
+      "LastResult": 1,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-06T21:35:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    },
+    {
+      "Name": "ERM_NOMINEE_VALIDATION_B_OBSERVER_2026-10-06",
+      "Path": "\\",
+      "State": "Ready",
+      "Execute": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "Arguments": "\"C:\\workspace\\TalonX-erm-val\\results\\erm_nominee_validation\\go_B\\observer\\observe_validation_B.py\"",
+      "NextRun": null,
+      "LastResult": 0,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-06T21:25:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    },
+    {
+      "Name": "ERM_V1_PhaseD_2026-10-03",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "Arguments": "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\workspace\\TalonX-erm\\research\\event_response_map_v1\\run_phase_d.ps1\"",
+      "NextRun": null,
+      "LastResult": 267014,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-03T15:00:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "S4U"
+    },
+    {
+      "Name": "ERM_V1_PhaseD_rescore",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "Arguments": "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\workspace\\TalonX-erm\\research\\event_response_map_v1\\run_phase_d.ps1\" -ScoringOnly",
+      "NextRun": null,
+      "LastResult": 0,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-04T14:00:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "S4U"
+    },
+    {
+      "Name": "PDM_V1_Collector",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "Arguments": "-m talonx_paperperf.post_delivery_collector --config C:\\workspace\\TalonX\\docs\\research\\protocols\\POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json --enable --budget-s 900",
+      "NextRun": "2026-10-20T00:15:00+01:00",
+      "LastResult": 267011,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-20T00:15:00",
+          "Enabled": true
+        },
+        {
+          "StartBoundary": "2026-10-20T06:30:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    },
+    {
+      "Name": "UniverseVerify_2026-10-05_build",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "Arguments": "\"C:\\workspace\\TalonX\\results\\ops_restore_20261004\\verify_universe_20261005.py\" build",
+      "NextRun": null,
+      "LastResult": 2,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-05T01:15:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    },
+    {
+      "Name": "UniverseVerify_2026-10-05_morning",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "Arguments": "\"C:\\workspace\\TalonX\\results\\ops_restore_20261004\\verify_universe_20261005.py\" morning",
+      "NextRun": null,
+      "LastResult": 1,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-05T10:30:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    },
+    {
+      "Name": "UniverseVerify_2026-10-05_premarket",
+      "Path": "\\TalonX\\",
+      "State": "Ready",
+      "Execute": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+      "Arguments": "\"C:\\workspace\\TalonX\\results\\ops_restore_20261004\\verify_universe_20261005.py\" premarket",
+      "NextRun": null,
+      "LastResult": 0,
+      "Triggers": [
+        {
+          "StartBoundary": "2026-10-05T09:15:00+01:00",
+          "Enabled": true
+        }
+      ],
+      "LogonType": "Interactive"
+    }
+  ],
+  "forward_status": {
+    "day": "2026-10-10",
+    "state": "SUCCESS",
+    "scheduled_utc": "2026-10-10T06:00:00+00:00",
+    "started_utc": "2026-10-10T06:00:00.291806+00:00",
+    "ended_utc": "2026-10-10T06:03:48.795792+00:00",
+    "runner_version": "forward_runner v1 (2026-10-05)"
+  },
+  "next_obligation": "2026-10-11T06:00:00Z; daily inclusive through 2026-10-31",
+  "monday_latest_recommended_check": "Restore paused evaluators by 2026-10-11T23:30:00Z / Monday 2026-10-12 00:30 BST; Monday universe window starts 2026-10-12T00:00:00Z / 01:00 BST; machine must stay running for Sunday 06:00Z observation",
+  "v2_operational_status": {
+    "heartbeat_utc": "2026-10-10T19:09:31.763872+00:00",
+    "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+    "execution_mode": "PAPER",
+    "data_state": "CURRENT",
+    "price_provider_contract": {
+      "mode": "sip",
+      "release_contract_active": true,
+      "contract_id": "V2_RELEASE_PRICE_CONTRACT@1",
+      "contract_fingerprint": "ac5e51aa3599d6c9",
+      "provider": "alpaca",
+      "feed": "sip",
+      "adjustment": "split",
+      "fallback_mode": "NONE",
+      "finality_rule": "usable iff now >= session_extended_end(S)=close(S)+4h + 15min SIP lag + 1min settle",
+      "witness_disagreements_recent": []
+    }
+  },
+  "intelligence_delivery_counts": {
+    "AMBIGUOUS": 3,
+    "EXPIRED": 50846,
+    "PENDING": 1,
+    "SENT": 368
+  },
+  "backup_access": "Restricted directory DACL: current Windows account, SYSTEM, administrators only; machine policy unchanged"
+}
