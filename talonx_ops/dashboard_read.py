@@ -697,6 +697,15 @@ class DashboardReadModel:
                                  sorted(reject_reasons.items(), key=lambda kv: -kv[1])]
         out["experimental_trades_recent"] = exp_trades
 
+        # V2@1 shadow forward tracker run records (2026-10-12): recorded vs conservatively derived state; operational
+        # metadata only -- talonx_paperperf.forward_status never opens forward/ or any research output.
+        try:
+            from talonx_paperperf import forward_status as _fs
+            out["v2_forward_runs"] = _fs.view_cached(Path(__file__).resolve().parents[1])
+        except Exception as exc:  # noqa: BLE001 -- unreadable is surfaced, never shown healthy
+            out["v2_forward_runs"] = {"error": f"{type(exc).__name__}: {exc}", "current_health": "UNREADABLE",
+                                      "runs": []}
+
         # forward outcomes (Task 99G)
         out["forward_outcomes"] = self._forward_outcomes_block()
 

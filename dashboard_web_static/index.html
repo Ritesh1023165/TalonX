@@ -377,6 +377,20 @@ function renderValidation(d){
        {label:'+30m', get:r=>r.r_30m},{label:'+60m', get:r=>r.r_60m},{label:'EOD', get:r=>r.r_eod},{label:'+1D', get:r=>r.r_1d},
        {label:'status', get:r=>r.status},
      ], 15, r=>r.obs_id)+srcLine(fo.source)+`</div>`;
+  const fr=d.v2_forward_runs||{};
+  h+=`<div class="card card-wide"><h3>V2@1 forward tracker runs ${pill(fr.current_health||'UNREADABLE')}</h3>`+
+     `<div class="small muted">Recorded = what the run record says; Observed = derived conservatively (process identity + deadline). `+
+     `Operational metadata only — no outcomes. Next scheduled run: <b>${esc(fr.next_scheduled_run_utc||'UNKNOWN')}</b> · study end: ${esc(fr.study_end_date||'UNKNOWN')}`+
+     ` · incomplete days in view: <b>${esc((fr.incomplete_days_in_view||[]).join(', ')||'none')}</b>${fr.error? ' · error: '+esc(fr.error):''}</div>`+
+     boundedTable(fr.runs, [
+       {label:'day', get:r=>r.day},{label:'run id', get:r=>r.run_id},
+       {label:'recorded', get:r=>r.recorded_state},{label:'observed', get:r=>r.observed_state},
+       {label:'why', get:r=>r.reason},{label:'scheduled', get:r=>r.scheduled_utc},{label:'started', get:r=>r.started_utc},
+       {label:'last stage', get:r=>r.last_stage? (r.last_stage.name+' '+r.last_stage.state):'—'},
+       {label:'last update', get:r=>r.last_update_utc},{label:'deadline', get:r=>r.deadline_utc},
+       {label:'process', get:r=>r.process? r.process.identity:'—'},{label:'artifact validated', get:r=>r.artifact_validated},
+       {label:'error', get:r=>r.error_class},{label:'persist. diag.', get:r=>(r.persistence_failure_diagnostics||[]).length},
+     ], 10, r=>r.day)+srcLine(fr.source)+`</div>`;
   h+=`<div class="card exp card-wide"><h3>Original vs Experimental (informational)</h3>`+
      `<div class="muted small">${esc(cmp.note||'')}</div><pre class="json">${esc(JSON.stringify({original:cmp.original,experimental:cmp.experimental},null,1))}</pre></div>`;
   h+=`</div>`;
