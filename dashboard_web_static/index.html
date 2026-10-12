@@ -381,7 +381,17 @@ function renderValidation(d){
   h+=`<div class="card card-wide"><h3>V2@1 forward tracker runs ${pill(fr.current_health||'UNREADABLE')}</h3>`+
      `<div class="small muted">Recorded = what the run record says; Observed = derived conservatively (process identity + deadline). `+
      `Operational metadata only — no outcomes. Next scheduled run: <b>${esc(fr.next_scheduled_run_utc||'UNKNOWN')}</b> · study end: ${esc(fr.study_end_date||'UNKNOWN')}`+
-     ` · incomplete days in view: <b>${esc((fr.incomplete_days_in_view||[]).join(', ')||'none')}</b>${fr.error? ' · error: '+esc(fr.error):''}</div>`+
+     `${fr.error? ' · error: '+esc(fr.error):''}</div>`+
+     (()=>{ const c=fr.completeness||{}, n=c.counts||{};
+       return `<div class="small" style="margin:6px 0"><b>Study completeness</b> (${esc(c.period||'UNKNOWN')}; as of ${esc(c.as_of_utc||'—')}; `+
+         `${num(c.slots)} registered slots): success <b>${num(n.success)}</b> · incomplete/missing <b>${num(n.incomplete_or_missing)}</b> · `+
+         `unverified (legacy) <b>${num(n.unverified)}</b> · running/due <b>${num(n.running_or_due)}</b> · not yet due <b>${num(n.not_yet_due)}</b> · `+
+         `unreadable/unknown <b>${num(n.unreadable_or_unknown)}</b>. <span class="muted">Current health (above) is the latest run only.</span></div>`+
+         boundedTable(c.affected, [
+           {label:'day', get:r=>r.day},{label:'state', get:r=>r.state},{label:'provenance', get:r=>r.provenance},
+           {label:'reason', get:r=>r.reason},{label:'conflicts', get:r=>(r.conflicts||[]).join('; ')||'—'},
+         ], 40, r=>r.day); })()+
+     `<div class="small muted" style="margin-top:6px">Recent run records</div>`+
      boundedTable(fr.runs, [
        {label:'day', get:r=>r.day},{label:'run id', get:r=>r.run_id},
        {label:'recorded', get:r=>r.recorded_state},{label:'observed', get:r=>r.observed_state},

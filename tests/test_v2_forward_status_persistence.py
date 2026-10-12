@@ -254,6 +254,9 @@ def test_success_needs_the_recorded_validated_flag_and_unknown_states_are_not_he
 def test_view_marks_abandoned_and_malformed_runs_and_separates_health_from_completeness(tmp_path):
     runs = tmp_path / "results" / "v2_validation" / "forward_runs"
     runs.mkdir(parents=True)
+    sh = tmp_path / "docs/research/evidence/2026-09-30_v2_validation/forward_daily_v2.sh"
+    sh.parent.mkdir(parents=True)
+    sh.write_text("d.date.today()<=d.date(2026,10,31)", encoding="utf-8")       # registered stop date
     (runs / "2026-10-10.json").write_text("{ broken")
     (runs / "2026-10-11.json").write_text(json.dumps(rec("2026-10-11", pid=999999)))
     (runs / "2026-10-12.json").write_text(json.dumps(rec("2026-10-12", state="SUCCESS", artifact={"validated": True},
@@ -266,7 +269,8 @@ def test_view_marks_abandoned_and_malformed_runs_and_separates_health_from_compl
     assert by["2026-10-11"]["recorded_state"] == "RUNNING" and by["2026-10-11"]["observed_state"] == "ABANDONED"
     assert by["2026-10-11"]["last_stage"]["name"] == "prices"
     assert out["current_health"] == "HEALTHY"                                   # the later run is healthy...
-    assert out["incomplete_days_in_view"] == ["2026-10-11", "2026-10-10"]       # ...but history stays visible
+    aff = {a["day"]: a["state"] for a in out["completeness"]["affected"]}      # ...but history stays visible
+    assert aff["2026-10-11"] == "ABANDONED" and aff["2026-10-10"] == "UNREADABLE"
     assert out["next_scheduled_run_utc"] == "2026-10-13T06:00:00+00:00"
 
 
@@ -285,7 +289,7 @@ def test_view_never_opens_outcome_files(tmp_path, monkeypatch):
         return real(self, *a, **k)
     monkeypatch.setattr(Path, "read_text", spy)
     out = FS.view(tmp_path, now=LATE, ps=PS(exists=False))
-    assert all("forward_runs" in p or p.endswith("forward_daily_v2.sh") for p in opened)
+    assert all("forward_runs" in p or p.endswith(("forward_daily_v2.sh", "forward.log")) for p in opened)
     assert "SECRET" not in json.dumps(out)
 
 

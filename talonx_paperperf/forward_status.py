@@ -117,6 +117,137 @@ def next_slot(now: datetime) -> datetime:
     return s if now < s else s + timedelta(days=1)
 
 
+# ---------------------------------------------------------------------------------------------- study completeness
+# Registered schedule (provenance):
+#   docs/research/evidence/2026-09-30_v2_validation/forward_daily.sh -- waits for the Jul-Sep EDGAR backfill
+#   (edgar/20260929.done), runs a START-UP cycle at once (it ran 2026-09-30), then daily at 06:00Z on EVERY calendar
+#   day (no weekday filter) while date.today() <= the stop date (INCLUSIVE). forward_daily_v2.sh (2026-10-05) keeps
+#   the same 06:00Z schedule and stop date. Documented interruptions: none skipped a slot (the 2026-10-05 loop
+#   replacement happened after that day's cycle; the 2026-10-10 weekend assessment kept the loop running).
+START_DAY = "2026-09-30"
+START_NOTE = "start-up cycle after the EDGAR backfill marker (not a 06:00Z slot)"
+RUN_BUDGET_MIN = 90                          # forward_runner deadline budget: never MISSING inside it
+_LOG_KEYS = {"cycle_done", "cycle_end", "day", "state", "exit", "forward_runner", "run_id", "failed_stage",
+             "error_class", "wrapper_v2_start", "first_cycle_at", "loop_end", "reason", "deadline_utc", "cutoffs",
+             "existing"}
+INCOMPLETE = ("FAILED", "PARTIAL", "ABANDONED", "MISSING", "PROCESS_ABSENT", "OVERDUE_ALIVE", "OVERDUE_UNCONFIRMED")
+
+
+def _structured_log(repo: Path) -> list[dict]:
+    """ONLY whole-line JSON objects made entirely of operational keys (cycle / runner markers). Every other line --
+    which may carry research statistics -- is dropped unparsed and never surfaced."""
+    out = []
+    try:
+        text = (repo / "results" / "v2_validation" / "forward.log").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return out
+    for line in text.splitlines():
+        t = line.strip()
+        if not (t.startswith("{") and t.endswith("}")):
+            continue
+        try:
+            d = json.loads(t)
+        except ValueError:
+            continue
+        if isinstance(d, dict) and d and set(d) <= _LOG_KEYS:
+            out.append(d)
+    return out
+
+
+def _slot_time(day: str) -> datetime:
+    d = datetime.fromisoformat(day).replace(tzinfo=UTC)
+    return d if day == START_DAY else d.replace(hour=SLOT_HOUR_UTC)
+
+
+def _classify_slot(row: dict, rec: dict | None, ends: list[dict], legacy: list[str], slot: datetime,
+                   now: datetime, ps) -> None:
+    if rec is not None:
+        dv = derive(rec, now, ps)
+        art = rec.get("artifact") if isinstance(rec.get("artifact"), dict) else {}
+        row.update(recorded_state=dv["recorded_state"], state=dv["observed_state"], reason=dv["reason"],
+                   artifact_validated=art.get("validated"),
+                   provenance="RECONSTRUCTED" if rec.get("reconstructed_from_log") else "RUNNER_RECORD")
+        if dv["observed_state"] == "SUCCESS" and row["output_file"] is None:
+            row["conflicts"].append("record SUCCESS but output file absent")
+        if dv["observed_state"] in ("FAILED", "PARTIAL") and row["output_file"] and rec.get("started_utc") \
+                and row["output_file"] >= str(rec.get("started_utc")):
+            row["conflicts"].append("record not SUCCESS but an output file was written after the run start")
+        for x in ends:
+            if x.get("state") != rec.get("state"):
+                row["conflicts"].append(f"loop logged {x.get('state')} but the record says {rec.get('state')}")
+    elif now < slot:
+        row.update(recorded_state=None, state="NOT_YET_DUE", reason="slot in the future")
+    elif legacy or ends:
+        row.update(recorded_state=None, state="UNVERIFIED", provenance="LEGACY_LOG" if legacy else "LOOP_LOG",
+                   reason="no run record; legacy loop recorded no exit status or validation"
+                          + ("; an output file was written during that cycle (not opened; never proof)"
+                             if row["output_file"] else "; no output file"))
+    elif now < slot + timedelta(minutes=RUN_BUDGET_MIN):
+        row.update(recorded_state=None, state="DUE_AWAITING_RECORD", reason="slot passed; inside the run budget")
+    else:
+        row.update(recorded_state=None, state="MISSING", reason="slot elapsed; no run evidence found")
+
+
+def completeness(repo: Path, now: datetime, ps=None) -> dict:
+    """One row per REGISTERED slot, START_DAY .. stop date inclusive -- built from the schedule, not from whichever
+    files exist. Evidence: the modern run record (read), structured legacy loop markers, and the output file's
+    existence/mtime (stat only -- outputs are never opened). One state per slot; conflicts are listed, never
+    silently resolved in the favourable direction."""
+    end = _end_date(repo)
+    runs = repo / "results" / "v2_validation" / "forward_runs"
+    outd = repo / "results" / "v2_validation" / "forward"
+    log = _structured_log(repo)
+    rows: list[dict] = []
+    d = datetime.fromisoformat(START_DAY).date()
+    last = datetime.fromisoformat(end).date() if end else None
+    while last is not None and d <= last:
+        day = d.isoformat()
+        slot = _slot_time(day)
+        row = {"day": day, "weekday": d.strftime("%a"), "evidence": [], "conflicts": [],
+               "expected_utc": f"{day} ({START_NOTE})" if day == START_DAY else slot.isoformat()}
+        rec, rec_p = None, runs / f"{day}.json"
+        if rec_p.exists():
+            try:
+                rec = json.loads(rec_p.read_text(encoding="utf-8"))
+                if not isinstance(rec, dict):
+                    raise ValueError("not an object")
+                row["evidence"].append("run record" + (" (RECONSTRUCTED from log)" if rec.get("reconstructed_from_log")
+                                                       else ""))
+            except (OSError, ValueError) as exc:
+                rec = None
+                row.update(recorded_state="UNREADABLE", state="UNREADABLE",
+                           reason=f"run record unreadable: {type(exc).__name__}")
+        if any(f.name != rec_p.name for f in runs.glob(f"{day}.json*") if f.name.endswith("tmp")):
+            row["evidence"].append("orphaned temp record (not authoritative, not read)")
+        legacy = [x["cycle_done"] for x in log if str(x.get("cycle_done", "")).startswith(day)]
+        ends = [x for x in log if x.get("cycle_end") and x.get("day") == day]
+        if legacy:
+            row["evidence"].append("legacy cycle_done " + ", ".join(legacy) + " (written unconditionally)")
+        if ends:
+            row["evidence"].append("loop cycle_end " + ", ".join(f"{x.get('state')}/exit {x.get('exit')}" for x in ends))
+        try:
+            row["output_file"] = datetime.fromtimestamp((outd / f"{day}.json").stat().st_mtime, UTC).isoformat()
+        except OSError:
+            row["output_file"] = None
+        if row.get("state") != "UNREADABLE":
+            _classify_slot(row, rec, ends, legacy, slot, now, ps)
+        rows.append(row)
+        d += timedelta(days=1)
+    counts = {"success": 0, "incomplete_or_missing": 0, "unverified": 0, "running_or_due": 0, "not_yet_due": 0,
+              "unreadable_or_unknown": 0}
+    for r in rows:
+        st = r["state"]
+        counts["success" if st == "SUCCESS" else "incomplete_or_missing" if st in INCOMPLETE else
+               "unverified" if st == "UNVERIFIED" else "not_yet_due" if st == "NOT_YET_DUE" else
+               "running_or_due" if st in ("RUNNING", "DUE_AWAITING_RECORD") else "unreadable_or_unknown"] += 1
+    return {"period": f"{START_DAY} .. {end} (inclusive)" if end else "UNKNOWN (stop date unreadable)",
+            "schedule": "start-up cycle 2026-09-30, then daily 06:00Z every calendar day (weekends included)",
+            "as_of_utc": now.isoformat(), "slots": len(rows), "counts": counts,
+            "affected": [{k: r.get(k) for k in ("day", "state", "reason", "provenance", "conflicts")}
+                         for r in rows if r["state"] not in ("SUCCESS", "NOT_YET_DUE")],
+            "slots_detail": rows}
+
+
 def view(repo: Path, now: datetime | None = None, days: int = 7, ps=None) -> dict:
     now = now or datetime.now(UTC)
     runs = Path(repo) / "results" / "v2_validation" / "forward_runs"
@@ -153,10 +284,12 @@ def view(repo: Path, now: datetime | None = None, days: int = 7, ps=None) -> dic
         "NO_RECORDS" if latest is None else
         "HEALTHY" if latest.get("observed_state") in ("SUCCESS", "RUNNING") else
         f"ATTENTION ({latest.get('observed_state')})")
-    out["incomplete_days_in_view"] = [r["day"] for r in out["runs"] if r.get("observed_state") != "SUCCESS"
-                                      and r.get("observed_state") != "RUNNING"]
-    out["note"] = ("current_health reflects the most recent day only; incomplete_days_in_view lists earlier days "
-                   "without a SUCCESS observation (study completeness), which a later healthy run does not repair")
+    # 2026-10-12 correction: the former "incomplete_days_in_view" covered only the last ``days`` record files, so
+    # 2026-10-05 (8th file back) and the record-less legacy days were never counted. Completeness is now derived from
+    # the REGISTERED schedule over the whole study period.
+    out["completeness"] = completeness(Path(repo), now, ps)
+    out["note"] = ("current_health = the most recent run only (operational); completeness = every registered slot "
+                   "of the study period (a later healthy run does not repair an earlier gap)")
     return out
 
 
