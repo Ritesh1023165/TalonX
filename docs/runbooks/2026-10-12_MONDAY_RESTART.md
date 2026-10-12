@@ -1,5 +1,24 @@
 # TalonX Monday restoration, 12 October 2026
 
+> **ACTUAL STATE, 2026-10-12 15:32Z (handoff).** The Sunday-night evaluator restoration was not performed.
+>
+> **Evaluators.** This session restored the four evaluators once, at 2026-10-12 15:26:59Z, using `up --only` from this
+> runbook. Each was declared `OPERATIONS_ONLY` (#52–#55); version `364f2071525f` → `67093049c7b1`, changed only through
+> shared `runtime.py`. Monday's 667 queued events were evaluated late, none was lost. `overall=HEALTHY`.
+>
+> **V2 forward, 2026-10-11: FAILED** (the record still says RUNNING). A `PermissionError` on the state-file replace
+> occurred before `evaluate`. Not rerun.
+>
+> **V2 forward, 2026-10-12: SUCCESS.** The next run is 2026-10-13 06:00Z.
+>
+> **Template V2:** natural verification PASS (17/17).
+>
+> **Controls:** all unchanged.
+>
+> Report: `docs/research/evidence/2026-10-12_monday_restoration/RECOVERY_REPORT.md`. The steps below are retained as
+> written.
+
+
 **KEEP THE MACHINE ON.** This is a partial shutdown. The V2 forward study requires Sunday 11 October **06:00 UTC / 07:00 BST**, then Monday 12 October at the same time. Saturday's run was SUCCESS, ending 06:03:48 UTC. Windows must remain running, on AC, connected to the internet and logged in to the existing account/session. Do not sleep, log off, reboot or power off. No power settings were changed and no boot/restart task was registered.
 
 Restore the four paused evaluators by **Sunday 11 October 23:30 UTC / Monday 12 October 00:30 BST**. This allows 30 minutes before Monday's **00:00 UTC / 01:00 BST** overnight window and normal universe preparation. Check again by **05:30 UTC / 06:30 BST**, ahead of the forward run. Premarket is 08:00 UTC / 09:00 BST; regular open is 13:30 UTC / 14:30 BST. Those are later obligations, not the restart deadline.
