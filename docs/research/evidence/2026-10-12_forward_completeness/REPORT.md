@@ -93,3 +93,58 @@ From `docs/research/evidence/2026-09-30_v2_validation/forward_daily.sh` (registr
 
 Historical records, the runner, the schedule, research rules, the end date, PDM, VR, DTU, ERM and review delivery. No
 study day was run, retried or backfilled, and no output was opened.
+
+## Deployment (2026-10-12)
+
+**Code and restart:**
+- Code is in `faa2a9a`, pushed; the live checkout was fast-forwarded. The freeze gate passes.
+- At deployment no forward stage was active; only the loop shells and the `sleep-to-next-slot` process existed.
+- The dashboard alone was restarted: the `dashboard_web.py` child was tree-killed at 19:55:46Z (10312 → 26188). Ops
+  supervisor 5316 respawned it at **19:55:54Z** (21224 → 25932), and it returns HTTP 200. Nothing else was restarted.
+
+**The served dashboard:**
+
+| Field | Value |
+|---|---|
+| Period | 2026-09-30 .. 2026-10-31 (inclusive), 32 slots |
+| As of | 2026-10-12 19:56:06Z |
+| Counts | success 6, incomplete 2, unverified 5, running/due 0, not yet due 19, unreadable 0 (identical to the table above) |
+| Affected dates | 09-30 … 10-04 UNVERIFIED (LEGACY_LOG); 10-05 PARTIAL (RECONSTRUCTED); 10-11 ABANDONED |
+| Current health | HEALTHY |
+
+**Verified unchanged:**
+- All `forward_runs/*.json` files have the same sizes and mtimes. 2026-10-05 is `900186b3…`; 2026-10-11 is `0f2ccf4f…`
+  and its `.tmp` `9f112685…`.
+- `forward.log` is unchanged.
+- There is one logical loop chain. The next slot is **2026-10-13 06:00Z (07:00 BST)**, the runner is v1.1, and the end
+  date is 2026-10-31.
+- PDM `verify_integrity` = []; the review, VR and DTU controls and the loop script are unchanged.
+
+**Tests:**
+- `tests/test_v2_forward_completeness.py`: 9 new tests, covering:
+  - the 10-05 reconstructed PARTIAL and the 10-11 abandoned run;
+  - legacy runs with and without an output file, and a missing past slot;
+  - due, running and future slots; weekends; the inclusive end date;
+  - conflicts and an unreadable record;
+  - health vs completeness, no output reads, structured-log filtering, and an unreadable stop date.
+- Forward and dashboard suites: 131 passed. Front-end and SPA suites: 32 passed.
+
+## 2026-10-13 live verification: PENDING
+
+The run is not due at the time of writing. After 07:00 BST, use this read-only check (status fields only). Never
+trigger the run.
+
+```powershell
+Set-Location C:\workspace\TalonX
+.venv\Scripts\python.exe -c "import json; x=json.load(open('results/v2_validation/forward_runs/2026-10-13.json',encoding='utf-8')); print({k:x.get(k) for k in ('runner_version','state','scheduled_utc','started_utc','ended_utc','deadline_utc','failed_stage','error_class')}); print([(s['name'],s['state'],s.get('exit_code')) for s in x['stages']]); print('artifact validated', (x.get('artifact') or {}).get('validated'), '| persistence_retries', len(x.get('persistence_retries') or []))"
+Get-ChildItem results\v2_validation\forward_runs -Filter '2026-10-13.*.persistence_failure.*.json' | Select-Object Name
+```
+
+**Expected:**
+- `runner_version` begins `forward_runner v1.1`.
+- `state` is terminal; stage exit codes are recorded.
+- No `persistence_failure` diagnostic exists.
+- The dashboard counts `success 7` (or the incomplete count rises if the run failed), with not-yet-due 18.
+
+A SUCCESS with zero `persistence_retries` verifies **normal operation only**, not a live exercise of the
+contention-recovery path.
