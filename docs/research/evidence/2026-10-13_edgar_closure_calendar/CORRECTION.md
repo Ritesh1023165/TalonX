@@ -114,3 +114,27 @@ further request was made to re-read it.
    previous crawler and will again request the 2026-10-12 index, so expect the previous failure.
 2. Keep `docs/research/protocols/edgar_calendar/`, this evidence, every `forward_runs/*` record and every
    `results/v2_validation/edgar/*` file. Nothing is deleted.
+
+## Archive reproducibility (2026-10-13 22:2xZ)
+
+The recorded `body_sha256` values in `SEC_DIAGNOSTIC.json` are the **original fetched bytes**. They are unchanged.
+
+| Archive | Recorded sha256 / bytes | Original file (worktree) | Committed blob (`827fcda`) | Live checkout before fix |
+|---|---|---|---|---|
+| `calendar_2026-10-13T203120Z.html` | `a50a1290…` / 67,436 | match (LF only) | match | **mismatch**: 68,877 B, CR added to 1,441 lines |
+| `announcements_2026-10-13T203123Z.html` | `07da672d…` / 159,419 | match | match | **mismatch**: 161,052 B, CR added to 1,633 lines |
+| `accessing_edgar_data_2026-10-13T203125Z.html` | `9a4d3cd9…` / 80,349 | match | match | **mismatch**: 82,025 B, CR added to 1,676 lines |
+
+**Cause.** `core.autocrlf=true` converted LF to CRLF on checkout. The committed blobs were always byte-exact.
+
+**Correction.**
+- A narrowly scoped `.gitattributes` rule,
+  `docs/research/evidence/2026-10-13_edgar_closure_calendar/*.html -text`, so these three archives are never
+  converted.
+- The live working copies of those three files were restored from their (unchanged) blobs.
+
+**Not changed:** no archive content, no recorded hash, no SEC request, and nothing in the calendar, runner, protocol or
+run records.
+
+**Verified:** see `ARCHIVE_VERIFICATION.json`. A fresh temporary clone with `core.autocrlf=true` reproduces all three
+recorded hashes.

@@ -3,3 +3,7 @@
 # another. The evidence manifest additionally hashes git-normalized (LF)
 # bytes, so verification holds even where a checkout ignores this file.
 results/task83_r1_production_collector_closure/** text eol=lf
+
+# 2026-10-13 EDGAR closure-calendar source archives: raw SEC page bytes as fetched; their recorded sha256
+# (SEC_DIAGNOSTIC.json) must reproduce from any checkout, so no line-ending conversion for these files only.
+docs/research/evidence/2026-10-13_edgar_closure_calendar/*.html -text
