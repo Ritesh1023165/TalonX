@@ -203,21 +203,61 @@ def _resume_lines(f: Path) -> set[str]:
     return seen
 
 
-def crawl(start: date, end: date, rate: float = 3.0, *, client: Client | None = None) -> dict:
+def _calendar_precheck(cal, start: date, end: date) -> tuple[str | None, str | None]:
+    """Before ANY request: every weekday in range must be classifiable, and no documented closure may already hold
+    archived crawl data (preserved untouched; stop for reconciliation, never discard)."""
+    from talonx_paperperf import edgar_calendar as EC
+    unknown, conflicts, d = [], [], start
+    while d <= end:
+        k = cal.classify(d)
+        if k == EC.UNKNOWN:
+            unknown.append(d.isoformat())
+        elif k == EC.SEC_CLOSED and ((OUT / f"{d:%Y%m%d}.done").exists() or (OUT / f"{d:%Y%m%d}.jsonl").exists()):
+            conflicts.append(d.isoformat())
+        d += timedelta(days=1)
+    if unknown:
+        return "CALENDAR_COVERAGE_UNKNOWN", f"EDGAR calendar does not cover weekdays {unknown[0]}..{unknown[-1]}"
+    if conflicts:
+        return "CALENDAR_CONFLICT", (f"archived crawl data exists for documented EDGAR closure(s) {conflicts}; "
+                                     "preserved untouched -- reconcile before acquisition")
+    return None, None
+
+
+def crawl(start: date, end: date, rate: float = 3.0, *, client: Client | None = None, calendar=None) -> dict:
     """One JSONL per day (idempotent: a finished day is skipped). Filing-level progress is checkpointed. Returns and
-    writes the acquisition status (module docstring); a transport failure never becomes an empty day."""
+    writes the acquisition status (module docstring); a transport failure never becomes an empty day.
+    EDGAR closures (2026-10-13 correction): a weekday that the versioned EDGAR calendar documents as an official
+    closure is recorded SEC_CLOSED -- no index request, no file, no .done marker, never counted as fetched or empty.
+    Every other weekday keeps the unchanged rules (HTTP 403 stays a failure; 404 policy unchanged)."""
+    from talonx_paperperf import edgar_calendar as EC
     OUT.mkdir(parents=True, exist_ok=True)
     st = {"run_id": os.environ.get("TALONX_FWD_RUN_ID"), "start": start.isoformat(), "end": end.isoformat(),
           "state": "RUNNING", "acquisition_result": None, "days_completed_this_run": [], "days_already_done": [],
-          "days_index_not_found": [], "day_interrupted": None, "filings_fetched": 0, "filings_not_found": 0,
-          "tx_P_S_this_run": 0, "cause": None, "error": None}
+          "days_index_not_found": [], "days_sec_closed": [], "day_interrupted": None, "filings_fetched": 0,
+          "filings_not_found": 0, "tx_P_S_this_run": 0, "cause": None, "error": None, "calendar": None}
+    try:
+        cal = calendar or EC.EdgarCalendar()
+        st["calendar"] = cal.provenance()
+        cause, err = _calendar_precheck(cal, start, end)
+    except EC.CalendarError as exc:
+        cal, cause, err = None, "CALENDAR_INVALID", str(exc)[:300]
+    if cause:                                         # fail explicitly, before any request
+        st.update(state="FAILED", cause=cause, error=err, requests=0)
+        _atomic_write(OUT / "_crawl_status.json", json.dumps(st, indent=1))
+        print(json.dumps({"edgar_crawl": "FAILED", "cause": cause}), flush=True)
+        return st
     c = client or Client(rate)
     d = start
     try:
         while d <= end:
             f = OUT / f"{d:%Y%m%d}.jsonl"
             done = OUT / f"{d:%Y%m%d}.done"
-            if d.weekday() < 5 and done.exists():
+            kind = cal.classify(d)
+            if kind == EC.SEC_CLOSED:                 # official closure: no index expected, nothing written
+                st["days_sec_closed"].append(d.isoformat())
+                print(json.dumps({"day": d.isoformat(), "index": "SEC_CLOSED",
+                                  "calendar": st["calendar"]["calendar_id"]}), flush=True)
+            elif d.weekday() < 5 and done.exists():
                 st["days_already_done"].append(d.isoformat())
             elif d.weekday() < 5:
                 st["day_interrupted"] = d.isoformat()

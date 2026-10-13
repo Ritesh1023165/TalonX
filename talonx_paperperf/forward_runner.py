@@ -86,7 +86,8 @@ def next_slot(now: datetime) -> datetime:
     return s if now < s else s + timedelta(days=1)
 
 
-RUNNER_VERSION = "forward_runner v1.1 (2026-10-12: bounded status-persistence retries, fail-closed boundaries)"
+RUNNER_VERSION = ("forward_runner v1.2 (2026-10-13: EDGAR closure-calendar provenance recorded; "
+                  "v1.1 2026-10-12: bounded status-persistence retries, fail-closed boundaries)")
 # Windows errors that can be TRANSIENT when replacing a file another process briefly holds open. Anything else (other
 # OSErrors, serialization errors, non-Windows permission errors) is raised immediately, without retry.
 RETRYABLE_WINERRORS = {5: "ERROR_ACCESS_DENIED", 32: "ERROR_SHARING_VIOLATION", 33: "ERROR_LOCK_VIOLATION"}
@@ -233,7 +234,8 @@ def _crawl_status_problem(run_id: str, crawl_end: date, stage: dict) -> str | No
     except (OSError, ValueError):
         return "EDGAR_STATUS_MISSING"
     stage["acquisition"] = {k: m.get(k) for k in ("state", "acquisition_result", "cause", "error", "end",
-                                                  "day_interrupted", "days_index_not_found", "tx_P_S_in_window")}
+                                                  "day_interrupted", "days_index_not_found", "days_sec_closed",
+                                                  "calendar", "tx_P_S_in_window")}
     if m.get("run_id") != run_id:
         return "EDGAR_STATUS_STALE"                     # a previous run's manifest never counts
     if m.get("end") != crawl_end.isoformat():
