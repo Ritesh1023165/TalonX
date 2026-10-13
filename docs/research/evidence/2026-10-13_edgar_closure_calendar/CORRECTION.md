@@ -77,7 +77,36 @@ later", and an unpublished same-day index is not treated as empty.
 
 ## Diagnostics
 
-PENDING: see `SEC_DIAGNOSTIC.json` once captured, at or after 20:30Z (R5 ends at 16:30 ET).
+**Run once at 2026-10-13 20:31:20–20:31:30Z, after R5**, by `sec_diagnostic.py`.
+- Crawler identification and transport (the User-Agent value is not recorded).
+- **One attempt per URL, no retries, 5 requests.** Full record: `SEC_DIAGNOSTIC.json`.
+
+| URL | Status | Server / type | Body | Class |
+|---|---|---|---|---|
+| EDGAR calendar page | 200 | nginx, text/html | 67,436 B, sha256 `a50a1290…`, archived `calendar_2026-10-13T203120Z.html` | OK |
+| EDGAR News & Announcements | 200 | nginx, text/html | 159,419 B, `07da672d…`, archived `announcements_2026-10-13T203123Z.html` | OK |
+| Accessing EDGAR Data | 200 | nginx, text/html | 80,349 B, `9a4d3cd9…`, archived `accessing_edgar_data_2026-10-13T203125Z.html` | OK |
+| `daily-index/2026/QTR4/form.20261012.idx` (closure) | **403** | Apache, `application/xml`, `Content-Encoding: gzip`, `x-amz-request-id` present, `no-cache` | 240 B (gzip), `2941e8fe…`; not stored | UNCLASSIFIED* |
+| `daily-index/2026/QTR4/form.20261009.idx` (known good) | **200** | Apache, `application/octet-stream`, Last-Modified 2026-10-10 02:01:37 GMT | 626,694 B, `385793e7…`; not stored or parsed | OK |
+
+\* The error body was gzip-encoded and the classifier inspected the raw bytes, so it could not read the text. No
+further request was made to re-read it.
+
+**The archived pages confirm:**
+- The calendar page contains "October 12", "Columbus Day" and "will not receive, process, or accept filings".
+- The announcements page's only closure notice is "EDGAR Will Be Closed December 24, 2025 Through December 26, 2025".
+
+**What this supports:**
+- The same identification and transport retrieve a normal-day Archives daily index (200) and SEC web pages (200).
+- Only the closure-date index is refused.
+- The refusal is a small XML error from the Archives' object-store-style backend (`x-amz-request-id`). That fits how
+  such backends commonly answer a request for a non-existent object when listing is not permitted.
+
+**What remains unknown:**
+- The exact reason for the 403. It was not decoded, and SEC documents no meaning for it.
+- This evidence does **not** prove the 403 means "file absent".
+- The correction does not depend on it. It relies only on the official closure calendar, and a 403 on any **expected**
+  filing day remains a failure.
 
 ## Rollback
 
