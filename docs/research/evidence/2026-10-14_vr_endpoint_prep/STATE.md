@@ -33,8 +33,12 @@ wrapper; its content was verified directly):
   | ACTIONABLE | 133 | 729 | 1 |
   | VIRTUAL_REALTIME | 167 | 696 | 0 |
 
-- **Pending row:** legacy NVCT (`13babda614db1b23`, window 2026-09-30, ACTIONABLE, never sent), unchanged since
-  2026-09-30 20:03:48Z.
+- **Pending row:** legacy NVCT (`13babda614db1b23`, window 2026-09-30, ACTIONABLE, paper entry never executed),
+  unchanged since 2026-09-30 20:03:48Z.
+  - *Wording correction 2026-10-16:* "never sent" meant the paper entry. The Telegram review alert **was delivered**
+    (Signal outbox `SENT` 2026-09-30 20:03:43Z, 1 attempt, transport ref recorded). The promotion was decided at
+    20:03:41Z, after that window's 19:50Z flatten, so the VR paper entry was never executable and the row's
+    `signal_wall_time` was never recorded. Row not modified.
 - **Segment labels:** `meta universe_segment` exists for 10-05 and 10-06 (DTU_V2). SEG1 windows predate the label and
   are defined by `UNIVERSE_SEGMENTS.json`.
 

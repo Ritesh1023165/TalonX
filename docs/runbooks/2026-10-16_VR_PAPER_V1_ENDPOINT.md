@@ -103,7 +103,9 @@ foreach ($w in '2026-10-01','2026-10-02','2026-10-05','2026-10-06') { .venv\Scri
 - Keep **ACTIONABLE vs VIRTUAL_REALTIME** separate.
 - Report 10-07 … 10-16 as INPUT_INTERRUPTED coverage.
 - **The legacy NVCT pending row:** report it as `PAPER_ENTRY_PENDING`, unresolved and never executable (its window
-  closed; never sent before flatten). **Do not delete, rewrite or "resolve" it.** `eod` already counts it under
+  closed; the paper entry was never executed before flatten). Telegram delivery and paper entry are separate: the
+  review alert itself **was delivered** (Signal outbox `SENT` 2026-09-30 20:03:43Z); only the VR paper entry never
+  happened (promotion decided 20:03:41Z, after the 19:50Z flatten). **Do not delete, rewrite or "resolve" it.** `eod` already counts it under
   `states.PAPER_ENTRY_PENDING` for 2026-09-30.
 - **No study-level procedure is registered.** The registration provides per-window EOD only, with no pooled metric,
   acceptance threshold or study-level verdict. Do not invent one. If a study-level summary is wanted, it needs a

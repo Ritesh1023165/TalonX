@@ -1,5 +1,24 @@
 # TalonX Monday restoration, 12 October 2026
 
+> **ACTUAL STATE, 2026-10-16 ~08:10Z (handoff; supersedes the 10-12 block below).** An unplanned Windows Update
+> reboot (00:29–00:32Z 2026-10-15) stopped everything. The machine then sat at the sign-in screen until 19:26Z.
+> Report: `docs/research/evidence/2026-10-15_reboot_recovery/RECOVERY_REPORT.md`.
+>
+> - **Restored with gaps.** Opportunity stack (11 components) at 2026-10-15 19:43Z. VR wrapper at 19:45Z. Forward
+>   wrapper at 19:46Z. Ops/V2 stack (Original, Intelligence, :8787, V2 companion) at 2026-10-16 07:50Z.
+> - **Forward.** 2026-10-15: **MISSED** (no record; not rerun). 2026-10-16: SUCCESS. Next run 10-17 06:00Z.
+> - **Controls unchanged.** DTU_V3_TOP600, review alerts RESEARCH_REVIEW, VR entries blocked, DTU collector stopped,
+>   ERM parked, PDM scheduled for 10-19 23:15Z.
+>
+> **Two corrections to the procedure below:**
+> 1. The Opportunity environment **must** also set `TALONX_DTU_MODE=ACTIVE`,
+>    `TALONX_SEC_REFRESH_CAPACITY=OBSERVABILITY_ONLY` and `TALONX_DTU_POLICY=DTU_V2`. Without `TALONX_DTU_MODE` the
+>    default is OFF, which is an **uncapped universe**. That happened for 2.5 minutes on 10-15; see the report. A
+>    corrected launcher is in `results/recovery_20261015/start_opportunity_supervisor.ps1`.
+> 2. Since f78fb34 (`.gitattributes`, evidence-only), `prospective start --expected-sha 41375bb` refuses with
+>    `repo_head_matches_release` NO_GO. The 10-16 start used `--force` with **owner authorisation for that one
+>    start**. Any further start needs the same owner decision, or a release re-freeze.
+
 > **ACTUAL STATE, 2026-10-12 15:32Z (handoff).** The Sunday-night evaluator restoration was not performed.
 >
 > **Evaluators.** This session restored the four evaluators once, at 2026-10-12 15:26:59Z, using `up --only` from this
@@ -126,6 +145,10 @@ $env:TALONX_OPP_NOTIFY_POLICY='LAB_NOTIFY_POLICY_V1_REGULAR_EXT_20260925'
 $env:TALONX_OPPORTUNITY_PROMOTION_MODE='PAPER_SIGNAL'
 $env:TALONX_SENTINEL_COMMANDS_ENABLED='1'
 $env:OPERATOR_UNIVERSE_MUTATION_MODE='DRY_RUN'
+# 2026-10-16 correction: required, omitted from the original list (default OFF = uncapped universe)
+$env:TALONX_DTU_MODE='ACTIVE'
+$env:TALONX_DTU_POLICY='DTU_V2'
+$env:TALONX_SEC_REFRESH_CAPACITY='OBSERVABILITY_ONLY'
 Remove-Item Env:TALONX_OPP_ROOT -ErrorAction SilentlyContinue
 .venv\Scripts\python.exe -u -m talonx_opportunity up --deliver --supervise
 ```
