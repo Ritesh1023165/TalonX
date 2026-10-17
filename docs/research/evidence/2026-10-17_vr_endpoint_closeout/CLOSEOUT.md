@@ -21,7 +21,9 @@ metric, threshold or verdict.
 | Trades created after the 2026-10-07 11:25:41Z boundary | 0 ✔. On 2026-10-16, 39 signals were seen and blocked |
 | Tick errors in `live.log` | 0 |
 
-**Machine state.** The machine entered Modern Standby (lid) at 2026-10-16 20:41:04Z. That was after the last
+**Machine state.** The machine entered Modern Standby at 2026-10-16 20:41:04Z. Kernel-Power 506 gives "Reason:
+Idle", not lid (corrected 2026-10-17 06:13Z). Scheduled work kept running afterwards: this check at 00:07Z and the
+06:00Z forward run. That was after the last
 collection tick (20:20:33Z), so no in-window collection was lost to that sleep.
 
 ## §4a Snapshot
