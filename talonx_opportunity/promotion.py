@@ -41,6 +41,7 @@ delivery is independent of any paper-trading admission (it never consults VR, V2
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -221,8 +222,11 @@ def render_review(p: dict, now: datetime, policy: str) -> str:
 # (the worker sends parse_mode=None). Missing evidence renders as UNKNOWN (or the optional Repeat line is omitted).
 # Previous wording: ``render_review`` (kept unchanged for rollback). Detailed score arithmetic stays in the
 # candidate_events record (score_json) and the deployment evidence.
-REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_COMPACT_V2"   # V1 2026-10-09 16:53Z; V2 = approved visual layout (icons,
-#                                                          bullets, direction from the RECORDED change vs prior close)
+REVIEW_TEMPLATE_VERSION_V2 = "RESEARCH_REVIEW_COMPACT_V2"   # V1 2026-10-09 16:53Z; V2 = approved visual layout
+#                                                             (icons, bullets, direction from the RECORDED change)
+# 2026-10-17 (owner-approved, PRESENTATION ONLY): V3 = a short visible summary + the unchanged V2 wording inside a
+# Telegram expandable quote (HTML). Same evidence, same values; only layout and parse mode differ. Rollback = V2.
+REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_EXPANDABLE_V3"
 _ET = ZoneInfo("America/New_York")
 _FORM_WORDS = {"144": "Form 144 proposed-sale notice", "3": "Form 3 initial ownership report",
                "4": "Form 4 insider transaction report", "5": "Form 5 annual insider report"}
@@ -303,7 +307,7 @@ def _why_items(f: dict) -> list[str]:
 
 
 def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
-    """The deployed research-review alert (REVIEW_TEMPLATE_VERSION). ``ctx``: {"event": candidate_events row or None,
+    """V2 research-review text (REVIEW_TEMPLATE_VERSION_V2; since V3 it is the expandable detail body). ``ctx``: {"event": candidate_events row or None,
     "close_utc": window close or None, "prior_delivery_date": ET date of the latest earlier CONFIRMED delivery for the
     symbol or None, "universe": policy name or None}. Never raises on missing evidence. Plain text (parse_mode=None)."""
     ctx = ctx or {}
@@ -356,6 +360,73 @@ def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None 
               f"🌐 Universe {ctx.get('universe') or 'UNKNOWN'}",
               f"🔖 Reference {p.get('promotion_id') or 'UNKNOWN'}"]
     return "\n".join(lines)
+
+
+HTML_DETAILS_OPEN = "<blockquote expandable>"      # marker: only a payload containing it is sent with parse_mode=HTML
+
+
+def _short_why(f: dict) -> str:
+    """One-line digest of ``_why_items`` (same values, shorter wording); UNKNOWN per missing part."""
+    gap, atr = _num(f.get("gap_pct")), _num(f.get("atr20_pct"))
+    parts = [f"{abs(gap) / atr:.1f}× ATR" if gap is not None and atr else "ATR multiple UNKNOWN"]
+    frac = _num(f.get("activity_adv_fraction"))
+    parts.append(f"vol {frac * 100:.1f}% of 20d avg" if frac is not None else "volume UNKNOWN")
+    pos, d = f.get("range_position"), _num(f.get("range_distance_pct"))
+    if pos == "ABOVE_PREV_HIGH" and d is not None:
+        parts.append(f"{d:.2f}% above prior-day high")
+    elif pos == "INSIDE_PREV_RANGE":
+        parts.append("inside prior-day range")
+    elif pos == "BELOW_PREV_LOW" and d is not None:
+        parts.append(f"{d:.2f}% below prior-day low")
+    else:
+        parts.append("prior-day range UNKNOWN")
+    return " · ".join(parts)
+
+
+def render_review_expandable(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
+    """REVIEW_TEMPLATE_VERSION (V3): five visible summary lines, then the complete V2 text (minus its header line) in a
+    collapsed Telegram expandable quote. Telegram HTML: every dynamic value is escaped; the only tags are <b> and the
+    blockquote. Never raises on missing evidence (same contract as ``render_review_compact``)."""
+    ctx = ctx or {}
+    ev = ctx.get("event") or {}
+    try:
+        f = json.loads(ev.get("features_json") or "{}")
+    except (TypeError, ValueError):
+        f = {}
+    f = f if isinstance(f, dict) else {}
+    try:
+        prov = json.loads(ev.get("provenance_json") or "{}")
+    except (TypeError, ValueError):
+        prov = {}
+    prov = prov if isinstance(prov, dict) else {}
+    e = lambda s: html.escape(str(s), quote=False)  # noqa: E731
+    ref, score, delay = _num(p.get("reference_price")), _num(p.get("score")), prov.get("delay_minutes")
+    summary = [
+        f"🔎 <b>{e(p.get('symbol') or 'UNKNOWN')}</b> · {e(_direction(f.get('gap_pct')))} · UNVALIDATED",
+        f"💵 {e(_ref(ref) if ref else 'UNKNOWN')} at {e(_et(p.get('data_as_of_utc')))} · "
+        f"{e(f'{delay}-min delayed' if delay else 'delayed')}, not live",
+        f"📊 {e(_short_why(f)) if f else 'Reasons UNKNOWN'}",
+        f"🧮 Score {score:.1f}/100 · not a probability" if score is not None else "🧮 Score UNKNOWN",
+        "⚠️ Paper results negative after costs · review only · no order",
+    ]
+    details = render_review_compact(p, now, policy, ctx).split("\n", 1)[-1].strip("\n")
+    return "\n".join(summary) + "\n" + HTML_DETAILS_OPEN + e(details) + "</blockquote>"
+
+
+class ExpandableHtmlClient:
+    """Wraps the Signal client (normally TracedTransport). Sends parse_mode=HTML only for a payload that contains the V3
+    marker; anything else (V2/minimal plain text, rows enqueued before deployment) keeps parse_mode=None. The text is
+    passed through unchanged, so the delivery trace still joins on the outbox payload hash."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    @property
+    def is_configured(self) -> bool:
+        return getattr(self._inner, "is_configured", True)
+
+    async def send(self, text: str, parse_mode=None, **kw):
+        return await self._inner.send(text, parse_mode="HTML" if HTML_DETAILS_OPEN in text else parse_mode, **kw)
 
 
 def render_review_minimal(p: dict, policy: str) -> str:
@@ -677,10 +748,10 @@ class Promoter:
 
     def _render_review(self, s: OpportunityStore, q: dict, now: datetime) -> str:
         try:
-            return render_review_compact(q, now, self.policy.version, self._review_context(s, q))
+            return render_review_expandable(q, now, self.policy.version, self._review_context(s, q))
         except Exception:  # noqa: BLE001 -- a presentation fault must never block a release: evidence-free form
             try:
-                return render_review_compact(q, now, self.policy.version, None)
+                return render_review_expandable(q, now, self.policy.version, None)
             except Exception:  # noqa: BLE001 -- last resort keeps every essential warning
                 return render_review_minimal(q, self.policy.version)
 
@@ -691,7 +762,15 @@ class Promoter:
             return self._drain(self.outbox)
         from talonx_ops.notify import TRADE_EVENT
         from talonx_ops.notify.worker import drain
-        return drain(self.outbox, destination=TRADE_EVENT, client=self._traced_client())
+        client = self._traced_client()
+        if client is None:                       # tracing unavailable: the worker's own client, still HTML-aware
+            try:
+                from talonx_ops.notify import resolve_destination_config, telegram_client_for
+                client = telegram_client_for(TRADE_EVENT) if resolve_destination_config(TRADE_EVENT).enabled else None
+            except Exception:  # noqa: BLE001 -- fall back to the worker's unchanged default resolution
+                client = None
+        return drain(self.outbox, destination=TRADE_EVENT,
+                     client=ExpandableHtmlClient(client) if client is not None else None)
 
     def _traced_client(self):
         """2026-10-09 (POST_DELIVERY_ALERT_MARKOUT_V1 delivery tracing): the SAME client the worker would resolve,

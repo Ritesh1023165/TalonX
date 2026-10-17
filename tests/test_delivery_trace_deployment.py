@@ -131,7 +131,7 @@ def test_promotion_send_path_uses_the_traced_wrapper_with_unchanged_content(tmp_
     pr.tick()
     ob = sqlite3.connect(P.signal_outbox_path(tmp_path))
     payload, state = ob.execute("SELECT payload_text, state FROM ops_notification_outbox").fetchone()
-    assert state == "SENT" and sent == [(payload, None)]             # same text, same parse mode, one send
+    assert state == "SENT" and sent == [(payload, "HTML")]           # same text, one send; V3 review alert = HTML (2026-10-17)
     tr = sqlite3.connect(P.trace_path(tmp_path))
     (h, mid, ref) = tr.execute("SELECT payload_sha256, message_id, chat_ref FROM traces").fetchone()
     assert h == T.payload_hash(payload) and mid == 11 and ref != "-77" and len(ref) == 12

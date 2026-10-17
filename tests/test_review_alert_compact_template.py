@@ -232,8 +232,9 @@ def test_live_path_renders_compact_template_records_version_and_tracing_still_co
     ob = sqlite3.connect(P.signal_outbox_path(tmp_path))
     ev, payload, state, prov = ob.execute("SELECT event_id, payload_text, state, provenance_json FROM "
                                           "ops_notification_outbox").fetchone()
-    assert state == "SENT" and c.sent == [(payload, None)]                    # one plain-text send, same text
-    assert payload.startswith("🔎 RESEARCH OPPORTUNITY — UNVALIDATED\nAAA · 🟢 ▲ UP +5.00%\nPrevious close: $9.52")
+    assert state == "SENT" and c.sent == [(payload, "HTML")]                  # one send, same text (V3: HTML)
+    assert payload.startswith("🔎 <b>AAA</b> · 🟢 ▲ UP +5.00% · UNVALIDATED\n")                    # V3 summary
+    assert "<blockquote expandable>AAA · 🟢 ▲ UP +5.00%\nPrevious close: $9.52" in payload      # V2 body = details
     assert "Form 144 proposed-sale notice" in payload and "closing 16:00 ET" in payload
     assert "🌐 Universe DTU_V3_TOP600\n🔖 Reference OPPORTUNITY_ENGINE:2026-09-24:AAA:GAP_UP" in payload
     assert json.loads(prov)["template_version"] == P.REVIEW_TEMPLATE_VERSION
