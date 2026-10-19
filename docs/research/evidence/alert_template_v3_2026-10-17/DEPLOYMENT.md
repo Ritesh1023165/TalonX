@@ -24,3 +24,20 @@ before the PDM first session (2026-10-19), so the whole PDM study sees one layou
 - **If Telegram rejects the HTML:** the row goes RETRY → FAILED (a definite 400, so no double send).
   - **Rollback:** `git revert d58b294`, declare `UI_ONLY` for the reverted version, then
     `python -m talonx_opportunity restart promotion`.
+
+## Natural verification: 2026-10-19 14:07Z (read-only, nothing sent or retried)
+
+**PASS.** First regular session after deployment (open 13:30Z).
+
+| Check | Result |
+|---|---|
+| Outbox rows since 13:30Z | 12, all `SENT`, 1 attempt each, no `last_error` |
+| Template | 12/12 `RESEARCH_REVIEW_EXPANDABLE_V3`, 12/12 contain the expandable marker |
+| Telegram acceptance (HTML) | 12/12 traces `API_ACCEPTED`, error_class none, `TRACE_OK`, message id present, no ambiguous prior attempt |
+| Timing | First sent 13:50:43Z (1 s after enqueue), last 14:06:20Z |
+| Outbox health | No PENDING/RETRY/AMBIGUOUS/FAILED, 0 duplicate dedup keys |
+| Promotion | Version `46d5867ae07b`, RUNNING, 0 failures, no component events since deployment; window 2026-10-19: 12 PROMOTED_SIGNAL, 7 QUEUED (normal rate limit) |
+
+- **Rollback not needed.**
+- **Not verifiable from records:** how the message renders on the device (collapsed summary, tap to expand).
+  The owner should confirm this on the phone.
