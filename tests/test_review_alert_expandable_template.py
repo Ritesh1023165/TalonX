@@ -156,3 +156,57 @@ def test_promotion_decisions_do_not_depend_on_the_template(tmp_path, monkeypatch
         mp.undo()
     assert rows[0] == rows[1] and rows[0]
     assert SimpleNamespace  # keep import used
+
+
+# ------------------------------------------------------------- 2026-10-22: overlong SEC context (MS 2026-10-21 FAILED)
+def u16(s: str) -> int:
+    return len(s.encode("utf-16-le")) // 2
+
+
+def bank_catalyst(n=212, types=("424B2",), extra="22 other SEC filing(s): FWP"):
+    days = [f"2026-10-{d:02d}" for d in range(1, 22)]
+    labs = [f"offering-related {types[i % len(types)]} filed {days[i % len(days)]}" for i in range(n)]
+    return "; ".join(labs + ([extra] if extra else []))
+
+
+def test_labels_without_repeats_render_exactly_as_before():
+    labs = ["8-K items 2.02, 9.01 filed 2026-10-20", "offering-related 424B2 filed 2026-10-19"]
+    assert P._compact_labels(labs) == labs
+
+
+def test_repeated_labels_collapse_with_count_and_date_range_and_cap():
+    labs = [f"offering-related 424B2 filed 2026-10-{d:02d}" for d in (3, 1, 2, 2)] + ["8-K items 8.01 filed 2026-10-04"]
+    assert P._compact_labels(labs) == ["offering-related 424B2 ×4 (filed 2026-10-01 to 2026-10-03)",
+                                       "8-K items 8.01 filed 2026-10-04"]
+    assert P._compact_labels(["a filed 2026-10-01", "a filed 2026-10-01"]) == ["a ×2 (filed 2026-10-01)"]
+    many = [f"form{i} filed 2026-10-01" for i in range(7)]
+    assert P._compact_labels(many)[-1] == "+3 more filing types" and len(P._compact_labels(many)) == 5
+
+
+def test_bank_style_catalyst_fits_telegram_and_keeps_every_warning():
+    txt = P.render_review_expandable(q(symbol="MS"), NOW, "OPPORTUNITY_PROMOTION_V1", ctx(cat=bank_catalyst()))
+    vis = visible(txt)
+    assert u16(vis) < P.TELEGRAM_TEXT_LIMIT and u16(vis) < 2000
+    sec = next(ln for ln in vis.split("\n") if "SEC context" in ln)
+    assert "offering-related 424B2 ×212 (filed 2026-10-01 to 2026-10-21)" in sec and len(sec) < 300
+    assert "other filing(s): Form FWP" in sec and P._TRUNCATED not in vis
+    for kept in ("negative after costs", "not a buy instruction", "🔖 Reference OPPORTUNITY_ENGINE:2026-10-09:TWLO"):
+        assert kept in vis
+
+
+def test_hard_guard_cuts_details_at_a_line_and_keeps_policy_universe_reference():
+    summary = "x" * 300
+    details = "\n".join([f"line {i} " + "🔎" * 60 for i in range(200)] + ["🏷️ Policy P", "🌐 Universe U", "🔖 Reference R"])
+    out = P._fit_details(summary, details)
+    assert u16(summary) + 1 + u16(out) <= P._FIT_BUDGET
+    assert out.endswith("🏷️ Policy P\n🌐 Universe U\n🔖 Reference R") and P._TRUNCATED in out
+    assert P._fit_details(summary, "short\nA\nB\nC") == "short\nA\nB\nC"
+    one = "\n".join(["Z" * 9000, "a", "b", "c"])                       # a single overlong line is cut by characters
+    cut = P._fit_details(summary, one)
+    assert u16(summary) + 1 + u16(cut) <= P._FIT_BUDGET and cut.startswith("ZZZ") and cut.endswith("a\nb\nc")
+
+
+def test_any_review_alert_stays_under_the_limit_even_with_extreme_unique_labels():
+    labs = "; ".join(f"8-K items {i}.01 filed 2026-10-{1 + i % 20:02d} with a long description " * 3 for i in range(400))
+    txt = P.render_review_expandable(q(), NOW, "P", ctx(cat=labs))
+    assert u16(visible(txt)) <= P._FIT_BUDGET

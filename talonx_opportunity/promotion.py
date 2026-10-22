@@ -249,6 +249,31 @@ def _et(v) -> str:
         return "UNKNOWN"
 
 
+SEC_MAX_GROUPS = 4                 # 2026-10-22: frequent filers (bank 424B2 programmes) produced >5,000-char lines
+
+
+def _compact_labels(found: list[str], max_groups: int = SEC_MAX_GROUPS) -> list[str]:
+    """Presentation only: identical labels (ignoring their ' filed <date>' suffix) collapse into one entry with a count
+    and the date range; at most ``max_groups`` entries, then '+N more filing types'. A list without repeats and within
+    the cap renders exactly as before."""
+    groups: dict[str, list[str]] = {}
+    for lab in found:
+        m = re.fullmatch(r"(.+) filed (\d{4}-\d{2}-\d{2})", lab)
+        key, d = (m.group(1), m.group(2)) if m else (lab, None)
+        groups.setdefault(key, []).append(d or "")
+    out = []
+    for key, dates in groups.items():
+        if len(dates) == 1:
+            out.append(f"{key} filed {dates[0]}" if dates[0] else key)
+            continue
+        ds = sorted(x for x in dates if x)
+        span = "" if not ds else f" (filed {ds[0]})" if ds[0] == ds[-1] else f" (filed {ds[0]} to {ds[-1]})"
+        out.append(f"{key} ×{len(dates)}{span}")
+    if len(out) > max_groups:
+        out = out[:max_groups] + [f"+{len(out) - max_groups} more filing types"]
+    return out
+
+
 def _sec_context(cat) -> str:
     c = str(cat).strip() if cat is not None else ""
     if not c:
@@ -264,6 +289,7 @@ def _sec_context(cat) -> str:
                                                    for f in m.group(1).split(",")) if m else lab)
     if not found:
         return f"SEC context: UNKNOWN ({'; '.join(gaps) or c}). News not checked."
+    found = _compact_labels(found)
     tail = f"; other sources UNKNOWN ({'; '.join(gaps)})" if gaps else ""
     return f"SEC context: {'; '.join(found)}{tail}. Connection to the move unverified; news not checked."
 
@@ -410,7 +436,44 @@ def render_review_expandable(p: dict, now: datetime, policy: str, ctx: dict | No
         "⚠️ Paper results negative after costs · review only · no order",
     ]
     details = render_review_compact(p, now, policy, ctx).split("\n", 1)[-1].strip("\n")
+    details = _fit_details(html.unescape(re.sub(r"<[^>]*>", "", "\n".join(summary))), details)
     return "\n".join(summary) + "\n" + HTML_DETAILS_OPEN + e(details) + "</blockquote>"
+
+
+TELEGRAM_TEXT_LIMIT = 4096         # UTF-16 code units of the parsed (visible) text
+_FIT_BUDGET = 3900                 # margin below the limit
+_TRUNCATED = "… (details shortened to fit Telegram's message limit)"
+
+
+def _u16(s: str) -> int:
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _fit_details(visible_summary: str, details: str) -> str:
+    """Hard guard (2026-10-22): the visible message must stay under Telegram's limit. Overlong details are cut at a line
+    boundary (a single overlong line is cut by characters) and marked. The last three lines (policy / universe /
+    reference) are always kept."""
+    budget = _FIT_BUDGET - _u16(visible_summary) - 1
+    if _u16(details) <= budget:
+        return details
+    lines = details.split("\n")
+    keep_tail = lines[-3:]
+    tail_cost = _u16("\n".join(["", _TRUNCATED, "", *keep_tail]))
+    room = budget - tail_cost
+    head: list[str] = []
+    for ln in lines[:-3]:
+        cost = _u16(ln) + (1 if head else 0)
+        if cost <= room:
+            head.append(ln)
+            room -= cost
+            continue
+        if room > 20:                                    # partial line: cut by characters, never split a pair
+            cut = ln
+            while _u16(cut) + (1 if head else 0) > room:
+                cut = cut[:-1]
+            head.append(cut)
+        break
+    return "\n".join([*head, _TRUNCATED, "", *keep_tail])
 
 
 class ExpandableHtmlClient:
