@@ -54,3 +54,16 @@ before the PDM first session (2026-10-19), so the whole PDM study sees one layou
 | Tests | 173 targeted + 281 wider passed (same 2 pre-existing release-freeze failures) |
 | After | One owner, RUNNING, 0 failures, queue 0, drain enabled; PDM `verify_integrity` OK |
 | Rollback | `git revert 0326dfa`, declare `UI_ONLY`, `restart promotion` |
+
+## End-of-session check 2026-10-22 20:23Z (read-only)
+
+**PASS.**
+
+| Check | Result |
+|---|---|
+| Delivery | 111 review alerts since 13:30Z, all SENT on the first attempt; 0 FAILED / RETRY / AMBIGUOUS; no `last_error` |
+| Telegram acceptance | 111/111 `API_ACCEPTED`, `TRACE_OK`; 0 `SEND_FAILED` |
+| Length | Longest visible text 1,209 UTF-16 units (limit 4,096); truncation marker never used |
+| Duplicates | 0 duplicate dedup keys |
+| Promotion | Version `28b69c173c9e`, RUNNING, 0 failures, queue 0, no component events since deployment. Window: 111 PROMOTED_SIGNAL, 4 EXPIRED, 14 REJECTED_WHILE_QUEUED |
+| Long-filer case | **NOT_YET_OBSERVED**: no JPM / MS / GS / BAC / C alert today. Covered by unit tests and the MS re-render (1,160 units) |
