@@ -41,3 +41,16 @@ before the PDM first session (2026-10-19), so the whole PDM study sees one layou
 - **Rollback not needed.**
 - **Not verifiable from records:** how the message renders on the device (collapsed summary, tap to expand).
   The owner should confirm this on the phone.
+
+## Fix deployed 2026-10-22 09:09Z: bounded SEC context + Telegram length guard
+
+| Item | Value |
+|---|---|
+| Cause | `OPPORTUNITY_ENGINE:2026-10-21:MS:GAP_UP` FAILED after 5 attempts, "Message is too long" (6,223 UTF-16 units; the SEC line held 5,219 chars of repeated `offering-related 424B2 filed <date>` labels). The defect predates V3 (unbounded field). Not resent. |
+| Change | Identical labels collapse with count + date range (max 4 groups, then `+N more filing types`). Details are cut at a line boundary if the visible text would exceed 3,900 UTF-16 units; the policy/universe/reference lines are always kept. Presentation only; discovery `catalysts.py` and PDM-locked files untouched |
+| Commit / declaration | `0326dfa`; #63 `UI_ONLY` bound to `28b69c173c9e`; deployment `20261022T090908Z-promotion-200da2`, `RULE:CONFIG_KEY_MAPPED+DECLARED`, `46d5867ae07b` → `28b69c173c9e` |
+| Unchanged | `PROMOTION_POLICY` `4926c12e5eace04e`, mode, delivery boundary, eligibility, queue, routing, dedup, trace |
+| Regression | All 200 delivered V3 alerts re-render byte-identical (`SEC_LENGTH_FIX_VERIFY.txt`); MS re-renders at 1,160 units, no truncation |
+| Tests | 173 targeted + 281 wider passed (same 2 pre-existing release-freeze failures) |
+| After | One owner, RUNNING, 0 failures, queue 0, drain enabled; PDM `verify_integrity` OK |
+| Rollback | `git revert 0326dfa`, declare `UI_ONLY`, `restart promotion` |
