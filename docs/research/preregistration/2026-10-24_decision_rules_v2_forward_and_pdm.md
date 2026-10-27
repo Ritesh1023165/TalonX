@@ -1,11 +1,11 @@
-# Decision rules for the two open studies (V2 forward, PDM): DRAFT for owner approval
+# Decision rules for the two open studies (V2 forward, PDM): APPROVED 2026-10-27
 
 **Written 2026-10-24, before either study's outcomes are read.** Neither the V2 forward outputs
 (`results/v2_validation/forward/*.json`) nor any PDM return value was opened to write this.
 
 This changes **nothing** in either study. It records, in advance, how the owner will act on each possible result, so
-the decision cannot be fitted to the numbers afterwards. Status becomes **APPROVED** only with the owner's explicit
-approval, recorded in a later commit; until then it is a draft.
+the decision cannot be fitted to the numbers afterwards. **Status: APPROVED by the owner, unchanged from the draft committed at `e378b67`
+(2026-10-24 07:16Z).** Approval is recorded below.
 
 ## Ground rules (both studies)
 
@@ -78,5 +78,6 @@ approval, recorded in a later commit; until then it is a draft.
 
 ## Owner approval
 
-- [ ] Approved as written, or approved with these changes: ______
-- Approval date/time (UTC): ______
+- [x] **Approved as written** (no changes), owner instruction in session: "Approved".
+- Approval date/time (UTC): **2026-10-27 07:12Z**.
+- At approval: no V2 forward output (`results/v2_validation/forward/*.json`) and no PDM return value had been read. The final forward run (2026-10-31) and the PDM endpoint (2026-11-17 22:00Z) are still in the future.
