@@ -67,3 +67,16 @@ before the PDM first session (2026-10-19), so the whole PDM study sees one layou
 | Duplicates | 0 duplicate dedup keys |
 | Promotion | Version `28b69c173c9e`, RUNNING, 0 failures, queue 0, no component events since deployment. Window: 111 PROMOTED_SIGNAL, 4 EXPIRED, 14 REJECTED_WHILE_QUEUED |
 | Long-filer case | **NOT_YET_OBSERVED**: no JPM / MS / GS / BAC / C alert today. Covered by unit tests and the MS re-render (1,160 units) |
+
+## Long-filer case confirmed live (checked 2026-11-02 13:05Z, read-only)
+
+**PASS.**
+
+| Item | Value |
+|---|---|
+| Alert | `OPPORTUNITY_ENGINE:2026-10-26:MS:GAP_UP`, the first big-bank (JPM/MS/GS/BAC/C) review alert since the fix |
+| Delivery | SENT 2026-10-26 15:21:37Z, 1 attempt, `RESEARCH_REVIEW_EXPANDABLE_V3` |
+| Length | 1,159 visible UTF-16 units; the truncation guard was not needed |
+| SEC line | 155 chars: `offering-related 424B2 ×34 (filed 2026-10-23 to 2026-10-26); other filing(s): Form FWP` (before the fix, MS's line was 5,219 chars) |
+| Trace | `TRACE_OK`, message id present, 0 hidden retries, no ambiguous prior attempt |
+| Since the fix (10-22 09:10Z → 10-30) | No new FAILED rows; all-time Signal-outbox FAILED remains 1 (the 2026-10-21 MS row) |
