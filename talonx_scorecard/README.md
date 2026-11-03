@@ -14,6 +14,9 @@ Offline research package for `TICKER_SCORECARD_V1`. Spec: `docs/research/preregi
 | `panel.py` | Pure transforms: bars to wide frames, universe floor, split parsing, panel SHA-256 |
 | `alpaca_fetch.py` | Alpaca bars and split fetch (network; run where the keys are) |
 | `../scripts/scorecard_build_panel.py` | Phase 1 runner: builds the panel, runs gates 1 and 2, writes `results/scorecard_v1/panel/gate_report.json` |
+| `features.py` | F1-F4 from adjusted closes; rank, winsorise, sign-flip, missing-value rule for all 12 |
+| `score.py` | The single `score(panel, date)` (EQ composite, decile views). RIDGE and calibration come in the model stage |
+| `../.github/workflows/scorecard_panel_build.yml` | Manual GitHub run of the panel build (secrets: APCA_API_KEY_ID, APCA_API_SECRET_KEY, SEC_USER_AGENT) |
 
 ## Next (in order)
 1. Run `scripts/scorecard_build_panel.py` on the machine with the keys (smoke test with `--max-symbols 60` first).

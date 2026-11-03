@@ -161,3 +161,103 @@ def test_frame_sha256_deterministic_and_value_sensitive():
     f = pd.DataFrame({"A": [1.0, 2.0, 3.0], "B": [4.0, 5.0, 6.0]}, index=idx)
     assert panel.frame_sha256({"x": f}) == panel.frame_sha256({"x": f[["B", "A"]]})
     assert panel.frame_sha256({"x": f}) != panel.frame_sha256({"x": f.assign(A=[1.0, 2.0, 3.1])})
+
+
+def _synthetic_panel(n=200, days=300, seed=3):
+    from talonx_scorecard import features
+    rng = np.random.default_rng(seed)
+    idx = pd.bdate_range("2023-01-02", periods=days)
+    names = [f"S{i:03d}" for i in range(n)]
+    px = pd.DataFrame(100 * np.exp(np.cumsum(rng.normal(0, .01, (days, n)), axis=0)), index=idx, columns=names)
+    raw = features.raw_price_features(px)
+    for fid in ["F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"]:
+        raw[fid] = pd.DataFrame(rng.normal(size=(days, n)), index=idx, columns=names)
+    uni = pd.DataFrame(True, index=idx, columns=names)
+    return {"raw": raw, "universe": uni}, idx, names, px
+
+
+def test_price_features_known_values():
+    from talonx_scorecard import features
+    idx = pd.bdate_range("2023-01-02", periods=300)
+    px = pd.DataFrame({"A": np.arange(1.0, 301.0)}, index=idx)
+    f = features.raw_price_features(px)
+    t = 280
+    assert f["F1"]["A"].iloc[t] == pytest.approx(px["A"].iloc[t] / px["A"].iloc[t - 5] - 1)
+    assert f["F2"]["A"].iloc[t] == pytest.approx(px["A"].iloc[t - 5] / px["A"].iloc[t - 26] - 1)
+    assert f["F3"]["A"].iloc[t] == pytest.approx(px["A"].iloc[t - 21] / px["A"].iloc[t - 252] - 1)
+    assert f["F4"]["A"].iloc[58:60].isna().all() or f["F4"]["A"].iloc[:59].isna().all()
+
+
+def test_signed_scores_flip_sign_and_range():
+    from talonx_scorecard import features
+    panel, idx, names, px = _synthetic_panel()
+    d = idx[-1]
+    sig = features.signed_scores(panel["raw"], panel["universe"].loc[d], d)
+    assert sig.shape[1] == 12 and sig.values.min() >= 0 and sig.values.max() <= 1
+    f1 = panel["raw"]["F1"].loc[d]
+    top = f1.idxmax()                                   # biggest 5d gain -> most bearish (reversal), sign -1
+    assert sig.loc[top, "F1"] < 0.1
+    f5 = panel["raw"]["F5"].loc[d]
+    assert sig.loc[f5.idxmax(), "F5"] > 0.9             # quality, sign +1
+
+
+def test_names_missing_more_than_six_features_are_dropped():
+    from talonx_scorecard import features
+    panel, idx, names, px = _synthetic_panel()
+    d = idx[-1]
+    for fid in ["F5", "F6", "F7", "F8", "F9", "F10", "F11"]:      # 7 missing for S000
+        panel["raw"][fid].loc[d, "S000"] = np.nan
+    for fid in ["F5", "F6", "F7", "F8", "F9", "F10"]:             # exactly 6 missing for S001: kept
+        panel["raw"][fid].loc[d, "S001"] = np.nan
+    sig = features.signed_scores(panel["raw"], panel["universe"].loc[d], d)
+    assert "S000" not in sig.index and "S001" in sig.index
+    assert (sig.loc["S001", ["F5", "F6"]] == C.MISSING_FILL).all()
+
+
+def test_universe_excludes_names():
+    from talonx_scorecard import features
+    panel, idx, names, px = _synthetic_panel()
+    d = idx[-1]
+    row = panel["universe"].loc[d].copy(); row[["S000", "S001"]] = False
+    assert not {"S000", "S001"} & set(features.signed_scores(panel["raw"], row, d).index)
+
+
+def test_score_views_are_deciles_and_deterministic():
+    from talonx_scorecard.score import score
+    panel, idx, names, px = _synthetic_panel()
+    d = idx[-1]
+    out = score(panel, d)
+    n = len(out)
+    assert (out["view"] == "Bullish").sum() == pytest.approx(n * 0.10, abs=2)
+    assert (out["view"] == "Bearish").sum() == pytest.approx(n * 0.10, abs=2)
+    assert out["rank"].iloc[0] == 1.0 and out.index.is_unique
+    pd.testing.assert_frame_equal(out, score(panel, d))
+    assert out.loc[out["view"] == "Bullish", "composite"].min() > out.loc[out["view"] == "Bearish", "composite"].max()
+
+
+def test_score_uses_only_data_up_to_the_date():
+    from talonx_scorecard.score import score
+    panel, idx, names, px = _synthetic_panel()
+    d = idx[-40]
+    base = score(panel, d)
+    for k, f in panel["raw"].items():                   # corrupt everything AFTER d
+        f.loc[f.index > d] = 1e9
+    pd.testing.assert_frame_equal(base, score(panel, d))
+
+
+def test_score_rejects_incomplete_weights():
+    from talonx_scorecard.score import score
+    panel, idx, names, px = _synthetic_panel()
+    with pytest.raises(ValueError):
+        score(panel, idx[-1], weights=pd.Series({"F1": 1.0}))
+
+
+def test_price_features_never_use_future_prices():
+    from talonx_scorecard import features
+    _, idx, names, px = _synthetic_panel()
+    d = idx[-60]
+    a = features.raw_price_features(px)
+    future = px.copy(); future.loc[future.index > d] = 1e9
+    b = features.raw_price_features(future)
+    for k in ["F1", "F2", "F3", "F4"]:
+        pd.testing.assert_series_equal(a[k].loc[d], b[k].loc[d])
