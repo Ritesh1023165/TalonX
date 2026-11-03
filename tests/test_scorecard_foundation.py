@@ -303,3 +303,18 @@ def test_gate1_strict_on_unverifiable():
     rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("ZZZ", idx[15], 2.0)], "2019-01-02", "2026-10-30")
     assert {r[2] for r in rows} == {"ADJUSTED", "SYMBOL_MISSING"}
     assert not gate1_from_classification(rows).passed
+
+
+def test_gate1_amendment1_universe_scope():
+    from talonx_scorecard.splits import Split, classify_splits
+    from talonx_scorecard.gates import gate1_from_classification
+    df, idx = _cls_frame()
+    uni = pd.DataFrame(False, index=idx, columns=df.columns)
+    uni["AAA"] = True                                     # BBB (unadjusted) is outside the universe
+    rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("BBB", idx[15], 2.0), Split("ZZZ", idx[15], 2.0)],
+                           "2019-01-02", "2026-10-30", universe=uni)
+    assert [r[2] for r in rows] == ["ADJUSTED", "NOT_IN_UNIVERSE", "NOT_IN_UNIVERSE"]
+    assert gate1_from_classification(rows).passed
+    uni["BBB"] = True                                     # now in universe: the unadjusted split must fail the gate
+    rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("BBB", idx[15], 2.0)], "2019-01-02", "2026-10-30", universe=uni)
+    assert not gate1_from_classification(rows).passed

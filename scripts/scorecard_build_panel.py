@@ -89,7 +89,7 @@ def main() -> int:
 
     from talonx_scorecard.splits import classify_splits
     all_splits = panel.parse_splits(split_payload)
-    cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END)
+    cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END, universe=uni)
     pd.DataFrame(cls, columns=["symbol", "ex_date", "status", "ratio", "adj_log_return", "gap_sessions"]).to_csv(out / "split_check_details.csv", index=False)
     for r in [r for r in cls if r[2] not in ("ADJUSTED", "OUT_OF_SAMPLE")][:200]:
         print(f"  split {r[2]:<15} {r[0]:<6} ex={str(r[1].date())} ratio={r[3]:.4g} adj_logret={r[4]:.3f} gap={r[5]}")

@@ -78,12 +78,12 @@ def all_passed(results: list[GateResult]) -> bool:
 
 
 def gate1_from_classification(rows: list[tuple]) -> GateResult:
-    """Strict gate 1 on classified splits: every in-sample split must be verified ADJUSTED.
+    """Strict gate 1 on classified splits: every in-sample, in-universe split must be verified ADJUSTED (Amendment 1).
 
     Anything else (NOT_ADJUSTED or unverifiable) fails the gate; the detail gives the breakdown so the cause is visible.
     """
     c = Counter(r[2] for r in rows)
-    in_sample = sum(v for k, v in c.items() if k != "OUT_OF_SAMPLE")
+    in_sample = sum(v for k, v in c.items() if k not in ("OUT_OF_SAMPLE", "NOT_IN_UNIVERSE"))
     ok = c.get("ADJUSTED", 0)
     detail = f"{ok}/{in_sample} in-sample splits verified adjusted; " + ", ".join(f"{k}={v}" for k, v in sorted(c.items()))
     return GateResult("G_DATA_1_split_adjustment", in_sample > 0 and ok == in_sample, ok / in_sample if in_sample else 0.0, 1.0, detail)
