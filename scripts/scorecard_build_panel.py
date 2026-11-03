@@ -53,6 +53,7 @@ def main() -> int:
     print(f"{len(syms)} symbols + SPY in {len(batches)} batches; spec {C.spec_fingerprint()[:12]}", flush=True)
 
     s = AF.session(ROOT)
+    print(AF.describe_keys(*AF.load_keys(ROOT)), flush=True)
     bars: dict[str, dict[str, list]] = {"all": {}, "raw": {}}
     split_payload = {"corporate_actions": {"forward_splits": [], "reverse_splits": []}}
     for bi, b in enumerate(batches):

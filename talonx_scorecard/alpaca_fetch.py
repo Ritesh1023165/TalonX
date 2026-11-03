@@ -15,7 +15,8 @@ ACTIONS_URL = "https://data.alpaca.markets/v1/corporate-actions"
 
 
 def load_keys(root: Path) -> tuple[str, str]:
-    key, sec = os.environ.get("APCA_API_KEY_ID"), os.environ.get("APCA_API_SECRET_KEY")
+    key = (os.environ.get("APCA_API_KEY_ID") or "").strip().strip('"').strip("'") or None
+    sec = (os.environ.get("APCA_API_SECRET_KEY") or "").strip().strip('"').strip("'") or None
     env = root / ".env"
     if (not key or not sec) and env.exists():
         for line in env.read_text().splitlines():
@@ -25,7 +26,13 @@ def load_keys(root: Path) -> tuple[str, str]:
                 sec = line.split("=", 1)[1].strip()
     if not key or not sec:
         raise RuntimeError("Alpaca keys not found (APCA_API_KEY_ID / APCA_API_SECRET_KEY)")
-    return key, sec
+    return key.strip().strip('"').strip("'"), sec.strip().strip('"').strip("'")
+
+
+def describe_keys(key: str, sec: str) -> str:
+    """Shape of the credentials only (never the values), to help diagnose a 401."""
+    return (f"key id: {len(key)} chars, starts with {key[:2]!r}; secret: {len(sec)} chars; "
+            f"paper-style key id (starts 'PK'): {key.startswith('PK')}; live-style (starts 'AK'): {key.startswith('AK')}")
 
 
 def session(root: Path) -> requests.Session:
@@ -40,6 +47,8 @@ def _get(s: requests.Session, url: str, params: dict, tries: int = 6) -> dict:
         r = s.get(url, params=params, timeout=60)
         if r.status_code == 429 or r.status_code >= 500:
             time.sleep(min(60, 2 ** i)); continue
+        if r.status_code in (401, 403):
+            raise RuntimeError(f"Alpaca refused the credentials (HTTP {r.status_code}): {r.text[:300]}")
         r.raise_for_status()
         return r.json()
     raise RuntimeError(f"giving up on {url} after {tries} tries (last status {r.status_code})")
