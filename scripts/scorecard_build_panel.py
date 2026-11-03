@@ -87,12 +87,13 @@ def main() -> int:
     avail = {h: labels.label_available(adj, spy, n) for h, n in C.HORIZONS.items()}
     splits = [x for x in panel.parse_splits(split_payload) if x.symbol in adj.columns]
 
-    from talonx_scorecard.splits import classify_splits
+    from talonx_scorecard.splits import classify_splits, adjustment_factor_change
     all_splits = panel.parse_splits(split_payload)
     cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END, universe=uni)
     pd.DataFrame(cls, columns=["symbol", "ex_date", "status", "ratio", "adj_log_return", "gap_sessions"]).to_csv(out / "split_check_details.csv", index=False)
     for r in [r for r in cls if r[2] not in ("ADJUSTED", "OUT_OF_SAMPLE", "NOT_IN_UNIVERSE")][:200]:
-        print(f"  split {r[2]:<15} {r[0]:<6} ex={str(r[1].date())} ratio={r[3]:.4g} adj_logret={r[4]:.3f} gap={r[5]}")
+        fc = adjustment_factor_change(adj, raw_c, r[0], r[1]) if r[0] in adj.columns and r[0] in raw_c.columns else float("nan")
+        print(f"  split {r[2]:<15} {r[0]:<6} ex={str(r[1].date())} ratio={r[3]:.4g} adj_logret={r[4]:.3f} gap={r[5]} adj/raw_factor_change={fc:.4f} (expect ~{r[3]:.4g} if adjusted)")
     g1 = gates.gate1_from_classification(cls)
     g2 = gates.gate2_label_coverage(uni, avail)
     not_run = [gates.GateResult("G_DATA_3_fundamental_coverage", False, None, C.GATE_FUNDAMENTAL_COVERAGE, "NOT_RUN: SEC stage pending"),

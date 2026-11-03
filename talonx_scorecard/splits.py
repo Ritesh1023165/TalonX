@@ -58,7 +58,7 @@ def check_split_adjustment(adj_close: pd.DataFrame, splits: list[Split]) -> Spli
 
 
 def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, end: str, max_gap: int = 5,
-                    universe: pd.DataFrame | None = None) -> list[tuple]:
+                    universe: pd.DataFrame | None = None, raw_close: pd.DataFrame | None = None) -> list[tuple]:
     """Diagnostic classification of every split. Rows: (symbol, ex_date, status, ratio, adj_log_return, gap_sessions).
 
     Compares the last bar BEFORE the ex-date with the first bar ON OR AFTER it, so a missing ex-date bar is not itself a
@@ -100,3 +100,14 @@ def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, en
         unadjusted = float(np.log(1.0 / sp.ratio))
         out("NOT_ADJUSTED" if abs(r - unadjusted) < abs(r) else "ADJUSTED", r, gap)
     return rows
+
+
+def adjustment_factor_change(adj_close: pd.DataFrame, raw_close: pd.DataFrame, symbol: str, ex_date) -> float:
+    """Diagnostic: change in the adj/raw price factor across the ex-date (should equal the split ratio, up to small dividends).
+
+    Unlike the price-return test this is independent of the market move on the day, so it separates a real unadjusted
+    split from a large genuine price move or a tiny-ratio corporate action.
+    """
+    f = (adj_close[symbol] / raw_close[symbol]).dropna()
+    b, a = f[f.index < ex_date], f[f.index >= ex_date]
+    return float(a.iloc[0] / b.iloc[-1]) if len(a) and len(b) else float("nan")
