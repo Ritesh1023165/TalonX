@@ -339,3 +339,9 @@ def test_is_plain_split():
         assert is_plain_split(r), r
     for r in (1.289, 0.97, 0.976, 1.05, 1.0):                                # spin-off-like or immaterial
         assert not is_plain_split(r), r
+
+
+def test_excluded_symbols_recorded_and_fingerprint_unchanged():
+    from talonx_scorecard import config as C
+    assert "HON" in C.EXCLUDED_SYMBOLS and C.EXCLUDED_SYMBOLS["HON"]
+    assert C.spec_fingerprint().startswith("81ddf67e19cf")

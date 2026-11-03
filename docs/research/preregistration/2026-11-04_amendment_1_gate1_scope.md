@@ -46,3 +46,15 @@ were not adjusted still fail the gate. All other rules unchanged.
 168 events that were in fact correctly adjusted (including legitimate 1:200 reverse splits). Corrected before any outcome
 data was read: the larger side cap is 100,000, and an event that verifies as ADJUSTED is always counted as verified.
 NON_SPLIT_EVENT applies only to events that fail verification and are not plain splits.
+
+---
+
+# Amendment 4 — Named exclusion: HON (2026-11-04)
+
+Approved by the owner on 2026-11-04, before any outcome data was read.
+
+**Finding.** After Amendment 3, one in-universe item still failed Gate 1: HON, ex-date 2026-06-29, listed ratio 0.5, adj/raw
+factor change 0.954. It is a spin-off of Honeywell Aerospace bundled with a reverse stock split, not a plain split.
+
+**Amendment.** HON is excluded from the study panel for every segment. It is recorded in `talonx_scorecard.config.EXCLUDED_SYMBOLS`
+and in the gate report. No other symbol is excluded. Any future exclusion needs its own dated amendment.

@@ -89,3 +89,10 @@ def spec_fingerprint() -> str:
         "features": [(f.id, f.family, f.name, f.sign) for f in FEATURES],
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+
+
+# Amendment 4 (2026-11-04): named exclusions. Deliberately NOT part of spec_fingerprint() (which fingerprints the original
+# pre-registration); each entry is recorded in docs/research/preregistration/.
+EXCLUDED_SYMBOLS = {
+    "HON": "2026-06-29 spin-off of Honeywell Aerospace bundled with a reverse split; adjusted/raw factor does not reflect the listed ratio",
+}
