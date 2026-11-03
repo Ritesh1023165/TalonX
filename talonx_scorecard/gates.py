@@ -6,7 +6,9 @@ from dataclasses import dataclass
 import pandas as pd
 
 from . import config as C
-from .splits import Split, check_split_adjustment
+from collections import Counter
+
+from .splits import Split, check_split_adjustment, classify_splits
 
 
 @dataclass(frozen=True)
@@ -73,3 +75,15 @@ def gate4_no_lookahead(records: pd.DataFrame) -> GateResult:
 
 def all_passed(results: list[GateResult]) -> bool:
     return len(results) == 4 and all(r.passed for r in results)
+
+
+def gate1_from_classification(rows: list[tuple]) -> GateResult:
+    """Strict gate 1 on classified splits: every in-sample split must be verified ADJUSTED.
+
+    Anything else (NOT_ADJUSTED or unverifiable) fails the gate; the detail gives the breakdown so the cause is visible.
+    """
+    c = Counter(r[2] for r in rows)
+    in_sample = sum(v for k, v in c.items() if k != "OUT_OF_SAMPLE")
+    ok = c.get("ADJUSTED", 0)
+    detail = f"{ok}/{in_sample} in-sample splits verified adjusted; " + ", ".join(f"{k}={v}" for k, v in sorted(c.items()))
+    return GateResult("G_DATA_1_split_adjustment", in_sample > 0 and ok == in_sample, ok / in_sample if in_sample else 0.0, 1.0, detail)

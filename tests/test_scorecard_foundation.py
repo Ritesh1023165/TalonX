@@ -269,3 +269,37 @@ def test_clean_symbol_keeps_stocks_and_drops_preferreds_warrants_units():
     assert clean_symbol("BRK-B") == "BRK.B" and clean_symbol("BF.B") == "BF.B"
     for bad in ["ABR-PD", "AAC-WT", "AAC-UN", "ABR-PE", "TOOLONGX", "A B", "", "123", "AB-1"]:
         assert clean_symbol(bad) is None, bad
+
+
+# ---- split classification (gate 1 refinement) ----
+def _cls_frame():
+    idx = pd.bdate_range("2021-01-04", periods=30)
+    return pd.DataFrame({"AAA": 100.0, "BBB": np.r_[np.full(15, 100.0), np.full(15, 50.0)]}, index=idx), idx
+
+
+def test_classify_adjusted_missing_exdate_bar_and_out_of_sample():
+    from talonx_scorecard.splits import Split, classify_splits
+    df, idx = _cls_frame()
+    df.loc[idx[15], "AAA"] = np.nan                       # no bar on the ex-date itself: not a failure
+    rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("AAA", pd.Timestamp("2016-01-04"), 2.0)], "2019-01-02", "2026-10-30")
+    st = {r[1].year: r[2] for r in rows}
+    assert st[2021] == "ADJUSTED"
+    assert st[2016] == "OUT_OF_SAMPLE"
+
+
+def test_classify_true_not_adjusted_still_fails():
+    from talonx_scorecard.splits import Split, classify_splits
+    from talonx_scorecard.gates import gate1_from_classification
+    df, idx = _cls_frame()
+    rows = classify_splits(df, [Split("BBB", idx[15], 2.0)], "2019-01-02", "2026-10-30")   # price halves: unadjusted
+    assert rows[0][2] == "NOT_ADJUSTED"
+    assert not gate1_from_classification(rows).passed
+
+
+def test_gate1_strict_on_unverifiable():
+    from talonx_scorecard.splits import Split, classify_splits
+    from talonx_scorecard.gates import gate1_from_classification
+    df, idx = _cls_frame()
+    rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("ZZZ", idx[15], 2.0)], "2019-01-02", "2026-10-30")
+    assert {r[2] for r in rows} == {"ADJUSTED", "SYMBOL_MISSING"}
+    assert not gate1_from_classification(rows).passed

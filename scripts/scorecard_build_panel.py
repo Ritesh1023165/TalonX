@@ -87,7 +87,13 @@ def main() -> int:
     avail = {h: labels.label_available(adj, spy, n) for h, n in C.HORIZONS.items()}
     splits = [x for x in panel.parse_splits(split_payload) if x.symbol in adj.columns]
 
-    g1 = gates.gate1_split_adjustment(adj, splits)
+    from talonx_scorecard.splits import classify_splits
+    all_splits = panel.parse_splits(split_payload)
+    cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END)
+    pd.DataFrame(cls, columns=["symbol", "ex_date", "status", "ratio", "adj_log_return", "gap_sessions"]).to_csv(out / "split_check_details.csv", index=False)
+    for r in [r for r in cls if r[2] not in ("ADJUSTED", "OUT_OF_SAMPLE")][:200]:
+        print(f"  split {r[2]:<15} {r[0]:<6} ex={str(r[1].date())} ratio={r[3]:.4g} adj_logret={r[4]:.3f} gap={r[5]}")
+    g1 = gates.gate1_from_classification(cls)
     g2 = gates.gate2_label_coverage(uni, avail)
     not_run = [gates.GateResult("G_DATA_3_fundamental_coverage", False, None, C.GATE_FUNDAMENTAL_COVERAGE, "NOT_RUN: SEC stage pending"),
                gates.GateResult("G_DATA_4_no_lookahead", False, None, 0.0, "NOT_RUN: SEC stage pending")]
@@ -98,7 +104,7 @@ def main() -> int:
     sha = panel.frame_sha256({"adj_close": adj, "raw_close": raw_c, "raw_volume": raw_v, "spy": spy.to_frame("SPY")})
     report = {"spec_fingerprint": C.spec_fingerprint(), "spec_commit": C.SPEC_COMMIT, "code_head": _git_head(),
               "symbols": len(syms), "sessions": len(sessions), "first": str(sessions[0].date()), "last": str(sessions[-1].date()),
-              "universe_avg_names_per_day": float(uni.sum(axis=1).mean()), "splits_found": len(splits),
+              "universe_avg_names_per_day": float(uni.sum(axis=1).mean()), "splits_found": len(all_splits),
               "panel_sha256": sha, "gates": [r.__dict__ for r in results],
               "overall": "DATA_NOT_READY" if not gates.all_passed(results) else "DATA_READY"}
     (out / "gate_report.json").write_text(json.dumps(report, indent=2, default=str))

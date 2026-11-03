@@ -55,3 +55,37 @@ def check_split_adjustment(adj_close: pd.DataFrame, splits: list[Split]) -> Spli
         else:
             out.passed += 1
     return out
+
+
+def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, end: str, max_gap: int = 5) -> list[tuple]:
+    """Diagnostic classification of every split. Rows: (symbol, ex_date, status, ratio, adj_log_return, gap_sessions).
+
+    Compares the last bar BEFORE the ex-date with the first bar ON OR AFTER it, so a missing ex-date bar is not itself a
+    failure. Statuses: ADJUSTED, NOT_ADJUSTED, OUT_OF_SAMPLE, INVALID_RATIO, SYMBOL_MISSING, NO_PRIOR_BAR,
+    NO_LATER_BAR, GAP_TOO_LONG (more than ``max_gap`` missing sessions between the two bars).
+    """
+    lo, hi = pd.Timestamp(start), pd.Timestamp(end)
+    sessions = adj_close.index
+    rows = []
+    for sp in splits:
+        def out(status, r=float("nan"), gap=-1):
+            rows.append((sp.symbol, sp.ex_date, status, sp.ratio, r, gap))
+        if not (lo <= sp.ex_date <= hi):
+            out("OUT_OF_SAMPLE"); continue
+        if sp.ratio <= 0 or abs(np.log(sp.ratio)) < 1e-9:
+            out("INVALID_RATIO"); continue
+        if sp.symbol not in adj_close.columns:
+            out("SYMBOL_MISSING"); continue
+        s = adj_close[sp.symbol].dropna()
+        before, after = s[s.index < sp.ex_date], s[s.index >= sp.ex_date]
+        if before.empty:
+            out("NO_PRIOR_BAR"); continue
+        if after.empty:
+            out("NO_LATER_BAR"); continue
+        gap = int(sessions.get_indexer([after.index[0]])[0] - sessions.get_indexer([before.index[-1]])[0]) - 1
+        if gap > max_gap:
+            out("GAP_TOO_LONG", gap=gap); continue
+        r = float(np.log(after.iloc[0] / before.iloc[-1]))
+        unadjusted = float(np.log(1.0 / sp.ratio))
+        out("NOT_ADJUSTED" if abs(r - unadjusted) < abs(r) else "ADJUSTED", r, gap)
+    return rows

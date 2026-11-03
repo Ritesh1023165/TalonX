@@ -39,6 +39,12 @@ jobs:
           pd.DataFrame({"symbol": syms}).to_csv("universe.csv", index=False)
           print(len(syms), "tickers from SEC")
           PY
+      - name: Restore fetched batches (skips the download when cached)
+        uses: actions/cache@v4
+        with:
+          path: results/scorecard_v1/panel/_batches
+          key: scorecard-batches-v1-${{ github.run_id }}
+          restore-keys: scorecard-batches-v1-
       - name: Build panel and run gates 1-2
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
@@ -52,7 +58,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scorecard-gate-report
-          path: results/scorecard_v1/panel/gate_report.json
+          path: |
+            results/scorecard_v1/panel/gate_report.json
+            results/scorecard_v1/panel/split_check_details.csv
       - name: Keep panel (for the next research stages)
         if: always()
         uses: actions/upload-artifact@v4
