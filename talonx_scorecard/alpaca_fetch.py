@@ -87,3 +87,16 @@ def fetch_splits(s: requests.Session, symbols: list[str], start: str, end: str) 
         if not token:
             return merged
     raise RuntimeError("pagination did not terminate")
+
+
+def probe_credentials(s: requests.Session) -> str:
+    """HTTP status codes only (no bodies, no keys): is the pair valid at all, and does it reach market data?"""
+    out = []
+    for label, url in (("paper account", "https://paper-api.alpaca.markets/v2/account"),
+                       ("live account", "https://api.alpaca.markets/v2/account"),
+                       ("market data (IEX latest SPY)", "https://data.alpaca.markets/v2/stocks/SPY/trades/latest?feed=iex")):
+        try:
+            out.append(f"{label}: HTTP {s.get(url, timeout=30).status_code}")
+        except requests.RequestException as e:
+            out.append(f"{label}: {type(e).__name__}")
+    return "; ".join(out)

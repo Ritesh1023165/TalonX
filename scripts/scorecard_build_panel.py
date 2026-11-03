@@ -54,6 +54,7 @@ def main() -> int:
 
     s = AF.session(ROOT)
     print(AF.describe_keys(*AF.load_keys(ROOT)), flush=True)
+    print('probe ->', AF.probe_credentials(s), flush=True)
     bars: dict[str, dict[str, list]] = {"all": {}, "raw": {}}
     split_payload = {"corporate_actions": {"forward_splits": [], "reverse_splits": []}}
     for bi, b in enumerate(batches):
