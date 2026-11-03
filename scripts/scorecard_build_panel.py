@@ -45,7 +45,9 @@ def main() -> int:
     a = ap.parse_args()
 
     out = Path(a.out); cache = out / "_batches"; cache.mkdir(parents=True, exist_ok=True)
-    syms = sorted({str(x).strip().upper() for x in pd.read_csv(a.symbols_file)["symbol"].dropna()} - {"SPY"})
+    cleaned = {panel.clean_symbol(x) for x in pd.read_csv(a.symbols_file)["symbol"].dropna()}
+    syms = sorted(cleaned - {None, "SPY"})
+    print(f"symbols after cleaning: {len(syms)}", flush=True)
     if a.max_symbols:
         syms = syms[: a.max_symbols]
     todo = ["SPY"] + syms

@@ -261,3 +261,11 @@ def test_price_features_never_use_future_prices():
     b = features.raw_price_features(future)
     for k in ["F1", "F2", "F3", "F4"]:
         pd.testing.assert_series_equal(a[k].loc[d], b[k].loc[d])
+
+
+def test_clean_symbol_keeps_stocks_and_drops_preferreds_warrants_units():
+    from talonx_scorecard.panel import clean_symbol
+    assert clean_symbol(" aapl ") == "AAPL" and clean_symbol("A") == "A"
+    assert clean_symbol("BRK-B") == "BRK.B" and clean_symbol("BF.B") == "BF.B"
+    for bad in ["ABR-PD", "AAC-WT", "AAC-UN", "ABR-PE", "TOOLONGX", "A B", "", "123", "AB-1"]:
+        assert clean_symbol(bad) is None, bad

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 
 import numpy as np
 import pandas as pd
@@ -60,3 +61,17 @@ def frame_sha256(frames: dict[str, pd.DataFrame]) -> str:
         h.update(f.index.strftime("%Y-%m-%d").to_numpy().astype("U10").tobytes())
         h.update(np.ascontiguousarray(f.to_numpy(dtype="float64"), dtype="float64").tobytes())
     return h.hexdigest()
+
+
+_PLAIN = re.compile(r"^[A-Z]{1,5}$")
+_CLASS = re.compile(r"^([A-Z]{1,4})[-.]([A-Z])$")
+
+
+def clean_symbol(raw: str) -> str | None:
+    """SEC ticker -> Alpaca symbol, or None to drop. Keeps plain tickers (AAPL) and share classes (BRK-B -> BRK.B).
+    Drops preferreds, warrants and units written with a hyphen suffix (ABR-PD, AAC-WT, AAC-UN) and anything odd."""
+    t = str(raw).strip().upper()
+    if _PLAIN.match(t):
+        return t
+    m = _CLASS.match(t)
+    return f"{m.group(1)}.{m.group(2)}" if m else None

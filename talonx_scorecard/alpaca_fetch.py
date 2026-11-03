@@ -49,6 +49,8 @@ def _get(s: requests.Session, url: str, params: dict, tries: int = 6) -> dict:
             time.sleep(min(60, 2 ** i)); continue
         if r.status_code in (401, 403):
             raise RuntimeError(f"Alpaca refused the credentials (HTTP {r.status_code}): {r.text[:300]}")
+        if 400 <= r.status_code < 500 and r.status_code != 429:
+            raise RuntimeError(f"Alpaca rejected the request (HTTP {r.status_code}): {r.text[:400]}")
         r.raise_for_status()
         return r.json()
     raise RuntimeError(f"giving up on {url} after {tries} tries (last status {r.status_code})")
