@@ -41,3 +41,8 @@ Alpaca's splits feed reports as splits, not plain splits.
 **Amendment.** Gate 1 counts only plain splits: ratio n:m with the smaller side <= 3, the larger side <= 100 (within 1%), and a
 price effect of at least 10%. Other events are reported as NON_SPLIT_EVENT with their details, not counted. Plain splits that
 were not adjusted still fail the gate. All other rules unchanged.
+
+**Implementation note (same day).** The first implementation of Amendment 3 capped the larger side at 100 and hid
+168 events that were in fact correctly adjusted (including legitimate 1:200 reverse splits). Corrected before any outcome
+data was read: the larger side cap is 100,000, and an event that verifies as ADJUSTED is always counted as verified.
+NON_SPLIT_EVENT applies only to events that fail verification and are not plain splits.
