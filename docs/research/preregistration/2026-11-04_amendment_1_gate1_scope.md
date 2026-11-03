@@ -27,3 +27,17 @@ had adjusted them. The price-return test misread a tiny ratio (OUT) and a genuin
 **Amendment.** Gate 1 verifies a split by the change in adjusted/raw close across the ex-date: ADJUSTED if the factor change
 is closer to the split ratio than to 1 and within 0.05 in log terms of the ratio. Scope (Amendment 1) and strictness are
 unchanged: any in-universe split that is NOT_ADJUSTED or unverifiable fails the gate.
+
+---
+
+# Amendment 3 — Gate 1 counts plain splits only (2026-11-04)
+
+Approved by the owner on 2026-11-04, before any outcome data was read.
+
+**Finding.** Under Amendment 2, three in-universe items still failed: TT (ratio 1.289, factor change 1.1375), HON (ratio 0.5,
+factor change 0.954) and QGEN (ratio 0.97, factor change 0.9992). They look like spin-off, merger or immaterial events that
+Alpaca's splits feed reports as splits, not plain splits.
+
+**Amendment.** Gate 1 counts only plain splits: ratio n:m with the smaller side <= 3, the larger side <= 100 (within 1%), and a
+price effect of at least 10%. Other events are reported as NON_SPLIT_EVENT with their details, not counted. Plain splits that
+were not adjusted still fail the gate. All other rules unchanged.

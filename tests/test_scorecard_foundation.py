@@ -331,3 +331,11 @@ def test_gate1_amendment2_factor_test_ignores_market_moves():
     rows = classify_splits(adj, [Split("REV", idx[10], 1 / 6), Split("BAD", idx[10], 1 / 6)], "2019-01-02", "2026-10-30",
                            universe=uni, raw_close=raw)
     assert [r[2] for r in rows] == ["ADJUSTED", "NOT_ADJUSTED"]       # BAD: adj == raw, factor never moved
+
+
+def test_is_plain_split():
+    from talonx_scorecard.splits import is_plain_split
+    for r in (2.0, 4.0, 10.0, 1.5, 0.5, 0.1, 0.1667, 0.025, 0.0125 * 1):   # 1:2 .. 1:80 reverse, 3:2 etc.
+        assert is_plain_split(r), r
+    for r in (1.289, 0.97, 0.976, 1.05, 1.0):                                # spin-off-like or immaterial
+        assert not is_plain_split(r), r

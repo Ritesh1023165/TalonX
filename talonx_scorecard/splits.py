@@ -60,6 +60,22 @@ def check_split_adjustment(adj_close: pd.DataFrame, splits: list[Split]) -> Spli
 FACTOR_TOL = 0.05   # |log(factor_change / split_ratio)| allowed (covers dividends inside adjustment=all)
 
 
+MIN_MATERIAL_LOG = float(np.log(1.10))   # Amendment 3: a split must move price by at least 10%
+
+
+def is_plain_split(ratio: float) -> bool:
+    """Amendment 3: a plain split has a simple-fraction ratio n:m (smaller side <= 3, larger side <= 100, within 1%) and
+    moves price by at least 10%. Anything else (spin-offs, mergers, tiny ratios) is a NON_SPLIT_EVENT."""
+    if not (ratio > 0) or abs(np.log(ratio)) < MIN_MATERIAL_LOG:
+        return False
+    x = ratio if ratio >= 1 else 1.0 / ratio
+    for small in (1, 2, 3):
+        big = round(x * small)
+        if 1 <= big <= 100 and abs(big / small - x) / x <= 0.01:
+            return True
+    return False
+
+
 def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, end: str, max_gap: int = 5,
                     universe: pd.DataFrame | None = None, raw_close: pd.DataFrame | None = None) -> list[tuple]:
     """Diagnostic classification of every split. Rows: (symbol, ex_date, status, ratio, adj_log_return, gap_sessions).
@@ -80,6 +96,8 @@ def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, en
             out("OUT_OF_SAMPLE"); continue
         if sp.ratio <= 0 or abs(np.log(sp.ratio)) < 1e-9:
             out("INVALID_RATIO"); continue
+        if universe is not None and not is_plain_split(sp.ratio):
+            out("NON_SPLIT_EVENT"); continue
         if universe is not None:
             in_uni = False
             if sp.symbol in universe.columns:
