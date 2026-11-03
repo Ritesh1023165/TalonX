@@ -57,6 +57,9 @@ def check_split_adjustment(adj_close: pd.DataFrame, splits: list[Split]) -> Spli
     return out
 
 
+FACTOR_TOL = 0.05   # |log(factor_change / split_ratio)| allowed (covers dividends inside adjustment=all)
+
+
 def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, end: str, max_gap: int = 5,
                     universe: pd.DataFrame | None = None, raw_close: pd.DataFrame | None = None) -> list[tuple]:
     """Diagnostic classification of every split. Rows: (symbol, ex_date, status, ratio, adj_log_return, gap_sessions).
@@ -96,6 +99,15 @@ def classify_splits(adj_close: pd.DataFrame, splits: list[Split], start: str, en
         gap = int(sessions.get_indexer([after.index[0]])[0] - sessions.get_indexer([before.index[-1]])[0]) - 1
         if gap > max_gap:
             out("GAP_TOO_LONG", gap=gap); continue
+        if raw_close is not None:                         # Amendment 2: adj/raw factor must step by the split ratio
+            if sp.symbol not in raw_close.columns:
+                out("SYMBOL_MISSING"); continue
+            fc = adjustment_factor_change(adj_close, raw_close, sp.symbol, sp.ex_date)
+            if not np.isfinite(fc) or fc <= 0:
+                out("NO_PRIOR_BAR", gap=gap); continue
+            d_split, d_none = abs(np.log(fc / sp.ratio)), abs(np.log(fc))
+            out("ADJUSTED" if (d_split < d_none and d_split <= FACTOR_TOL) else "NOT_ADJUSTED", float(np.log(fc)), gap)
+            continue
         r = float(np.log(after.iloc[0] / before.iloc[-1]))
         unadjusted = float(np.log(1.0 / sp.ratio))
         out("NOT_ADJUSTED" if abs(r - unadjusted) < abs(r) else "ADJUSTED", r, gap)

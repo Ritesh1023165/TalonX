@@ -89,7 +89,7 @@ def main() -> int:
 
     from talonx_scorecard.splits import classify_splits, adjustment_factor_change
     all_splits = panel.parse_splits(split_payload)
-    cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END, universe=uni)
+    cls = classify_splits(adj, all_splits, C.SAMPLE_START, C.SAMPLE_END, universe=uni, raw_close=raw_c)
     pd.DataFrame(cls, columns=["symbol", "ex_date", "status", "ratio", "adj_log_return", "gap_sessions"]).to_csv(out / "split_check_details.csv", index=False)
     for r in [r for r in cls if r[2] not in ("ADJUSTED", "OUT_OF_SAMPLE", "NOT_IN_UNIVERSE")][:200]:
         fc = adjustment_factor_change(adj, raw_c, r[0], r[1]) if r[0] in adj.columns and r[0] in raw_c.columns else float("nan")

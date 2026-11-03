@@ -318,3 +318,16 @@ def test_gate1_amendment1_universe_scope():
     uni["BBB"] = True                                     # now in universe: the unadjusted split must fail the gate
     rows = classify_splits(df, [Split("AAA", idx[15], 2.0), Split("BBB", idx[15], 2.0)], "2019-01-02", "2026-10-30", universe=uni)
     assert not gate1_from_classification(rows).passed
+
+
+def test_gate1_amendment2_factor_test_ignores_market_moves():
+    from talonx_scorecard.splits import Split, classify_splits
+    idx = pd.bdate_range("2021-01-04", periods=20)
+    raw = pd.DataFrame({"REV": np.r_[np.full(10, 2.0), np.full(10, 12.0)],      # 1:6 reverse split, raw jumps 6x
+                        "BAD": np.r_[np.full(10, 2.0), np.full(10, 12.0)]}, index=idx)
+    adj = raw.copy()
+    adj["REV"] = 12.0                                    # correctly back-adjusted: adj flat, factor steps by the ratio
+    uni = pd.DataFrame(True, index=idx, columns=raw.columns)
+    rows = classify_splits(adj, [Split("REV", idx[10], 1 / 6), Split("BAD", idx[10], 1 / 6)], "2019-01-02", "2026-10-30",
+                           universe=uni, raw_close=raw)
+    assert [r[2] for r in rows] == ["ADJUSTED", "NOT_ADJUSTED"]       # BAD: adj == raw, factor never moved

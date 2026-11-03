@@ -13,3 +13,17 @@ Inside the universe the gate stays strict: every split must be verified ADJUSTED
 split fails the gate. No symbols are dropped to make the gate pass.
 
 **Unchanged.** All thresholds, features, segments, models, gates G1–G5 and the decision table.
+
+---
+
+# Amendment 2 — Gate 1 verification method (2026-11-04)
+
+Approved by the owner on 2026-11-04, before any outcome data was read.
+
+**Finding.** After Amendment 1 only two in-universe splits failed: OUT (ex 2025-01-17, ratio 0.976) and TAOP (ex 2020-07-30,
+ratio 0.1667). The adjusted/raw price factor stepped by exactly the split ratio for both (0.9760 and 0.1667), so Alpaca
+had adjusted them. The price-return test misread a tiny ratio (OUT) and a genuine ~4x price spike (TAOP).
+
+**Amendment.** Gate 1 verifies a split by the change in adjusted/raw close across the ex-date: ADJUSTED if the factor change
+is closer to the split ratio than to 1 and within 0.05 in log terms of the ratio. Scope (Amendment 1) and strictness are
+unchanged: any in-universe split that is NOT_ADJUSTED or unverifiable fails the gate.
