@@ -53,3 +53,11 @@ jobs:
         with:
           name: scorecard-gate-report
           path: results/scorecard_v1/panel/gate_report.json
+      - name: Keep panel (for the next research stages)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-panel
+          path: results/scorecard_v1/panel/panel_frames.pkl.gz
+          retention-days: 30
+          compression-level: 0

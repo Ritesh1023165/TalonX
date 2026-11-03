@@ -16,6 +16,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -57,24 +58,26 @@ def main() -> int:
     s = AF.session(ROOT)
     print(AF.describe_keys(*AF.load_keys(ROOT)), flush=True)
     print('probe ->', AF.probe_credentials(s), flush=True)
-    bars: dict[str, dict[str, list]] = {"all": {}, "raw": {}}
+    parts_adj, parts_rc, parts_rv = [], [], []
     split_payload = {"corporate_actions": {"forward_splits": [], "reverse_splits": []}}
     for bi, b in enumerate(batches):
-        f = cache / f"batch_{bi:04d}.json"
+        f = cache / f"batch_{bi:04d}.pkl.gz"
         if f.exists():
-            d = json.loads(f.read_text())
+            d = pd.read_pickle(f)
         else:
-            d = {"all": AF.fetch_bars(s, b, "all", C.SAMPLE_START, "2026-10-31"),
-                 "raw": AF.fetch_bars(s, b, "raw", C.SAMPLE_START, "2026-10-31"),
+            ba = AF.fetch_bars(s, b, "all", C.SAMPLE_START, "2026-10-31")
+            br = AF.fetch_bars(s, b, "raw", C.SAMPLE_START, "2026-10-31")
+            d = {"adj": panel.bars_to_wide(ba, "c"), "rawc": panel.bars_to_wide(br, "c"), "rawv": panel.bars_to_wide(br, "v"),
                  "splits": AF.fetch_splits(s, b, C.SAMPLE_START, "2026-10-31")}
-            f.write_text(json.dumps(d))
-        bars["all"].update(d["all"]); bars["raw"].update(d["raw"])
+            del ba, br                                         # raw bar dicts are large; keep only the compact frames
+            pd.to_pickle(d, f)
+        parts_adj.append(d["adj"]); parts_rc.append(d["rawc"]); parts_rv.append(d["rawv"])
         for k in ("forward_splits", "reverse_splits"):
             split_payload["corporate_actions"][k].extend(d["splits"]["corporate_actions"][k])
-        print(f"  batch {bi + 1}/{len(batches)} done", flush=True)
+        print(f"  batch {bi + 1}/{len(batches)} done  ({time.strftime('%H:%M:%S')})", flush=True)
 
-    adj, raw_c, raw_v = (panel.bars_to_wide(bars["all"], "c"), panel.bars_to_wide(bars["raw"], "c"),
-                         panel.bars_to_wide(bars["raw"], "v"))
+    adj, raw_c, raw_v = (pd.concat(x, axis=1).sort_index() for x in (parts_adj, parts_rc, parts_rv))
+    del parts_adj, parts_rc, parts_rv
     if "SPY" not in adj:
         print("SPY bars missing; cannot continue", file=sys.stderr); return 2
     sessions = adj["SPY"].dropna().index
@@ -90,6 +93,8 @@ def main() -> int:
                gates.GateResult("G_DATA_4_no_lookahead", False, None, 0.0, "NOT_RUN: SEC stage pending")]
     results = [g1, g2] + not_run
 
+    pd.to_pickle({"adj_close": adj, "raw_close": raw_c, "raw_volume": raw_v, "spy": spy, "universe": uni,
+                  "splits": splits}, out / "panel_frames.pkl.gz")
     sha = panel.frame_sha256({"adj_close": adj, "raw_close": raw_c, "raw_volume": raw_v, "spy": spy.to_frame("SPY")})
     report = {"spec_fingerprint": C.spec_fingerprint(), "spec_commit": C.SPEC_COMMIT, "code_head": _git_head(),
               "symbols": len(syms), "sessions": len(sessions), "first": str(sessions[0].date()), "last": str(sessions[-1].date()),
