@@ -96,3 +96,8 @@ def spec_fingerprint() -> str:
 EXCLUDED_SYMBOLS = {
     "HON": "2026-06-29 spin-off of Honeywell Aerospace bundled with a reverse split; adjusted/raw factor does not reflect the listed ratio",
 }
+
+# Amendment 5 (2026-11-04): the daily universe is capped at the UNIVERSE_TOP_N most liquid names (20-session average dollar
+# volume, as known at that day's close) among those passing the price / dollar-volume floor. None = no cap (original spec).
+# Not part of spec_fingerprint(); recorded in docs/research/preregistration/.
+UNIVERSE_TOP_N = 1000

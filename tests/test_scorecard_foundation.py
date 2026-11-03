@@ -345,3 +345,15 @@ def test_excluded_symbols_recorded_and_fingerprint_unchanged():
     from talonx_scorecard import config as C
     assert "HON" in C.EXCLUDED_SYMBOLS and C.EXCLUDED_SYMBOLS["HON"]
     assert C.spec_fingerprint().startswith("81ddf67e19cf")
+
+
+def test_universe_top_n_caps_and_keeps_most_liquid():
+    from talonx_scorecard import panel as P
+    idx = pd.bdate_range("2021-01-04", periods=25)
+    close = pd.DataFrame({"A": 50.0, "B": 50.0, "C": 50.0, "D": 2.0}, index=idx)          # D fails the $5 price floor
+    vol = pd.DataFrame({"A": 4e6, "B": 1e6, "C": 8e5, "D": 9e9}, index=idx)               # ADV: A $200M, B $50M, C $40M
+    full = P.universe_mask(close, vol)
+    top2 = P.universe_mask(close, vol, top_n=2)
+    assert full.iloc[-1].to_dict() == {"A": True, "B": True, "C": True, "D": False}
+    assert top2.iloc[-1].to_dict() == {"A": True, "B": True, "C": False, "D": False}
+    assert (top2.sum(axis=1) <= 2).all()

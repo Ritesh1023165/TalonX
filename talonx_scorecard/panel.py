@@ -24,12 +24,17 @@ def bars_to_wide(bars: dict[str, list[dict]], field: str) -> pd.DataFrame:
     return out.reindex(sorted(out.columns), axis=1)
 
 
-def universe_mask(raw_close: pd.DataFrame, raw_volume: pd.DataFrame) -> pd.DataFrame:
+def universe_mask(raw_close: pd.DataFrame, raw_volume: pd.DataFrame, top_n: int | None = None) -> pd.DataFrame:
     """DTU_V2 floor on AS-TRADED data known at the close of each session: close >= $5 and 20-session average
     dollar volume >= $20M. A name needs all 20 sessions, so a fresh listing enters after 20 sessions."""
     dollar = raw_close * raw_volume
     adv20 = dollar.rolling(20, min_periods=20).mean()
-    return ((raw_close >= C.MIN_PRICE) & (adv20 >= C.MIN_ADV20_USD)).fillna(False)
+    floor = ((raw_close >= C.MIN_PRICE) & (adv20 >= C.MIN_ADV20_USD)).fillna(False)
+    if top_n is None:
+        return floor
+    # Amendment 5: keep the top_n most liquid floor-passing names each day (ties broken by column order, deterministic)
+    rank = adv20.where(floor).rank(axis=1, ascending=False, method="first")
+    return floor & (rank <= top_n)
 
 
 def parse_splits(payload: dict) -> list[Split]:

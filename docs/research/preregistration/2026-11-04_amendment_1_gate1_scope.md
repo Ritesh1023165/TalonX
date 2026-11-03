@@ -58,3 +58,19 @@ factor change 0.954. It is a spin-off of Honeywell Aerospace bundled with a reve
 
 **Amendment.** HON is excluded from the study panel for every segment. It is recorded in `talonx_scorecard.config.EXCLUDED_SYMBOLS`
 and in the gate report. No other symbol is excluded. Any future exclusion needs its own dated amendment.
+
+---
+
+# Amendment 5 — Universe capped at the 1,000 most liquid names (2026-11-04)
+
+Approved by the owner on 2026-11-04, before any outcome data was read.
+
+**Reason.** The floor (close >= $5, 20-session average dollar volume >= $20M) yields about 1,560 names a day. The owner wants about
+1,000 for tradability and run cost.
+
+**Amendment.** Each day the universe is the `UNIVERSE_TOP_N = 1000` names with the highest 20-session average dollar volume among
+those that pass the floor, using only data known at that day's close (no look-ahead). Ties break by column order. The floor itself is
+unchanged. Decile views therefore hold about 100 names. Amendments 1-3 (Gate 1 scope) now apply to this smaller universe. All
+gate thresholds, features, segments, models and the decision table are unchanged.
+
+**Known cost.** Fewer names make each ranking test noisier (about 25% noisier than at 1,560), so a small real edge is harder to detect.

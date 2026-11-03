@@ -86,7 +86,7 @@ def main() -> int:
     dropped = [x for x in C.EXCLUDED_SYMBOLS if x in adj.columns]
     adj = adj.drop(columns=dropped); raw_c = raw_c.drop(columns=dropped, errors="ignore"); raw_v = raw_v.drop(columns=dropped, errors="ignore")
     print("excluded symbols (Amendment 4):", dropped, flush=True)
-    uni = panel.universe_mask(raw_c, raw_v).reindex(columns=adj.columns, fill_value=False)
+    uni = panel.universe_mask(raw_c, raw_v, top_n=C.UNIVERSE_TOP_N).reindex(columns=adj.columns, fill_value=False)
     avail = {h: labels.label_available(adj, spy, n) for h, n in C.HORIZONS.items()}
     splits = [x for x in panel.parse_splits(split_payload) if x.symbol in adj.columns]
 
@@ -108,7 +108,7 @@ def main() -> int:
     sha = panel.frame_sha256({"adj_close": adj, "raw_close": raw_c, "raw_volume": raw_v, "spy": spy.to_frame("SPY")})
     report = {"spec_fingerprint": C.spec_fingerprint(), "spec_commit": C.SPEC_COMMIT, "code_head": _git_head(),
               "symbols": len(syms), "sessions": len(sessions), "first": str(sessions[0].date()), "last": str(sessions[-1].date()),
-              "universe_avg_names_per_day": float(uni.sum(axis=1).mean()), "splits_found": len(all_splits), "excluded_symbols": C.EXCLUDED_SYMBOLS,
+              "universe_avg_names_per_day": float(uni.sum(axis=1).mean()), "splits_found": len(all_splits), "excluded_symbols": C.EXCLUDED_SYMBOLS, "universe_top_n": C.UNIVERSE_TOP_N,
               "panel_sha256": sha, "gates": [r.__dict__ for r in results],
               "overall": "DATA_NOT_READY" if not gates.all_passed(results) else "DATA_READY"}
     (out / "gate_report.json").write_text(json.dumps(report, indent=2, default=str))
