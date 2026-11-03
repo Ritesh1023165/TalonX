@@ -28,15 +28,18 @@ def gate1_split_adjustment(adj_close: pd.DataFrame, splits: list[Split]) -> Gate
     return GateResult("G_DATA_1_split_adjustment", chk.ok and chk.checked > 0, rate, 1.0, detail)
 
 
-def gate2_label_coverage(universe: pd.DataFrame, labels: dict[str, pd.DataFrame]) -> GateResult:
-    """universe: bool DataFrame (rank_date x symbol). labels: horizon -> excess-return frame. Worst horizon decides."""
+def gate2_label_coverage(universe: pd.DataFrame, available: dict[str, pd.DataFrame]) -> GateResult:
+    """universe: bool DataFrame (session x symbol). available: horizon -> bool mask from ``labels.label_available``.
+
+    Worst horizon decides. No return value is read.
+    """
     worst, worst_h = 1.0, ""
-    for h, lab in labels.items():
-        u = universe.reindex(index=lab.index, columns=lab.columns, fill_value=False)
+    for h, av in available.items():
+        u = universe.reindex(index=av.index, columns=av.columns, fill_value=False)
         total = int(u.to_numpy().sum())
         if total == 0:
             return GateResult("G_DATA_2_label_coverage", False, 0.0, C.GATE_LABEL_COVERAGE, f"{h}: empty universe")
-        cov = float((lab.notna() & u).to_numpy().sum()) / total
+        cov = float((av & u).to_numpy().sum()) / total
         if cov < worst:
             worst, worst_h = cov, h
     return GateResult("G_DATA_2_label_coverage", worst >= C.GATE_LABEL_COVERAGE, worst, C.GATE_LABEL_COVERAGE,

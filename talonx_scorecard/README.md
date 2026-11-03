@@ -11,10 +11,13 @@ Offline research package for `TICKER_SCORECARD_V1`. Spec: `docs/research/preregi
 | `labels.py` | SPY-excess labels, rank dates, purged TRAIN / VALIDATE / HOLDOUT membership |
 | `splits.py` | Split-adjustment check for data gate 1 |
 | `gates.py` | The four data gates (`DATA_NOT_READY` if any fails) |
+| `panel.py` | Pure transforms: bars to wide frames, universe floor, split parsing, panel SHA-256 |
+| `alpaca_fetch.py` | Alpaca bars and split fetch (network; run where the keys are) |
+| `../scripts/scorecard_build_panel.py` | Phase 1 runner: builds the panel, runs gates 1 and 2, writes `results/scorecard_v1/panel/gate_report.json` |
 
 ## Next (in order)
-1. `panel.py`: build the point-in-time daily panel from Alpaca daily bars and SEC bulk files (run on the machine that holds the data; the sandbox has no market data or keys).
-2. Run the four data gates on the real panel; commit the report.
+1. Run `scripts/scorecard_build_panel.py` on the machine with the keys (smoke test with `--max-symbols 60` first).
+2. SEC bulk-file stage (XBRL with filing times, Form 4): needed for gates 3 and 4, which report NOT_RUN until then.
 3. `features.py` (F1–F12), `score.py` (EQ and RIDGE, one `score(panel, date)` used by backtest and live), `evaluate.py` (G1–G5).
 
 No outcome (return, IC, hit rate) may be computed before all four data gates pass.

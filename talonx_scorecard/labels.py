@@ -19,6 +19,18 @@ def excess_return(adj_close: pd.DataFrame, spy: pd.Series, h: int) -> pd.DataFra
     return fwd.sub(spy_fwd, axis=0)
 
 
+def label_available(adj_close: pd.DataFrame, spy: pd.Series, h: int) -> pd.DataFrame:
+    """True where a label could be computed (price at t and t+h for the stock and for SPY). Computes NO return.
+
+    Data gate 2 uses this so coverage can be checked before any outcome exists.
+    """
+    if not adj_close.index.equals(spy.index):
+        raise ValueError("adj_close and spy must share the same session index")
+    ok_spy = (spy.notna() & spy.shift(-h).notna()).to_numpy()
+    ok = adj_close.notna() & adj_close.shift(-h).notna()
+    return ok.mul(ok_spy, axis=0).astype(bool)
+
+
 def rank_dates(sessions: pd.DatetimeIndex, horizon: str) -> pd.DatetimeIndex:
     """1D: every session. Others: the last session of each ISO week (the Friday close, or earlier if closed)."""
     sessions = pd.DatetimeIndex(sessions).sort_values()

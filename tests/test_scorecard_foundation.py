@@ -92,8 +92,8 @@ def test_gate1_fails_with_no_known_splits():
 def test_gate2_label_coverage_threshold():
     idx = pd.bdate_range("2024-01-02", periods=10)
     uni = pd.DataFrame(True, index=idx, columns=["A", "B"])
-    ok = pd.DataFrame(1.0, index=idx, columns=["A", "B"])
-    bad = ok.copy(); bad.iloc[:3, 0] = np.nan                                  # 3 of 20 missing -> 85%
+    ok = pd.DataFrame(True, index=idx, columns=["A", "B"])
+    bad = ok.copy(); bad.iloc[:3, 0] = False                                   # 3 of 20 missing -> 85%
     assert gates.gate2_label_coverage(uni, {"1M": ok}).passed
     r = gates.gate2_label_coverage(uni, {"1M": ok, "3M": bad})
     assert not r.passed and "3M" in r.detail
@@ -123,3 +123,41 @@ def test_gate4_catches_values_published_after_the_close():
 def test_all_passed_requires_exactly_four():
     ok = gates.GateResult("x", True, 1.0, 1.0)
     assert gates.all_passed([ok] * 4) and not gates.all_passed([ok] * 3)
+
+
+def test_label_available_matches_excess_return_nan_pattern():
+    idx = pd.bdate_range("2024-01-02", periods=8)
+    px = pd.DataFrame({"A": [1, 2, np.nan, 4, 5, 6, 7, 8.0], "B": np.arange(1, 9.0)}, index=idx)
+    spy = pd.Series(np.arange(10, 18.0), index=idx)
+    av = labels.label_available(px, spy, 2)
+    assert av.equals(labels.excess_return(px, spy, 2).notna())
+
+
+def test_bars_to_wide_and_universe_floor():
+    from talonx_scorecard import panel
+    days = pd.bdate_range("2024-01-02", periods=25)
+    def rows(c, v):
+        return [{"t": d.strftime("%Y-%m-%dT05:00:00Z"), "c": c, "v": v} for d in days]
+    bars = {"BIG": rows(50.0, 1_000_000), "CHEAP": rows(4.0, 50_000_000), "THIN": rows(50.0, 1_000), "NONE": []}
+    close, vol = panel.bars_to_wide(bars, "c"), panel.bars_to_wide(bars, "v")
+    assert list(close.columns) == ["BIG", "CHEAP", "THIN"] and close.index[0] == days[0]
+    u = panel.universe_mask(close, vol)
+    assert not u.iloc[:19].any().any()                          # needs 20 sessions before entering
+    assert u["BIG"].iloc[19:].all() and not u["CHEAP"].any() and not u["THIN"].any()
+
+
+def test_parse_splits_ratio_and_bad_rows():
+    from talonx_scorecard import panel
+    p = {"corporate_actions": {"forward_splits": [{"symbol": "A", "ex_date": "2024-06-10", "new_rate": 2, "old_rate": 1}],
+                               "reverse_splits": [{"symbol": "B", "ex_date": "2024-07-01", "new_rate": 1, "old_rate": 10},
+                                                  {"symbol": "C", "ex_date": "2024-07-01"}]}}
+    sp = {x.symbol: x.ratio for x in panel.parse_splits(p)}
+    assert sp == {"A": 2.0, "B": 0.1, "C": 0.0}
+
+
+def test_frame_sha256_deterministic_and_value_sensitive():
+    from talonx_scorecard import panel
+    idx = pd.bdate_range("2024-01-02", periods=3)
+    f = pd.DataFrame({"A": [1.0, 2.0, 3.0], "B": [4.0, 5.0, 6.0]}, index=idx)
+    assert panel.frame_sha256({"x": f}) == panel.frame_sha256({"x": f[["B", "A"]]})
+    assert panel.frame_sha256({"x": f}) != panel.frame_sha256({"x": f.assign(A=[1.0, 2.0, 3.1])})
