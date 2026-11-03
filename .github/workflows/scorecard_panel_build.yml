@@ -1,0 +1,55 @@
+name: Scorecard panel build
+
+# TICKER_SCORECARD_V1, Phase 1. Manual trigger only. Builds the daily panel and runs data gates 1 and 2.
+# Reads market data only. Computes no returns. Never touches the live engine.
+# Needs repository secrets: APCA_API_KEY_ID, APCA_API_SECRET_KEY, SEC_USER_AGENT
+# (SEC_USER_AGENT is the contact string SEC asks for, e.g. "Your Name your@email"; the same value as TALONX_SEC_USER_AGENT).
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_symbols:
+        description: "Symbols to fetch. 60 = smoke test, 0 = all"
+        required: true
+        default: "60"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install pandas numpy requests pytest
+      - name: Unit tests
+        run: python -m pytest tests/test_scorecard_foundation.py -q
+      - name: Symbol list from SEC
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          python - <<'PY'
+          import os, requests, pandas as pd
+          ua = os.environ["SEC_USER_AGENT"]
+          d = requests.get("https://www.sec.gov/files/company_tickers.json", headers={"User-Agent": ua}, timeout=60)
+          d.raise_for_status()
+          syms = sorted({v["ticker"].upper() for v in d.json().values() if v.get("ticker")})
+          pd.DataFrame({"symbol": syms}).to_csv("universe.csv", index=False)
+          print(len(syms), "tickers from SEC")
+          PY
+      - name: Build panel and run gates 1-2
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+        run: python scripts/scorecard_build_panel.py --symbols-file universe.csv --max-symbols ${{ github.event.inputs.max_symbols }}
+      - name: Show report
+        if: always()
+        run: cat results/scorecard_v1/panel/gate_report.json || true
+      - name: Keep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-gate-report
+          path: results/scorecard_v1/panel/gate_report.json
