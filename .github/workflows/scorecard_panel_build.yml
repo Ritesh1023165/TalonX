@@ -12,10 +12,21 @@ on:
         description: "Symbols to fetch. 60 = smoke test, 0 = all"
         required: true
         default: "60"
+      study_step:
+        description: "Study step to run after the data stages: none / freeze / fit / validate / holdout. Each runs ONCE."
+        required: false
+        default: "none"
+      confirm:
+        description: "validate needs I_APPROVE_VALIDATE, holdout needs I_APPROVE_HOLDOUT (single-use reads)"
+        required: false
+        default: ""
       run_sec:
         description: "Also run the SEC stage (gates 3-4, features F5-F10). Needs max_symbols=0 to be meaningful. true / false"
         required: false
         default: "false"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,9 +38,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install pandas numpy requests pytest
+        run: pip install pandas numpy requests pytest scikit-learn scipy
       - name: Unit tests
-        run: python -m pytest tests/test_scorecard_foundation.py tests/test_scorecard_sec.py -q
+        run: python -m pytest tests/test_scorecard_foundation.py tests/test_scorecard_sec.py tests/test_scorecard_model.py -q
       - name: Symbol list from SEC
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
@@ -62,6 +73,20 @@ jobs:
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: python scripts/scorecard_sec_stage.py
+      - name: Study step (single use; result is committed to this branch)
+        if: ${{ github.event.inputs.study_step != 'none' && github.event.inputs.study_step != '' }}
+        env:
+          STEP: ${{ github.event.inputs.study_step }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$STEP" = "validate" ] && [ "$CONFIRM" != "I_APPROVE_VALIDATE" ]; then echo "validate needs confirm=I_APPROVE_VALIDATE"; exit 7; fi
+          if [ "$STEP" = "holdout" ] && [ "$CONFIRM" != "I_APPROVE_HOLDOUT" ]; then echo "holdout needs confirm=I_APPROVE_HOLDOUT"; exit 7; fi
+          python scripts/scorecard_study.py --step "$STEP"
+          git config user.name "scorecard-bot"
+          git config user.email "scorecard-bot@users.noreply.github.com"
+          git add -f "results/scorecard_v1/$STEP"
+          git commit -m "scorecard study: $STEP result (code $(git rev-parse --short HEAD))"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
       - name: Show SEC report
         if: ${{ always() && github.event.inputs.run_sec == 'true' }}
         run: cat results/scorecard_v1/sec/sec_stage_report.json || true
