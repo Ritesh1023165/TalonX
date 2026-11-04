@@ -90,3 +90,19 @@ later only as a separate pre-registered V1.1.
 
 **Also (data note).** SEC moved its newest insider data sets (2026 Q2 onward) to a different URL path; the downloader now tries both.
 Insider data is still blank after the last published quarter (2026 Q3 is published; Q4 is not).
+
+---
+
+# Amendment 7 — Implementation choices the pre-registration left open (2026-11-04)
+
+Approved by the owner on 2026-11-04, before the panel was frozen and before any outcome was read.
+
+1. **RIDGE target.** The pre-registration fixes RIDGE as a linear ridge (alpha 1.0) on the 12 ranked features but not what it predicts. The target
+   is each date's excess-return label ranked 0-1 across names, centred at zero. Intercept fitted, then dropped (it cannot change a ranking).
+2. **Undefined decision-table cell.** G1 and G4 pass, exactly one of G2/G3 passes, and G5 fails: no row covers it. It resolves to
+   `FAIL_NO_VALUE` (no view at that horizon), and the output flags it as UNDEFINED CELL.
+3. **Reported, never decisive.** Sector-ETF IC, next-open returns and the S&P 500 subset are produced after the verdict, not before. They
+   cannot change any outcome.
+4. **Other fixed details.** Newey-West lag in rank dates: 1D 1, 1W 1, 1M 4, 3M 13. Calibration error: 10 equal-count bins over the calibrated
+   probabilities. G4 halves: first and second half of HOLDOUT rank dates by count. Hit rate = share of name-dates with label > 0.
+   Ranks and deciles are taken among scored names on each date.
