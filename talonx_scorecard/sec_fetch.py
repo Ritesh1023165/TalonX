@@ -11,7 +11,11 @@ import requests
 
 COMPANYFACTS_URL = "https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip"
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-FORM345_URL = "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{y}q{q}_form345.zip"
+# SEC moved the newest quarters (2026 Q2 onward) from /structureddata/ to /datastandardsinnovation/; try both.
+FORM345_URLS = [
+    "https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{y}q{q}_form345.zip",
+    "https://www.sec.gov/files/datastandardsinnovation/data/insider-transactions-data-sets/{y}q{q}_form345.zip",
+]
 
 
 def user_agent() -> str:

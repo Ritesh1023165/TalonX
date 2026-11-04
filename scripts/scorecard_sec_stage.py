@@ -78,7 +78,7 @@ def main() -> int:
     ev_parts, missing_q = [], []
     for y, q in FETCH.quarters(C.SAMPLE_START, C.SAMPLE_END):
         p = cache / f"{y}q{q}_form345.zip"
-        if FETCH.download(FETCH.FORM345_URL.format(y=y, q=q), p, ua):
+        if any(FETCH.download(u.format(y=y, q=q), p, ua) for u in FETCH.FORM345_URLS):
             ev_parts.append(INS.parse_form345_zip(p.read_bytes()))
         else:
             missing_q.append(f"{y}q{q}")

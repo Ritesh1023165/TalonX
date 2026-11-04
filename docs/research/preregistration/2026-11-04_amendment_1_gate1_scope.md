@@ -74,3 +74,19 @@ unchanged. Decile views therefore hold about 100 names. Amendments 1-3 (Gate 1 s
 gate thresholds, features, segments, models and the decision table are unchanged.
 
 **Known cost.** Fewer names make each ranking test noisier (about 25% noisier than at 1,560), so a small real edge is harder to detect.
+
+---
+
+# Amendment 6 — V1 runs without F11 (2026-11-04)
+
+Approved by the owner on 2026-11-04, before any outcome data was read.
+
+**Reason.** F11 (risk-factor change) needs the text of every 10-K and 10-Q for about 2,500 companies over 8 years. Filing text is
+not in the SEC bulk files, so building it would break the "SEC bulk files only" rule and need thousands of per-filing requests.
+
+**Amendment.** V1 runs with F11 missing for every name. Under the locked rule a missing feature takes the neutral value 0.5, a constant
+that does not change any ranking or the ridge fit, so V1 is equivalent to an 11-feature model. The report states this. F11 may be added
+later only as a separate pre-registered V1.1.
+
+**Also (data note).** SEC moved its newest insider data sets (2026 Q2 onward) to a different URL path; the downloader now tries both.
+Insider data is still blank after the last published quarter (2026 Q3 is published; Q4 is not).
