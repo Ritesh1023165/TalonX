@@ -85,6 +85,10 @@ def main() -> int:
     print("insider quarters missing (404):", missing_q, flush=True)
     events = pd.concat(ev_parts, ignore_index=True) if ev_parts else pd.DataFrame(columns=["issuer_cik", "owner_cik", "filed", "code"])
     ins = INS.net_buyers_wide(events, sessions, sorted(want))
+    got = [(y, q) for y, q in FETCH.quarters(C.SAMPLE_START, C.SAMPLE_END) if f"{y}q{q}" not in missing_q]
+    covered_through = pd.Timestamp(year=got[-1][0], month=got[-1][1] * 3, day=1) + pd.offsets.MonthEnd(0) if got else None
+    if covered_through is not None:                       # no insider data after the last published quarter: unknown, not zero
+        ins.loc[ins.index > covered_through] = np.nan
     feats["F10"] = pd.DataFrame({s: ins[c] if c in ins.columns else np.nan for s, c in sym2cik.items()}, index=sessions).reindex(columns=symbols)
 
     # ---- gates 3 and 4 ----
@@ -97,7 +101,9 @@ def main() -> int:
     results = g12 + [g3, g4]
     cov = {k: float((v.notna() & uni).to_numpy().sum() / max(int(uni.to_numpy().sum()), 1)) for k, v in feats.items()}
     report = {"spec_fingerprint": C.spec_fingerprint(), "panel_sha256": prev["panel_sha256"], "gates": [r.__dict__ for r in results],
-              "feature_coverage_of_universe_days": cov, "insider_quarters_missing": missing_q,
+              "feature_coverage_of_universe_days": cov, "insider_quarters_missing": missing_q, "insider_covered_through": str(covered_through.date()) if covered_through is not None else None,
+              "caveats": [f"F10 insider data is NaN after {covered_through.date() if covered_through is not None else 'n/a'} (SEC data sets for {missing_q} not published)" if missing_q else "none",
+                          "F11 (risk-factor change) not built; missing for every name"],
               "companies_parsed": n, "F11": "NOT_BUILT (risk-factor diff engine pending)",
               "overall": "DATA_READY" if gates.all_passed(results) else "DATA_NOT_READY"}
     (out / "sec_stage_report.json").write_text(json.dumps(report, indent=2, default=str))
