@@ -12,6 +12,10 @@ on:
         description: "Symbols to fetch. 60 = smoke test, 0 = all"
         required: true
         default: "60"
+      run_sec:
+        description: "Also run the SEC stage (gates 3-4, features F5-F10). Needs max_symbols=0 to be meaningful. true / false"
+        required: false
+        default: "false"
 
 jobs:
   build:
@@ -25,7 +29,7 @@ jobs:
       - name: Install
         run: pip install pandas numpy requests pytest
       - name: Unit tests
-        run: python -m pytest tests/test_scorecard_foundation.py -q
+        run: python -m pytest tests/test_scorecard_foundation.py tests/test_scorecard_sec.py -q
       - name: Symbol list from SEC
         env:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
@@ -53,6 +57,24 @@ jobs:
       - name: Show report
         if: always()
         run: cat results/scorecard_v1/panel/gate_report.json || true
+      - name: SEC stage (bulk files only; gates 3-4, features F5-F10)
+        if: ${{ github.event.inputs.run_sec == 'true' }}
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python scripts/scorecard_sec_stage.py
+      - name: Show SEC report
+        if: ${{ always() && github.event.inputs.run_sec == 'true' }}
+        run: cat results/scorecard_v1/sec/sec_stage_report.json || true
+      - name: Keep SEC report and raw features
+        if: ${{ always() && github.event.inputs.run_sec == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-sec
+          path: |
+            results/scorecard_v1/sec/sec_stage_report.json
+            results/scorecard_v1/sec/raw_features.pkl.gz
+          retention-days: 30
+          compression-level: 0
       - name: Keep report
         if: always()
         uses: actions/upload-artifact@v4
