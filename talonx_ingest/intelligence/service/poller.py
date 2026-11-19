@@ -58,11 +58,24 @@ class PollCycleResult:
     new_form4_filings: int = 0
     submissions_freshness: str = FreshnessStatus.UNKNOWN.value
     errors: list[str] = field(default_factory=list)
+    # Ownership filings listed in a watched CIK's submissions whose OWN declared issuer is a different, parseable
+    # CIK (the watched entity is the filer / reporting owner, e.g. a bank reporting a holding in another issuer).
+    # The Task 131 identity guard correctly drops them -- a deterministic, verified-content decision, not an
+    # acquisition or processing failure -- so they are counted here (telemetry) and NOT added to ``errors``.
+    identity_drops: int = 0
     duration_seconds: float = 0.0
 
     @property
     def had_success(self) -> bool:
         return self.symbols_polled > 0 and self.symbols_polled > self.symbols_failed
+
+
+def _is_other_issuer_filing(outcome) -> bool:
+    """True only for the identity guard's MISMATCH drop: the filing declares a parseable issuer CIK that differs
+    from the watched CIK. A filing with no parseable issuer CIK, a missing authoritative CIK, a fetch or a parse
+    failure is NOT this case and stays a counted error."""
+    return (outcome.identity_check == "DROPPED_MISMATCH"
+            and (outcome.error or "").startswith("ISSUER_CIK_MISMATCH"))
 
 
 class EdgarPoller:
@@ -214,6 +227,11 @@ class EdgarPoller:
                     self.metrics.insider_transactions += outcome.transactions_total
                     if self.stores.events.has_event(eid):
                         result.new_event_ids.append(eid)
+                elif _is_other_issuer_filing(outcome):
+                    # 2026-10-07: one such BAC filing was re-dropped every ~3 min and counted as a poll error,
+                    # raising POLL_ERRORS every cycle (37 hourly Operations alerts) while all 39 symbols were
+                    # FRESH. Not a source failure: freshness and the error list are unaffected.
+                    result.identity_drops += 1
                 else:
                     ownership_ok = False
                     self.metrics.insider_parse_failures += 1

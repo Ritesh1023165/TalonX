@@ -1,0 +1,12 @@
+{
+ "study": "DTU shadow collector (results/dtu_shadow; registry UNIVERSE_SEGMENTS.json)",
+ "registered_endpoint_utc": "2026-10-08T00:15:00Z",
+ "status": "CLOSED_AND_CONTAINED",
+ "overrun": "2026-10-08T08:00:41Z .. 10:36:19Z (window 2026-10-08 only; outside both segments)",
+ "collector_stopped_utc": "2026-10-08T10:36:32.75Z (interpreter pid 17920 terminated after sweep 6710 committed at 10:36:19Z)",
+ "wrapper_exit_utc": "2026-10-08T10:37:02Z (tracker_dtu_collector.sh loop refused relaunch: endpoint passed)",
+ "relaunch_guard": "talonx_shadow/dtu.py COLLECTION_END_UTC: run refuses to start, loop stops, in-flight sweep writes nothing",
+ "exclusion_manifest": "docs/research/evidence/2026-10-08_dtu_containment/exclusion_manifest.json",
+ "raw_data": "preserved unchanged (no rows deleted or modified)",
+ "do_not": "restart this study; pool SEG1 and SEG2; use window 2026-10-08 data as study data"
+}

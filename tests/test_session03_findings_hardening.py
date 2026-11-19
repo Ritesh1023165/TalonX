@@ -206,7 +206,9 @@ def test_delivery_queue_breakdown_separates_live_queue_from_historical_expiry():
 # ---------------------------------------------------------------------------- A4 /ping attribution
 def test_ping_labels_the_shared_quant_counter_and_brain_scope():
     src = (REPO / "talonx_dispatch/telegram_listener.py").read_text(encoding="utf-8")
-    assert "Quant published (all lanes incl. Experimental talonx:exp:*)" in src
+    # SUPERSEDED 2026-09-24 (S14 legacy cleanup): the Experimental lane that shared this counter is RETIRED from
+    # active startup, so the label now attributes the counter to the CONTROL lane explicitly.
+    assert "Quant published (CONTROL; Experimental retired)" in src
     assert "Brain received (Original talonx:signals:quant only)" in src
     assert '"published_no_subscriber"' in src
 

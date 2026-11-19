@@ -1,0 +1,102 @@
+{
+ "user_agent": "configured (value not recorded)",
+ "attempts_per_url": 1,
+ "requests": 5,
+ "results": [
+  {
+   "url": "https://www.sec.gov/submit-filings/filer-support-resources/edgar-calendar",
+   "requested_utc": "2026-10-13T20:31:20.857718+00:00",
+   "status": 200,
+   "headers": {
+    "Server": "nginx",
+    "Content-Type": "text/html; charset=utf-8",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Last-Modified": "Tue, 13 Oct 2026 16:56:08 GMT",
+    "ETag": "\"1791910568-gzip\"",
+    "Cache-Control": "public, max-age=900",
+    "Date": "Tue, 13 Oct 2026 20:31:21 GMT"
+   },
+   "body_bytes": 67436,
+   "body_sha256": "a50a12900c8f986acc411344b467485ec17cae94863b9e3f198077ed02130b39",
+   "body_class": "OK",
+   "archived_as": "calendar_2026-10-13T203120Z.html",
+   "name": "calendar"
+  },
+  {
+   "url": "https://www.sec.gov/submit-filings/edgar-news-announcements",
+   "requested_utc": "2026-10-13T20:31:23.209920+00:00",
+   "status": 200,
+   "headers": {
+    "Server": "nginx",
+    "Content-Type": "text/html; charset=utf-8",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Last-Modified": "Tue, 13 Oct 2026 20:30:31 GMT",
+    "ETag": "\"1791923431-gzip\"",
+    "Cache-Control": "public, max-age=900",
+    "Date": "Tue, 13 Oct 2026 20:31:23 GMT"
+   },
+   "body_bytes": 159419,
+   "body_sha256": "07da672dbabcc5a29116193e80bfc0eef7a12da306f867875a642153e66bd54a",
+   "body_class": "OK",
+   "archived_as": "announcements_2026-10-13T203123Z.html",
+   "name": "announcements"
+  },
+  {
+   "url": "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data",
+   "requested_utc": "2026-10-13T20:31:25.495181+00:00",
+   "status": 200,
+   "headers": {
+    "Server": "nginx",
+    "Content-Type": "text/html; charset=utf-8",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Last-Modified": "Tue, 13 Oct 2026 16:56:13 GMT",
+    "ETag": "\"1791910573-gzip\"",
+    "Cache-Control": "public, max-age=900",
+    "Date": "Tue, 13 Oct 2026 20:31:25 GMT"
+   },
+   "body_bytes": 80349,
+   "body_sha256": "9a4d3cd9adde03aa7c0f071928f9420d17fa0e16bccb8f351f6c9ef2b57f15a0",
+   "body_class": "OK",
+   "archived_as": "accessing_edgar_data_2026-10-13T203125Z.html",
+   "name": "accessing_edgar_data"
+  },
+  {
+   "url": "https://www.sec.gov/Archives/edgar/daily-index/2026/QTR4/form.20261012.idx",
+   "requested_utc": "2026-10-13T20:31:27.784871+00:00",
+   "status": 403,
+   "headers": {
+    "Content-Type": "application/xml",
+    "Server": "Apache",
+    "X-Frame-Options": "SAMEORIGIN",
+    "x-amz-request-id": "SRP2Z2WEFPPKDWCF",
+    "Content-Encoding": "gzip",
+    "Content-Length": "240",
+    "Cache-Control": "no-cache, no-store, no-transform, proxy-revalidate",
+    "Date": "Tue, 13 Oct 2026 20:31:27 GMT"
+   },
+   "body_bytes": 240,
+   "body_sha256": "2941e8fe2d9aeeea0e7298c2e3fad22478bb3bb2e54c92dc393554d7175a0c21",
+   "body_class": "UNCLASSIFIED",
+   "name": "index_2026-10-12_closure"
+  },
+  {
+   "url": "https://www.sec.gov/Archives/edgar/daily-index/2026/QTR4/form.20261009.idx",
+   "requested_utc": "2026-10-13T20:31:29.989248+00:00",
+   "status": 200,
+   "headers": {
+    "Content-Type": "application/octet-stream",
+    "Server": "Apache",
+    "X-Frame-Options": "SAMEORIGIN",
+    "x-amz-request-id": "KG59BYKQS7E2T6C9",
+    "Last-Modified": "Sat, 10 Oct 2026 02:01:37 GMT",
+    "ETag": "\"4046b3204903ce222db684498d09cbee-gzip\"",
+    "Cache-Control": "no-cache, no-store, no-transform, proxy-revalidate",
+    "Date": "Tue, 13 Oct 2026 20:31:30 GMT"
+   },
+   "body_bytes": 626694,
+   "body_sha256": "385793e747ef3184713ee25334c497ec7e894be944e1df72a10036fac3a4f5a6",
+   "body_class": "OK",
+   "name": "index_2026-10-09_known_good"
+  }
+ ]
+}

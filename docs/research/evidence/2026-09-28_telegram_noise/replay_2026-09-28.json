@@ -1,0 +1,197 @@
+{
+ "window_id": "2026-09-28",
+ "validation": {
+  "LEGACY_REPLAY_REPRODUCES_LIVE_DECISIONS": true,
+  "LEGACY_REPLAY_MESSAGES": 315,
+  "LIVE_SELECTED": 315,
+  "V1_DECISIONS_IDENTICAL_TO_LIVE": true
+ },
+ "LAB": {
+  "CURRENT_LAB_MESSAGES": 315,
+  "NEW_IMMEDIATE_LAB_MESSAGES": 203,
+  "NEW_DIGEST_MESSAGES": 18,
+  "SUPPRESSED_LOW_INFO_MESSAGES": 135,
+  "NEW_TOTAL_LAB_MESSAGES": 221,
+  "LAB_MESSAGE_REDUCTION_PERCENT": 29.8,
+  "immediate_not_in_legacy (open-Signal invalidations never surfaced in Lab)": 23,
+  "sent_today_by_info_class": {
+   "HIGH": 142,
+   "LOW": 135,
+   "MEDIUM": 38
+  },
+  "routes_by_class_reason": {
+   "HIGH:NEW_SETUP": 18,
+   "HIGH:OPEN_SIGNAL_INVALIDATED": 23,
+   "HIGH:SENT_SETUP_INVALIDATED": 70,
+   "HIGH:UPGRADE_TO_SETUP": 54,
+   "LOW:INVALIDATED_NEVER_SENT_AS_SETUP": 3,
+   "LOW:NEW_WATCH": 15,
+   "LOW:SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 110,
+   "LOW:WATCH_UPDATE": 7,
+   "MEDIUM:SENT_SETUP_MOVE_EXTENDED": 38
+  },
+  "independent_high_info_events": 165,
+  "high_info_immediate": 165,
+  "REPLAY_HIGH_INFO_LAB_CAPTURE": "PASS",
+  "high_info_missed": []
+ },
+ "digests": [
+  {
+   "period": "08:30-09:00Z",
+   "n": 15,
+   "counts": {
+    "NEW_WATCH": 15
+   }
+  },
+  {
+   "period": "09:00-09:30Z",
+   "n": 5,
+   "counts": {
+    "INVALIDATED_NEVER_SENT_AS_SETUP": 2,
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 2,
+    "WATCH_UPDATE": 1
+   }
+  },
+  {
+   "period": "09:30-10:30Z",
+   "n": 6,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 2,
+    "WATCH_UPDATE": 4
+   }
+  },
+  {
+   "period": "10:30-11:30Z",
+   "n": 6,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 4,
+    "WATCH_UPDATE": 2
+   }
+  },
+  {
+   "period": "11:30-12:00Z",
+   "n": 5,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 5
+   }
+  },
+  {
+   "period": "12:00-12:30Z",
+   "n": 8,
+   "counts": {
+    "INVALIDATED_NEVER_SENT_AS_SETUP": 1,
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 7
+   }
+  },
+  {
+   "period": "12:30-13:30Z",
+   "n": 8,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 8
+   }
+  },
+  {
+   "period": "13:30-14:00Z",
+   "n": 10,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 10
+   }
+  },
+  {
+   "period": "14:00-14:30Z",
+   "n": 6,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 6
+   }
+  },
+  {
+   "period": "14:30-15:00Z",
+   "n": 11,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 11
+   }
+  },
+  {
+   "period": "15:00-15:30Z",
+   "n": 8,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 8
+   }
+  },
+  {
+   "period": "15:30-16:00Z",
+   "n": 7,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 7
+   }
+  },
+  {
+   "period": "16:00-17:00Z",
+   "n": 7,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 7
+   }
+  },
+  {
+   "period": "17:00-17:30Z",
+   "n": 5,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 5
+   }
+  },
+  {
+   "period": "17:30-18:00Z",
+   "n": 5,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 5
+   }
+  },
+  {
+   "period": "18:00-19:30Z",
+   "n": 5,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 5
+   }
+  },
+  {
+   "period": "19:30-20:30Z",
+   "n": 8,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 8
+   }
+  },
+  {
+   "period": "20:30-21:30Z",
+   "n": 6,
+   "counts": {
+    "SETUP_UPDATE_NOT_BEYOND_LAST_SHOWN": 6
+   }
+  }
+ ],
+ "sample_digest": "🧪 TALONX LAB — REGULAR DIGEST\n14:30–15:00Z\n\n11 low-information updates held back\n• 11 setup updates without a new extreme\n\nActive setups: 190 bullish · 617 bearish\nSent individually: 0 new bullish · 0 new bearish · 2 invalidated\nNo open Signal opportunity affected\n\nResearch only · not a trade · no order",
+ "sample_immediate": {
+  "SENT_SETUP_INVALIDATED": "🧪 TALONX LAB — SETUP INVALIDATED\n\n⚫ INLF · BEARISH → INVALIDATED\n⭐ 43.5\n📉 -0.69%\n💵 $3.8M session volume\n✖️ gap faded below 1.0%\n\nREGULAR · data 17:28Z\nResearch only · not a trade · no order",
+  "NEW_SETUP": "🧪 TALONX LAB — NEW SETUP\n\n🔴 MNDY · BEARISH\n⭐ 69.4\n📉 -6.07%\n💵 $7.0M session volume\n\nREGULAR · data 13:34Z\nResearch only · not a trade · no order",
+  "UPGRADE_TO_SETUP": "🧪 TALONX LAB — SETUP UPGRADE\n\n🔴 CARL · BEARISH\n⭐ 71.8\n📉 -6.09%\n💵 $614K session volume\n⬆️ WATCH → BEARISH\n\nAFTER_HOURS · data 20:04Z\nResearch only · not a trade · no order",
+  "SENT_SETUP_MOVE_EXTENDED": "🧪 TALONX LAB — SETUP UPDATE\n\n🟢 IDT · BULLISH\n⭐ 100.0\n📈 +7.29% (was +3.19%)\n💵 $20.2M session volume\n📰 8-K earnings (item 2.02) filed 2026-09-28\nMove extended beyond last update\n\nAFTER_HOURS · data 20:34Z\nResearch only · not a trade · no order",
+  "OPEN_SIGNAL_INVALIDATED": "🧪 TALONX LAB — SETUP INVALIDATED\n\n⚫ SDGR · BULLISH → INVALIDATED\n⭐ 47.5\n📈 +0.76%\n💵 $48.4M session volume\n✖️ gap faded below 1.0%\n⚠️ Was a Signal paper opportunity (14:58Z)\n\nREGULAR · data 19:24Z\nResearch only · not a trade · no order"
+ },
+ "destinations": [
+  "RESEARCH"
+ ],
+ "SIGNAL": {
+  "base_sha": "6cfde8f",
+  "changed_definitions": [
+   "SIGNAL_FOOTER",
+   "_ref",
+   "render"
+  ],
+  "only_presentation_changed": true,
+  "PROMOTION_POLICY_fingerprint": "4926c12e5eace04e",
+  "CURRENT_SIGNAL_MESSAGES": 154,
+  "NEW_SIGNAL_MESSAGES": 154,
+  "REPLAY_SIGNAL_COUNT_MATCH": "PASS",
+  "sample_new_signal": "🚨 TALONX SIGNAL — PAPER\n\n🟢 NVDA · BULLISH\n⭐ Score 78.7\n💵 Ref $232.12\n🕒 REGULAR · data 13:34Z\n⏱ INTRADAY / SAME_DAY\n\nPaper opportunity only · no order placed · not proven profitable"
+ },
+ "_note": "digest 'Active setups' lines use the end-of-window candidate snapshot (display only; counts unaffected)"
+}

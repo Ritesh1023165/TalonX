@@ -66,6 +66,7 @@ class ServiceMetrics:
     delivery_enqueued: int = 0
     delivery_updates: int = 0
     delivery_suppressed: int = 0
+    delivery_skipped_stale_at_enqueue: int = 0     # S14: never enqueued because already past its cutoff
     delivery_sent: int = 0
     delivery_dry_run: int = 0
     delivery_failed: int = 0
@@ -149,6 +150,7 @@ class ServiceMetrics:
                 "enqueued": self.delivery_enqueued,
                 "updates": self.delivery_updates,
                 "suppressed": self.delivery_suppressed,
+                "skipped_stale_at_enqueue": self.delivery_skipped_stale_at_enqueue,
                 "sent": self.delivery_sent,
                 "dry_run": self.delivery_dry_run,
                 "failed": self.delivery_failed,

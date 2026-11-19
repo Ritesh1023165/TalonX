@@ -64,7 +64,9 @@ def _enq(s, event_id, kind, action, dedup, *, deliver_by=None, payload="card"):
 def test_transport_holds_when_not_configured(tmp_path):
     t = OfficialTelegramTransport(client=_StubClient(configured=False))
     r = t.send("x", meta={"dedup_key": "k"})
-    assert r == {"held": True, "detail": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not configured -- HOLD"}
+    # 2026-09-25 routing fix: the HOLD names the logical destination (TRADE_EVENT) and states there is no legacy fallback
+    assert r == {"held": True, "detail": "TRADE_EVENT destination not enabled/configured -- HOLD "
+                                         "(no fallback to the legacy TELEGRAM_BOT_TOKEN)"}
 
 
 def test_transport_sends_with_parse_mode_none_and_returns_ref(tmp_path):

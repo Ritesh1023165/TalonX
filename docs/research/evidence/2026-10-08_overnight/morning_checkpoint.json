@@ -1,0 +1,239 @@
+{
+ "scheduled_utc": "2026-10-08T08:30:00+00:00",
+ "actual_utc": "2026-10-08T08:30:15.576384+00:00",
+ "late_seconds": 15.6,
+ "late_flag": false,
+ "v2_forward_2026_10_08": {
+  "run_id": "20261008T060000Z-564665",
+  "day": "2026-10-08",
+  "cutoffs": {
+   "as_of": "2026-10-08",
+   "info_cutoff_filing_date_max": "2026-10-07",
+   "price_end_last_completed_session": "2026-10-07",
+   "basis": "date-based study contract; deadline is an execution bound only"
+  },
+  "scheduled_utc": "2026-10-08T06:00:00+00:00",
+  "started_utc": "2026-10-08T06:00:00.253691+00:00",
+  "ended_utc": "2026-10-08T06:03:28.225277+00:00",
+  "deadline_utc": "2026-10-08T07:30:00.253691+00:00",
+  "state": "SUCCESS",
+  "failed_stage": null,
+  "error_class": null,
+  "runner_version": "forward_runner v1 (2026-10-05)",
+  "artifact": {
+   "path": "results/v2_validation/forward/2026-10-08.json",
+   "validated": true,
+   "problems": []
+  },
+  "stages": [
+   {
+    "name": "edgar_crawl",
+    "state": "SUCCESS",
+    "retries": 0,
+    "exit_code": 0,
+    "started_utc": "2026-10-08T06:00:00.255696+00:00",
+    "ended_utc": "2026-10-08T06:01:23.611450+00:00"
+   },
+   {
+    "name": "episodes",
+    "state": "SUCCESS",
+    "retries": 0,
+    "exit_code": 0,
+    "started_utc": "2026-10-08T06:01:23.611450+00:00",
+    "ended_utc": "2026-10-08T06:01:49.528743+00:00"
+   },
+   {
+    "name": "prices",
+    "state": "SUCCESS",
+    "retries": 0,
+    "exit_code": 0,
+    "started_utc": "2026-10-08T06:01:49.528743+00:00",
+    "ended_utc": "2026-10-08T06:02:45.996967+00:00"
+   },
+   {
+    "name": "evaluate",
+    "state": "SUCCESS",
+    "retries": 0,
+    "exit_code": 0,
+    "started_utc": "2026-10-08T06:02:45.998970+00:00",
+    "ended_utc": "2026-10-08T06:03:27.997479+00:00"
+   },
+   {
+    "name": "forward",
+    "state": "SUCCESS",
+    "retries": 0,
+    "exit_code": 0,
+    "started_utc": "2026-10-08T06:03:27.997479+00:00",
+    "ended_utc": "2026-10-08T06:03:28.223265+00:00"
+   }
+  ]
+ },
+ "promotion_control": {
+  "paused": false,
+  "delivery_mode": "RESEARCH_REVIEW",
+  "delivery_boundary_utc": "2026-10-07T22:42:55+00:00"
+ },
+ "promotion_component": [
+  [
+   20708,
+   "RUNNING",
+   "1fc8264f3c56",
+   "2026-10-08T08:30:10.632097+00:00",
+   "{\"PROMOTION_POLICY\": \"4926c12e5eace04e\", \"mode\": \"PAPER_SIGNAL\", \"promotion_src\": \"f44cb75059a0\", \"signal_delivery\": \"RESEARCH_REVIEW@2026-10-07T22:42:55+00:00\"}"
+  ]
+ ],
+ "components": [
+  [
+   "ingestion",
+   "RUNNING",
+   "2026-10-08T08:30:15.369974+00:00"
+  ],
+  [
+   "evaluator:INTRADAY",
+   "RUNNING",
+   "2026-10-08T08:30:15.317237+00:00"
+  ],
+  [
+   "evaluator:SAME_DAY",
+   "RUNNING",
+   "2026-10-08T08:30:11.760416+00:00"
+  ],
+  [
+   "discovery",
+   "RUNNING",
+   "2026-10-08T08:30:00.022033+00:00"
+  ],
+  [
+   "evaluator:SHORT_TERM",
+   "RUNNING",
+   "2026-10-08T08:30:14.937647+00:00"
+  ],
+  [
+   "evaluator:LONG_TERM",
+   "RUNNING",
+   "2026-10-08T08:30:14.995161+00:00"
+  ],
+  [
+   "notifier",
+   "RUNNING",
+   "2026-10-08T08:30:12.713448+00:00"
+  ],
+  [
+   "outcomes",
+   "RUNNING",
+   "2026-10-08T08:30:11.118744+00:00"
+  ],
+  [
+   "reporting",
+   "RUNNING",
+   "2026-10-08T08:30:12.288242+00:00"
+  ],
+  [
+   "promotion",
+   "RUNNING",
+   "2026-10-08T08:30:10.632097+00:00"
+  ],
+  [
+   "sentinel",
+   "RUNNING",
+   "2026-10-08T08:30:14.738505+00:00"
+  ],
+  [
+   "supervisor",
+   "RUNNING",
+   "2026-10-08T08:30:06.288536+00:00"
+  ]
+ ],
+ "component_errors_since_restore": [
+  [
+   "RESTARTED",
+   1
+  ],
+  [
+   "START",
+   1
+  ],
+  [
+   "STOPPED",
+   1
+  ],
+  [
+   "SUPERVISOR_PERFORMED_RESTART",
+   1
+  ]
+ ],
+ "outbox": [
+  [
+   "PAPER_OPPORTUNITY",
+   "SENT",
+   1221
+  ]
+ ],
+ "outbox_after_restore": [
+  [
+   0
+  ]
+ ],
+ "paused_rows_changed": [
+  [
+   0
+  ]
+ ],
+ "promotions_after_restore": [],
+ "vr_heartbeat": [
+  [
+   "2026-10-08T08:29:52.354611+00:00",
+   "{\"window\": \"2026-10-08\", \"new_signals\": 0, \"opened\": 0, \"exited\": 0, \"open_vr\": 0, \"open_act\": 0, \"entry_control\": \"BLOCKED\", \"entry_boundary_utc\": \"2026-10-07T11:25:41.846991+00:00\", \"entry_control_detail\": \"results/vr_paper/ARM_INTERRUPTION_2026-10-07.json\"}"
+  ]
+ ],
+ "vr_trades_after_pause": [
+  [
+   0
+  ]
+ ],
+ "vr_open": [],
+ "dtu_sweeps_after_endpoint": [
+  [
+   27,
+   "2026-10-08T08:29:18.637235+00:00"
+  ]
+ ],
+ "intel_last_poll": "{\"at_utc\":\"2026-10-08T08:29:02.332948+00:00\",\"cycle\":443,\"symbols_polled\":39,\"symbols_failed\":0,\"new_form4\":0,\"new_events\":0,\"freshness\":\"FRESH\",\"error_count\":0,\"identity_drops\":1,\"recovery_timed_out\":0,\"recovery_failed\":0,\"delivery_ok\":true,\"health_causes\":[]}",
+ "v2_status": {
+  "heartbeat_utc": "2026-10-08T08:30:08.931533+00:00",
+  "data_state": "CURRENT",
+  "execution_scope_count": 39,
+  "open_positions": 0,
+  "entries_this_tick": 0
+ },
+ "processes": {
+  "promotion": [
+   1748,
+   20708
+  ],
+  "vr": [
+   18688,
+   21460
+  ],
+  "dtu": [
+   9400,
+   17920
+  ],
+  "v2": [
+   720,
+   10872
+  ],
+  "intel": [
+   6612,
+   14388
+  ],
+  "dashboard": [
+   4048,
+   24340
+  ],
+  "forward": [
+   16236,
+   16852
+  ]
+ }
+}

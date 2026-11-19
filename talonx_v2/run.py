@@ -261,9 +261,10 @@ def main(argv: list[str] | None = None) -> int:
             # FINAL ACCEPTANCE: the complete read-only release gate (provider QUALIFIED, contract + strategy
             # fingerprints, Signal/Sentinel configured + previously validated for the ACTIVE config, Lab OFF,
             # no active account block, ledger reconciles).  Nothing is sent; no secret is printed.
-            from talonx_v2.release_gate import evaluate_release_readiness
+            from talonx_v2.release_gate import evaluate_release_readiness, telegram_bot_identity
             _gate = evaluate_release_readiness(db_path=args.db, pricing_mode=args.pricing_mode,
-                                               deliver=args.deliver, transport=args.transport)
+                                               deliver=args.deliver, transport=args.transport,
+                                               bot_identity_check=telegram_bot_identity)
             if _gate.status != "READY":
                 raise SystemExit("FATAL: release readiness gate NOT_READY -- refusing to start: "
                                  + "; ".join(f"{c.name}: {c.detail}" for c in _gate.failed))

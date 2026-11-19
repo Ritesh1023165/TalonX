@@ -1,0 +1,37 @@
+============================================================
+  PROSPECTIVE V2 -- EVENING CLOSE
+============================================================
+  time            : 2026-09-26T10:48:40.205697+01:00
+  verdict         : PASS_WITH_FINDINGS
+  V2 health       : HEALTHY
+  market feed     : HEALTHY
+  cash            : 100000.0  (start 100000.0)
+  open / closed   : 0 / 0   unresolved 0
+  BUY / SELL      : 0 / 0
+  clusters(>=2)   : 2  fresh-eligible 0  stale 2
+  interpretation  : STRATEGY_SELECTIVE
+  asserts:
+    buys_eq_sells_plus_open_plus_unresolved: PASS
+    cash_plus_open_cost_reconciles: PASS
+    no_negative_cash: PASS
+    whole_share_positions: PASS
+    positive_finite_position_cost: PASS
+    corporate_action_adjustments_consistent: PASS
+    dividend_accounting_consistent: PASS
+    no_duplicate_buy_episode_id: PASS
+    no_duplicate_position_episode_id: PASS
+    no_stale_episode_entered: PASS
+    no_illegal_eod_flatten: PASS
+    real_capital_off: PASS
+    shorts_off: PASS
+    experimental_external_sends_zero: PASS
+    no_cross_lane_contamination: PASS
+    official_dispatch_healthy: PASS
+    base_reconciliation: PARTIAL
+    v2_ledger_preserved_copy: PASS
+    lane_accounting_snapshot: PASS
+  findings:
+    - base eod_reconciliation PARTIAL (typically: no PIV reader) -- mismatches=[]
+  shutdown        : {"performed": false, "shutdown_notice": {"status": "DRAINED", "timeout_s": 20.0, "summary": {"destination": "OPERATIONS", "enabled": true, "reason": "OPERATIONS: using dedicated destination credentials", "considered": 1, "sent": 1, "held": 0, "retry": 0, "failed": 0, "ambiguous": 0, "expired": 0, "skipped_disabled": 0}}}
+  evidence        : results\prospective_2026-09-25
+============================================================

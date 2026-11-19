@@ -373,6 +373,9 @@ def test_position_level_detail_reconciles_against_the_real_paper_engine_output(h
     # reconcile against a DIRECT, independent call to the same real
     # function -- not merely re-reading the panel's own text.
     direct = build_v2_paper_performance(tmp_path / "v2.db", home=home, now=NOW)
+    # 2026-10-08: the dashboard corrects the V2 cost WORDING only (zero-fee accounting); every number stays identical
+    from talonx_ops.dashboard_read import _relabel_v2_costs
+    direct = _relabel_v2_costs(direct)
     direct_open_by_symbol = {r["symbol"]: r for r in direct["open_positions"]["detail"]}
     direct_closed_by_symbol = {r["symbol"]: r for r in direct["closed_trades"]}
 

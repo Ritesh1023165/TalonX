@@ -1,0 +1,6945 @@
+{
+ "time_utc": "2026-09-25T20:55:51",
+ "phase": "AFTER_HOURS",
+ "regular": {
+  "last_premarket_scan": "13:25:00",
+  "first_regular_scan": {
+   "decision_utc": "2026-09-25T13:30:00.030185+00:00",
+   "phase": "REGULAR",
+   "state": "SCANNED",
+   "data_as_of_utc": "2026-09-25T13:14:00+00:00",
+   "duration_s": 23.17
+  },
+  "regular_scans": 75,
+  "regular_cadence_s": {
+   "median": 300.00055299999997,
+   "max": 600.010734
+  },
+  "first_after_hours_scan": {
+   "decision_utc": "2026-09-25T20:00:00.056828+00:00",
+   "phase": "AFTER_HOURS",
+   "state": "SCANNED",
+   "data_as_of_utc": "2026-09-25T19:44:00+00:00",
+   "duration_s": 64.11
+  },
+  "REGULAR_FIRST_SEEN_COUNT": 1755,
+  "REGULAR_FIRST_SEEN_SYMBOLS": [
+   "ISPC:INVALIDATED",
+   "CLS:INVALIDATED",
+   "AAL:INVALIDATED",
+   "FRVO:INVALIDATED",
+   "RDW:INVALIDATED",
+   "VBIO:BEARISH",
+   "ANET:INVALIDATED",
+   "SEZL:INVALIDATED",
+   "DDOG:BULLISH",
+   "YMAT:WATCH",
+   "KDK:BEARISH",
+   "RZLT:INVALIDATED",
+   "NTES:WATCH",
+   "GRAL:INVALIDATED",
+   "UGP:BEARISH",
+   "FSLY:INVALIDATED",
+   "HMC:WATCH",
+   "FFBC:BULLISH",
+   "RMBS:INVALIDATED",
+   "OCGN:BULLISH",
+   "AGO:BULLISH",
+   "FUL:INVALIDATED",
+   "SNX:INVALIDATED",
+   "WRD:BEARISH",
+   "META:BEARISH",
+   "SLI:BEARISH",
+   "SRZN:INVALIDATED",
+   "GPOR:BEARISH",
+   "ZH:INVALIDATED",
+   "PONY:INVALIDATED",
+   "RAPP:INVALIDATED",
+   "ASPN:INVALIDATED",
+   "GWW:WATCH",
+   "BYND:BEARISH",
+   "CRCL:BEARISH",
+   "SECZ:BEARISH",
+   "LU:BEARISH",
+   "SHG:WATCH",
+   "SHAZ:INVALIDATED",
+   "FISN:BEARISH"
+  ],
+  "FIRST_REGULAR_CANDIDATE_TIME": "13:30:00",
+  "FIRST_REGULAR_LAB_DELIVERY_TIME": "13:46:15",
+  "AFTER_HOURS_FIRST_SEEN_COUNT": 108
+ },
+ "continuity": {
+  "cohort": [
+   {
+    "cid": "2026-09-25:GLND:GAP_UP",
+    "state": "INVALIDATED",
+    "phases": [
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "REGULAR",
+    "last_observed": "13:50:00",
+    "chain": "08:30P:NEW(98) > 09:15P:MAT(100) > 10:15P:MAT(100) > 11:25P:MAT(100) > 12:35P:MAT(100) > 13:50R:INV(74)"
+   },
+   {
+    "cid": "2026-09-25:INLF:GAP_UP",
+    "state": "BULLISH_SETUP",
+    "phases": [
+     "AFTER_HOURS",
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "AFTER_HOURS",
+    "last_observed": "20:45:00",
+    "chain": "08:30P:NEW(97) > 09:15P:MAT(100) > 09:45P:MAT(100) > 10:30P:MAT(100) > 11:05P:MAT(100) > 11:40P:MAT(100) > 12:10P:MAT(100) > 12:40P:MAT(100) > 13:15P:MAT(100) > 13:50R:MAT(100) > 14:20R:MAT(100) > 15:15R:MAT(100) > 15:50R:MAT(100) > 16:30R:MAT(100) > 17:35R:MAT(100) > 18:20R:MAT(100) > 18:55R:MAT(100) > 19:40R:MAT(100) > 20:15A:MAT(100)"
+   },
+   {
+    "cid": "2026-09-25:AKAM:GAP_UP",
+    "state": "BULLISH_SETUP",
+    "phases": [
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "AFTER_HOURS",
+    "last_observed": "20:45:00",
+    "chain": "08:30P:NEW(74) > 10:00P:MAT(83) > 11:10P:MAT(91) > 12:10P:MAT(100) > 12:45P:MAT(100) > 13:50R:MAT(100) > 14:20R:MAT(100) > 17:35R:MAT(84)"
+   },
+   {
+    "cid": "2026-09-25:STAK:GAP_DOWN",
+    "state": "BEARISH_SETUP",
+    "phases": [
+     "AFTER_HOURS",
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "AFTER_HOURS",
+    "last_observed": "20:45:00",
+    "chain": "08:30P:NEW(59) > 09:45P:UPG(65) > 14:15R:MAT(63) > 14:45R:MAT(69) > 20:05A:MAT(71) > 20:40A:MAT(71)"
+   },
+   {
+    "cid": "2026-09-25:GRML:GAP_UP",
+    "state": "INVALIDATED",
+    "phases": [
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "REGULAR",
+    "last_observed": "16:20:00",
+    "chain": "08:30P:NEW(55) > 08:45P:UPG(63) > 10:00P:MAT(61) > 11:05P:MAT(58) > 11:35P:MAT(76) > 12:20P:MAT(73) > 13:25P:MAT(61) > 14:00R:MAT(54) > 14:30R:MAT(61) > 16:10R:MAT(54) > 16:25R:INV(51)"
+   },
+   {
+    "cid": "2026-09-25:ZS:GAP_DOWN",
+    "state": "BEARISH_SETUP",
+    "phases": [
+     "PREMARKET",
+     "REGULAR"
+    ],
+    "last_phase_observed": "AFTER_HOURS",
+    "last_observed": "20:45:00",
+    "chain": "08:30P:NEW(48) > 11:45P:UPG(61) > 13:50R:MAT(86) > 14:20R:MAT(100)"
+   },
+   {
+    "cid": "2026-09-25:WNC:GAP_UP",
+    "state": "BULLISH_SETUP",
+    "phases": [
+     "REGULAR"
+    ],
+    "last_phase_observed": "AFTER_HOURS",
+    "last_observed": "20:45:00",
+    "chain": "13:50R:NEW(41) > 14:00R:UPG(91) > 14:30R:MAT(88) > 16:35R:MAT(98)"
+   },
+   {
+    "cid": "2026-09-25:GLND:GAP_DOWN",
+    "state": "INVALIDATED",
+    "phases": [
+     "REGULAR"
+    ],
+    "last_phase_observed": "REGULAR",
+    "last_observed": "14:20:00",
+    "chain": "13:55R:NEW(67) > 14:00R:UPG(69) > 14:25R:INV(52)"
+   }
+  ],
+  "duplicate_identities": [],
+  "candidates_spanning_phases": 281,
+  "active_last_observed_in_regular": 118
+ },
+ "missed": {
+  "movers_ge_5pct_actionable": 243,
+  "by_class": {
+   "B_DETECTED_HELD_BY_NOTIFICATION_POLICY": 171,
+   "A_DETECTED_AND_SENT": 27,
+   "H_CLOSED_BY_OTHER_LIFECYCLE_RULE": 20,
+   "D_REJECTED_BY_SCORING_OR_ENTRY_RULE": 12,
+   "E_BLOCKED_BY_STALE_INVALIDATION": 13
+  },
+  "E_G_H_I_detail": [
+   {
+    "symbol": "AEHR",
+    "move_pct": 7.27,
+    "prev_close": 97.42,
+    "last": 104.5,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 287977399,
+    "bars": 476,
+    "adv20": 246984291,
+    "activity_pct": 101.1,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "AESI",
+    "move_pct": 15.2,
+    "prev_close": 10.99,
+    "last": 12.66,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 154795390,
+    "bars": 452,
+    "adv20": 39606937,
+    "activity_pct": 400.4,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "BE",
+    "move_pct": 8.57,
+    "prev_close": 266.65,
+    "last": 289.49,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 4918762805,
+    "bars": 638,
+    "adv20": 4228353056,
+    "activity_pct": 105.1,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "CABO",
+    "move_pct": -6.27,
+    "prev_close": 15.63,
+    "last": 14.65,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 5093620,
+    "bars": 199,
+    "adv20": 6640193,
+    "activity_pct": 106.9,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "DFDV",
+    "move_pct": 5.01,
+    "prev_close": 5.79,
+    "last": 6.08,
+    "last_print": "2026-09-25T20:33:00Z",
+    "session_dollars": 17018740,
+    "bars": 498,
+    "adv20": 14809124,
+    "activity_pct": 110.6,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "EPSM",
+    "move_pct": -9.86,
+    "prev_close": 1.42,
+    "last": 1.28,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 130471,
+    "bars": 56,
+    "adv20": 1226863,
+    "activity_pct": 12.9,
+    "latest_cls": "WATCH",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "ETRA",
+    "move_pct": -5.16,
+    "prev_close": 11.82,
+    "last": 11.21,
+    "last_print": "2026-09-25T20:04:00Z",
+    "session_dollars": 4927168,
+    "bars": 297,
+    "adv20": 20303031,
+    "activity_pct": 27.6,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "FGL",
+    "move_pct": -5.44,
+    "prev_close": 4.41,
+    "last": 4.17,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 2452312,
+    "bars": 182,
+    "adv20": 2933434,
+    "activity_pct": 116.4,
+    "latest_cls": "WATCH",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "FN",
+    "move_pct": 5.04,
+    "prev_close": 398.36,
+    "last": 418.419,
+    "last_print": "2026-09-25T20:37:00Z",
+    "session_dollars": 304728117,
+    "bars": 377,
+    "adv20": 319523574,
+    "activity_pct": 92.7,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "GOSS",
+    "move_pct": -5.22,
+    "prev_close": 10.93,
+    "last": 10.36,
+    "last_print": "2026-09-25T20:01:00Z",
+    "session_dollars": 4367968,
+    "bars": 209,
+    "adv20": 2635714,
+    "activity_pct": 183.4,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "HHH",
+    "move_pct": 5.96,
+    "prev_close": 64.58,
+    "last": 68.43,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 73836973,
+    "bars": 330,
+    "adv20": 43631889,
+    "activity_pct": 157.7,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "INTG",
+    "move_pct": -9.38,
+    "prev_close": 36.78,
+    "last": 33.33,
+    "last_print": "2026-09-25T19:59:00Z",
+    "session_dollars": 1084631,
+    "bars": 48,
+    "adv20": 3420549,
+    "activity_pct": 32.4,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "JAGX",
+    "move_pct": 10.62,
+    "prev_close": 7.06,
+    "last": 7.81,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 283913007,
+    "bars": 648,
+    "adv20": 54410466,
+    "activity_pct": 1375.2,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "KLXE",
+    "move_pct": 13.61,
+    "prev_close": 1.47,
+    "last": 1.67,
+    "last_print": "2026-09-25T20:35:00Z",
+    "session_dollars": 3550007,
+    "bars": 289,
+    "adv20": 1340120,
+    "activity_pct": 271.1,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "KPTI",
+    "move_pct": -6.36,
+    "prev_close": 1.73,
+    "last": 1.62,
+    "last_print": "2026-09-25T20:30:00Z",
+    "session_dollars": 2440195,
+    "bars": 258,
+    "adv20": 2487534,
+    "activity_pct": 103.0,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "MX",
+    "move_pct": 18.81,
+    "prev_close": 3.18,
+    "last": 3.7782,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 6730559,
+    "bars": 334,
+    "adv20": 1970869,
+    "activity_pct": 294.6,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "NATH",
+    "move_pct": 7.7,
+    "prev_close": 94.29,
+    "last": 101.55,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 15119034,
+    "bars": 107,
+    "adv20": 2524714,
+    "activity_pct": 576.0,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "NCPL",
+    "move_pct": 14.15,
+    "prev_close": 1.27,
+    "last": 1.4497,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 19966116,
+    "bars": 719,
+    "adv20": 27120041,
+    "activity_pct": 39.4,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "NFE",
+    "move_pct": 12.79,
+    "prev_close": 6.1,
+    "last": 6.88,
+    "last_print": "2026-09-25T20:02:00Z",
+    "session_dollars": 3474508,
+    "bars": 269,
+    "adv20": 4437176,
+    "activity_pct": 119.8,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "OESX",
+    "move_pct": 5.98,
+    "prev_close": 29.25,
+    "last": 31.0,
+    "last_print": "2026-09-25T20:19:00Z",
+    "session_dollars": 1298294,
+    "bars": 71,
+    "adv20": 2677090,
+    "activity_pct": 43.8,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "ORBS",
+    "move_pct": 8.74,
+    "prev_close": 1.03,
+    "last": 1.12,
+    "last_print": "2026-09-25T20:35:00Z",
+    "session_dollars": 15011035,
+    "bars": 530,
+    "adv20": 13290959,
+    "activity_pct": 103.6,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "PPLI",
+    "move_pct": 11.61,
+    "prev_close": 35.93,
+    "last": 40.1,
+    "last_print": "2026-09-25T20:25:00Z",
+    "session_dollars": 121897217,
+    "bars": 430,
+    "adv20": 41853651,
+    "activity_pct": 275.1,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "QMCO",
+    "move_pct": 8.1,
+    "prev_close": 29.49,
+    "last": 31.88,
+    "last_print": "2026-09-25T20:33:00Z",
+    "session_dollars": 127561891,
+    "bars": 488,
+    "adv20": 35044392,
+    "activity_pct": 291.8,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "H_CLOSED_BY_OTHER_LIFECYCLE_RULE (worthy now)"
+   },
+   {
+    "symbol": "SCHL",
+    "move_pct": -7.12,
+    "prev_close": 34.83,
+    "last": 32.35,
+    "last_print": "2026-09-25T20:22:00Z",
+    "session_dollars": 38137097,
+    "bars": 369,
+    "adv20": 14566115,
+    "activity_pct": 294.0,
+    "latest_cls": "BEARISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   },
+   {
+    "symbol": "SLGL",
+    "move_pct": 10.06,
+    "prev_close": 60.74,
+    "last": 66.85,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 1241876,
+    "bars": 22,
+    "adv20": 4355171,
+    "activity_pct": 29.4,
+    "latest_cls": "BULLISH_SETUP",
+    "latest_scan": "20:45:00",
+    "class": "E_BLOCKED_BY_STALE_INVALIDATION"
+   }
+  ],
+  "D_detail_top": [
+   {
+    "symbol": "ZTG",
+    "move_pct": -16.03,
+    "prev_close": 1.56,
+    "last": 1.31,
+    "last_print": "2026-09-25T20:34:00Z",
+    "session_dollars": 414757,
+    "bars": 243,
+    "adv20": 15174949,
+    "activity_pct": 2.4,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "TNMG",
+    "move_pct": -14.57,
+    "prev_close": 5.01,
+    "last": 4.28,
+    "last_print": "2026-09-25T20:32:00Z",
+    "session_dollars": 286763,
+    "bars": 103,
+    "adv20": 8726249,
+    "activity_pct": 2.7,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "MEDS",
+    "move_pct": -11.27,
+    "prev_close": 3.5,
+    "last": 3.1054,
+    "last_print": "2026-09-25T20:39:00Z",
+    "session_dollars": 1257821,
+    "bars": 220,
+    "adv20": 68779861,
+    "activity_pct": 2.7,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "AEMD",
+    "move_pct": -7.24,
+    "prev_close": 6.77,
+    "last": 6.28,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 804624,
+    "bars": 143,
+    "adv20": 40500904,
+    "activity_pct": 1.6,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "TURB",
+    "move_pct": -7.14,
+    "prev_close": 1.12,
+    "last": 1.04,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 117799,
+    "bars": 70,
+    "adv20": 5976800,
+    "activity_pct": 2.4,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "GRNQ",
+    "move_pct": -6.8,
+    "prev_close": 11.32,
+    "last": 10.55,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 154618,
+    "bars": 25,
+    "adv20": 2082019,
+    "activity_pct": 10.2,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "KXIN",
+    "move_pct": -6.62,
+    "prev_close": 1.51,
+    "last": 1.41,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 170457,
+    "bars": 86,
+    "adv20": 8895104,
+    "activity_pct": 2.1,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "YDDL",
+    "move_pct": 6.34,
+    "prev_close": 1.42,
+    "last": 1.51,
+    "last_print": "2026-09-25T20:15:00Z",
+    "session_dollars": 31645,
+    "bars": 51,
+    "adv20": 4160574,
+    "activity_pct": 1.1,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "LXEH",
+    "move_pct": -6.15,
+    "prev_close": 1.79,
+    "last": 1.68,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 180577,
+    "bars": 126,
+    "adv20": 2353663,
+    "activity_pct": 7.2,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "PCLA",
+    "move_pct": 5.96,
+    "prev_close": 7.2,
+    "last": 7.629,
+    "last_print": "2026-09-25T20:03:00Z",
+    "session_dollars": 365058,
+    "bars": 51,
+    "adv20": 6661023,
+    "activity_pct": 7.1,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "MYSZ",
+    "move_pct": -5.56,
+    "prev_close": 1.78,
+    "last": 1.681,
+    "last_print": "2026-09-25T20:20:00Z",
+    "session_dollars": 63532,
+    "bars": 40,
+    "adv20": 3911033,
+    "activity_pct": 2.1,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   },
+   {
+    "symbol": "PMI",
+    "move_pct": -5.13,
+    "prev_close": 4.87,
+    "last": 4.62,
+    "last_print": "2026-09-25T20:00:00Z",
+    "session_dollars": 134852,
+    "bars": 52,
+    "adv20": 3567600,
+    "activity_pct": 5.2,
+    "latest_cls": "SCORED",
+    "latest_scan": "20:45:00",
+    "class": "D_REJECTED_BY_SCORING_OR_ENTRY_RULE (SCORED)"
+   }
+  ]
+ },
+ "latency": {
+  "n": 218,
+  "provider_age_s": {
+   "p50": 1020.0,
+   "p90": 1020.1,
+   "max": 1020.1
+  },
+  "t1_t2": {
+   "p50": 76.9,
+   "p90": 259.6,
+   "max": 330.7
+  },
+  "t2_t3": {
+   "p50": -0.0,
+   "p90": 0.0,
+   "max": -0.0
+  },
+  "t3_t4": {
+   "p50": 2.4,
+   "p90": 13.6,
+   "max": 38.9
+  },
+  "internal_t1_t4": {
+   "p50": 88.1,
+   "p90": 261.9,
+   "max": 332.1
+  },
+  "worst10": [
+   {
+    "symbol": "EROC",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 330.7,
+    "t2_t3": -0.0,
+    "t3_t4": 1.5,
+    "internal_t1_t4": 332.1
+   },
+   {
+    "symbol": "SVRN",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 315.4,
+    "t2_t3": -0.0,
+    "t3_t4": 1.1,
+    "internal_t1_t4": 316.5
+   },
+   {
+    "symbol": "BTDR",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 312.2,
+    "t2_t3": 0.0,
+    "t3_t4": 2.0,
+    "internal_t1_t4": 314.2
+   },
+   {
+    "symbol": "APUS",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 960.1,
+    "t1_t2": 312.2,
+    "t2_t3": -0.0,
+    "t3_t4": 1.2,
+    "internal_t1_t4": 313.4
+   },
+   {
+    "symbol": "STAK",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 312.2,
+    "t2_t3": -0.0,
+    "t3_t4": 1.0,
+    "internal_t1_t4": 313.2
+   },
+   {
+    "symbol": "WHLR",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 310.8,
+    "t2_t3": 0.0,
+    "t3_t4": 2.0,
+    "internal_t1_t4": 312.9
+   },
+   {
+    "symbol": "APUS",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 310.8,
+    "t2_t3": -0.0,
+    "t3_t4": 1.0,
+    "internal_t1_t4": 311.8
+   },
+   {
+    "symbol": "SVRN",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 960.0,
+    "t1_t2": 305.1,
+    "t2_t3": -0.0,
+    "t3_t4": 1.6,
+    "internal_t1_t4": 306.6
+   },
+   {
+    "symbol": "BENF",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 300.2,
+    "t2_t3": -0.0,
+    "t3_t4": 3.0,
+    "internal_t1_t4": 303.2
+   },
+   {
+    "symbol": "APUS",
+    "type": "MATERIAL_UPDATE",
+    "provider_age_s": 1020.1,
+    "t1_t2": 300.2,
+    "t2_t3": -0.0,
+    "t3_t4": 1.6,
+    "internal_t1_t4": 301.8
+   }
+  ]
+ },
+ "outcomes": {
+  "expected_rows": 1894,
+  "rows_present": 2002,
+  "missing_rows": 0,
+  "missing_sample": [],
+  "stale_rows": 0,
+  "wrong_links": 0,
+  "duplicate_rows": 0,
+  "mature_30m": 1894,
+  "mature_30m_missing_ret": 26,
+  "by_status": {
+   "NOT_APPLICABLE_SAME_DAY": 36,
+   "INVALIDATED": 137,
+   "CONFIRMED": 831,
+   "FAILED_CONFIRMATION": 900,
+   "OUTCOME_PENDING": 98
+  },
+  "by_model": {
+   "N/A": 36,
+   "PREMARKET_RESEARCH_V1.measure": 161,
+   "SINCE_FIRST_SEEN_V1": 1805
+  },
+  "coverage_sent": "75/75",
+  "coverage_held": "1927/1927",
+  "coverage_never_surfaced": "0/0"
+ },
+ "quality_groups": {
+  "A_setup_ge80": {
+   "n": 6,
+   "status": {
+    "INVALIDATED": 2,
+    "CONFIRMED": 2,
+    "FAILED_CONFIRMATION": 2
+   },
+   "ret30": {
+    "n": 6,
+    "mean": -16.756,
+    "median": -12.977
+   },
+   "ret1h": {
+    "n": 6,
+    "mean": -13.86,
+    "median": -7.583
+   },
+   "mfe": {
+    "n": 6,
+    "mean": 0.944,
+    "median": 1.263
+   },
+   "mae": {
+    "n": 6,
+    "mean": -21.78,
+    "median": -18.559
+   },
+   "invalidated_lifecycle": 2,
+   "stale_invalidated": 0
+  },
+  "B_setup_60_80": {
+   "n": 21,
+   "status": {
+    "FAILED_CONFIRMATION": 7,
+    "CONFIRMED": 11,
+    "INVALIDATED": 3
+   },
+   "ret30": {
+    "n": 21,
+    "mean": 1.658,
+    "median": 0.327
+   },
+   "ret1h": {
+    "n": 19,
+    "mean": 0.415,
+    "median": -0.121
+   },
+   "mfe": {
+    "n": 21,
+    "mean": 7.099,
+    "median": 2.001
+   },
+   "mae": {
+    "n": 21,
+    "mean": -3.301,
+    "median": -1.895
+   },
+   "invalidated_lifecycle": 6,
+   "stale_invalidated": 0
+  },
+  "C_watch_ge50": {
+   "n": 1072,
+   "status": {
+    "FAILED_CONFIRMATION": 527,
+    "CONFIRMED": 508,
+    "INVALIDATED": 37
+   },
+   "ret30": {
+    "n": 1072,
+    "mean": -0.139,
+    "median": -0.054
+   },
+   "ret1h": {
+    "n": 1024,
+    "mean": -0.185,
+    "median": -0.139
+   },
+   "mfe": {
+    "n": 1072,
+    "mean": 1.357,
+    "median": 0.821
+   },
+   "mae": {
+    "n": 1072,
+    "mean": -1.693,
+    "median": -1.102
+   },
+   "invalidated_lifecycle": 454,
+   "stale_invalidated": 16
+  },
+  "D_watch_lt50": {
+   "n": 769,
+   "status": {
+    "INVALIDATED": 95,
+    "CONFIRMED": 310,
+    "FAILED_CONFIRMATION": 364
+   },
+   "ret30": {
+    "n": 769,
+    "mean": -0.323,
+    "median": -0.249
+   },
+   "ret1h": {
+    "n": 760,
+    "mean": -0.374,
+    "median": -0.35
+   },
+   "mfe": {
+    "n": 769,
+    "mean": 2.248,
+    "median": 1.326
+   },
+   "mae": {
+    "n": 769,
+    "mean": -2.821,
+    "median": -1.979
+   },
+   "invalidated_lifecycle": 415,
+   "stale_invalidated": 29
+  }
+ },
+ "fatigue": {
+  "sent_total": 275,
+  "surfaced_candidates": 75,
+  "by_type": {
+   "NEW": 27,
+   "UPGRADE": 55,
+   "MATERIAL_UPDATE": 166,
+   "INVALIDATED": 27
+  },
+  "per_15min_max": 28,
+  "per_15min_last6": [
+   [
+    "2026-09-25T19:30",
+    2
+   ],
+   [
+    "2026-09-25T19:45",
+    2
+   ],
+   [
+    "2026-09-25T20:00",
+    6
+   ],
+   [
+    "2026-09-25T20:15",
+    5
+   ],
+   [
+    "2026-09-25T20:30",
+    2
+   ],
+   [
+    "2026-09-25T20:45",
+    1
+   ]
+  ],
+  "top_symbols": [
+   [
+    "INLF",
+    19
+   ],
+   [
+    "APUS",
+    19
+   ],
+   [
+    "WHLR",
+    13
+   ],
+   [
+    "SDEV",
+    11
+   ],
+   [
+    "GRML",
+    11
+   ],
+   [
+    "SVRN",
+    11
+   ]
+  ],
+  "material_updates_small_change(<5 score & <5 gap-pts)": 52,
+  "small_change_sample": [
+   [
+    "GRML",
+    1.8,
+    3.2
+   ],
+   [
+    "GLND",
+    0.0,
+    3.9
+   ],
+   [
+    "GRML",
+    2.6,
+    3.2
+   ],
+   [
+    "GLND",
+    0.0,
+    3.9
+   ],
+   [
+    "SDEV",
+    3.2,
+    3.9
+   ],
+   [
+    "SDEV",
+    0.8,
+    3.1
+   ],
+   [
+    "GRML",
+    3.9,
+    3.8
+   ],
+   [
+    "GLND",
+    0.0,
+    3.4
+   ]
+  ],
+  "stale_invalidations_sent": 7
+ },
+ "cap": {
+  "new_used": 75,
+  "watch_used": 15,
+  "setups_used": 60,
+  "remaining": -35,
+  "strong_setups_blocked": [
+   [
+    "NCPL",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "12:01:04"
+   ],
+   [
+    "BB",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "12:06:06"
+   ],
+   [
+    "PMAX",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "12:11:06"
+   ],
+   [
+    "CIFR",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "12:11:06"
+   ],
+   [
+    "KITT",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "BB",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "BUUU",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "ASPN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "CMCSA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "CRDO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "JBL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "UGP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "ALM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "PANW",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "DKNG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "PONY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "DELL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "OKTA",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "SUIG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "LPLA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "BYND",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "13:56:04"
+   ],
+   [
+    "WNC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "ZH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "FFBC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "WRD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "STRZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "GPOR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "VIAV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "CRCL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "PURR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "STAA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "GLND",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "SATL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "HSHP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "SHIP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "PTGX",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "AAON",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "BELFB",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "VNET",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "IREN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "TRNS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "PSQL",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "DFDV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "SECZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "PGY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "CLSK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "MARA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "P",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "MXL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "KYTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "GENI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "TSEM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "FISN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "EDRY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "FLY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "SKYQ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "GEMI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "COHU",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:02:20"
+   ],
+   [
+    "FFAI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "MSFT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "NKTR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "LBRT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "SNOW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "QCOM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "RDW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "TGB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "BETA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "MRLN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "WTI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "FLEX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "ON",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:06:08"
+   ],
+   [
+    "EQPT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:18:14"
+   ],
+   [
+    "WOLF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:18:14"
+   ],
+   [
+    "QLYS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:18:14"
+   ],
+   [
+    "CEVA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:18:14"
+   ],
+   [
+    "HUT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "MANU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "CLVT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "SLNH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "NET",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "SFM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "ESP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "VCYT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "CYD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "HIVE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "PTRN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "RIOT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "SBET",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "WULF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "LYB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "BTBT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "BLSH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "CXW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "YPF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "TSSI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "MDXG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "WIX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "REAX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "FSLY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "GENB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "ALVO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:21:13"
+   ],
+   [
+    "MOS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "ACAD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "NTSK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "BTGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "FRVO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "CRWV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "ACLS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "SFIX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "ANDG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "GLXY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "BATL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "PRME",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "INOD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "IPI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "SYNA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:25:51"
+   ],
+   [
+    "ADI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "META",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "KLIC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "RBLX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "IMOS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "EMAT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "TWST",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "DNA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "NXPI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:32:52"
+   ],
+   [
+    "KLXE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "AFYA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "AGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "MRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "WU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "BKKT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "MGTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "GSHD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "SDGR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "IMMX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "CCCC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "COIN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "IMNM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "NTLA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "SNEX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "BMEA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "PBLS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "RXRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "PWP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "ABSI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "SVRA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:36:09"
+   ],
+   [
+    "BLBD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "HUM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "PYPL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "MLYS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "SGML",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "CNTN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:40:40"
+   ],
+   [
+    "LU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "IT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "VG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "BGC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "CORZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "NUTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "AGL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "ARTV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "LRMR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "ACFN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:48:03"
+   ],
+   [
+    "CIFR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:07"
+   ],
+   [
+    "INSM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:07"
+   ],
+   [
+    "CRK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:07"
+   ],
+   [
+    "ELMT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:07"
+   ],
+   [
+    "FBRT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:08"
+   ],
+   [
+    "LQDA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:08"
+   ],
+   [
+    "ANNX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:08"
+   ],
+   [
+    "BLZE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:51:08"
+   ],
+   [
+    "CLMB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "FROG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "PRM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "OFIX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "VNCE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "KLRA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "RPD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "PCT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "ACHV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "OBE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "14:55:39"
+   ],
+   [
+    "BKNG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "BKV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "AIBZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "FWRD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "GEO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "STRO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "MBX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:02:56"
+   ],
+   [
+    "TALO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "AR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "GFS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "MRVI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "MAAS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "VSH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "AQST",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "EVC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "ARCT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "KPLT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "HOST",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:05:58"
+   ],
+   [
+    "SRZN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:10:45"
+   ],
+   [
+    "VRNS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:10:45"
+   ],
+   [
+    "DXYZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:10:45"
+   ],
+   [
+    "FIGR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:10:45"
+   ],
+   [
+    "KYMR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:10:45"
+   ],
+   [
+    "CBOE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:19:16"
+   ],
+   [
+    "LINC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:19:16"
+   ],
+   [
+    "TH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:19:16"
+   ],
+   [
+    "EVGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:19:16"
+   ],
+   [
+    "IE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:19:16"
+   ],
+   [
+    "ACET",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "XRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "BWA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "ALHC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "KRMN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "ABX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "BHC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:21:23"
+   ],
+   [
+    "RVMD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "CRMT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "PZZA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "ESI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "PDFS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "PLSE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "GOTU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "RARE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "PS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "NRDS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "GSM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "NNBR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:25:41"
+   ],
+   [
+    "MGM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "BXDC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "TRIP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "GEN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "ASTH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "OPRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "BRVE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "OLMA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:33:17"
+   ],
+   [
+    "MH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "MIAX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "PRCH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "OLED",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "CSHR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "VERI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "RRR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "FOSL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:35:50"
+   ],
+   [
+    "MQ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "RGTI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "RYAN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "IOND",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "TENB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "IMXI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "XHLD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "DDD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "ARQQ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "AIRJ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "KMTS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:40:52"
+   ],
+   [
+    "MTLS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "CHTR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "BETR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "NHP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "HYMC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "AVTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "LXU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "CRBP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:48:38"
+   ],
+   [
+    "TIGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "CLOV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "LEA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "CVS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "AI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "CLFD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "RCEL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "EMBC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "OBX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:51:26"
+   ],
+   [
+    "CME",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "OUST",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "SXC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "AVX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "KEEL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "UMAC",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "INTG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "FBDT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "INDP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "LTRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "15:56:01"
+   ],
+   [
+    "CLBT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "NAVI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "MYRG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "FLO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "VKTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "BYRN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "EGHT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:03:17"
+   ],
+   [
+    "BJRI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:05:51"
+   ],
+   [
+    "SAIL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:05:51"
+   ],
+   [
+    "BMNR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:05:51"
+   ],
+   [
+    "PTLO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:05:51"
+   ],
+   [
+    "DRI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:11:23"
+   ],
+   [
+    "APLD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:11:23"
+   ],
+   [
+    "TEVA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:11:23"
+   ],
+   [
+    "KARD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:11:23"
+   ],
+   [
+    "FSLR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:11:23"
+   ],
+   [
+    "DVN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "JCI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "TT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "AKTS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "HRI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "MAIR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "JMIA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "AVBP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "CRCT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "SBSW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "CWH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "GAU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "ERIE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "IVA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "KOS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "EPM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "ETON",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "SABS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:18:57"
+   ],
+   [
+    "MGA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "MBC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "MHK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "FUTU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "VFC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "RRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "BV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "FBIN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "PTON",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "NXDR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "MUR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "WPP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "NCLH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "FCN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "SM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "VGNT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "AN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "PLNT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "BTG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "WLFC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "IAUX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "RUN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "USAS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "SGRY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "SHLS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "OGG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "NRGV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "HLLY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "FNKO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "TSAT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:21:28"
+   ],
+   [
+    "INFQ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "ATEC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "KMT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "CARR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "AMRZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "ST",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "ABNB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "OPEN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "ENTG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "MRAM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "ALB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "HNGE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "VET",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "SSYS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "DOO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "CSL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "CCB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "NVTS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "SITM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "AYA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "THC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "SIDU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "VWAV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "VHC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "TRUP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "SAH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "MNTK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "LTBR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "HYLN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:26:19"
+   ],
+   [
+    "AYI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "OC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "COMP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "CCL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "ESAB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "CHRD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "UAL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "ALGT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "HIPO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "RH",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "BVS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "RR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "WATT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:34:37"
+   ],
+   [
+    "UAN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "CNXC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "REPX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "BSIN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "EWTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "FUBO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "LOVE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "PALI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:36:39"
+   ],
+   [
+    "DAL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "KSS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "ABG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "ULCC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "TRU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "LBGJ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "GFR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:41:13"
+   ],
+   [
+    "FTDR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "WMS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "ALSN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "CHKP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "LIND",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "GWRE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "APC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "KMX",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "RMIX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "ONT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "IPDN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "AVLN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:50:30"
+   ],
+   [
+    "SHMD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "WFF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "TEM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "CNM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "INGM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "CF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "BORR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "ACRS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "GPCR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "NGNE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "BOT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "LCUT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "16:56:47"
+   ],
+   [
+    "OKE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "DSX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "ASO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "NEXT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "SLGL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "MAGN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "OIG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "AGPU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:04:05"
+   ],
+   [
+    "AER",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "PRGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "PRDO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "MRNA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "PLBL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "LENZ",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:05:51"
+   ],
+   [
+    "HEPS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "KREF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "IIIV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "VUZI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "EROK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "TNDM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "ZBIO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:14:51"
+   ],
+   [
+    "LRN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:16:12"
+   ],
+   [
+    "SUNB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:16:12"
+   ],
+   [
+    "FTK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:16:12"
+   ],
+   [
+    "NEOV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:16:12"
+   ],
+   [
+    "COHR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:20:59"
+   ],
+   [
+    "EXK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:20:59"
+   ],
+   [
+    "VYGR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:20:59"
+   ],
+   [
+    "APA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "STRA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "UI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "APTV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "EPRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "DUOT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:30:15"
+   ],
+   [
+    "AS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "NE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "PVLA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "PD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "SUJA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "APEI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:36:16"
+   ],
+   [
+    "LKFT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "DOW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "MNPR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "MTDR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "PTEN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "QTTB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "XENE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "ODD",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "RCKT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:44:19"
+   ],
+   [
+    "EPC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "WLY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "CRVS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "TRAX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "CIX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "SWMR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:45:52"
+   ],
+   [
+    "APPN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:51:22"
+   ],
+   [
+    "TSCO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:51:22"
+   ],
+   [
+    "OPTU",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:51:22"
+   ],
+   [
+    "OEC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:51:22"
+   ],
+   [
+    "TTAN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:51:22"
+   ],
+   [
+    "GDOT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "IBEX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "NBR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "CV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "ALTG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "SIGA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "SCTX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "17:59:24"
+   ],
+   [
+    "EZPW",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:00:55"
+   ],
+   [
+    "EGY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:00:55"
+   ],
+   [
+    "ADV",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:00:55"
+   ],
+   [
+    "ALOY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:06:25"
+   ],
+   [
+    "TARA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:06:25"
+   ],
+   [
+    "YDES",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:06:25"
+   ],
+   [
+    "PRLB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:14:26"
+   ],
+   [
+    "KRSA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:14:26"
+   ],
+   [
+    "SLE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:14:26"
+   ],
+   [
+    "GM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:15:56"
+   ],
+   [
+    "TJGC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:15:56"
+   ],
+   [
+    "IMCC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:15:56"
+   ],
+   [
+    "ENVX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:15:56"
+   ],
+   [
+    "CX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "KSPI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "RNG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "SHEN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "NRC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "ASIC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:24:41"
+   ],
+   [
+    "AIB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:25:57"
+   ],
+   [
+    "WVE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:25:57"
+   ],
+   [
+    "EDIT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:25:57"
+   ],
+   [
+    "TGS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:30:58"
+   ],
+   [
+    "WEX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:30:58"
+   ],
+   [
+    "CPA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:30:58"
+   ],
+   [
+    "COGT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:30:58"
+   ],
+   [
+    "TYRA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:30:58"
+   ],
+   [
+    "VCTR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:40:00"
+   ],
+   [
+    "OPRT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:40:00"
+   ],
+   [
+    "MLAB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:40:00"
+   ],
+   [
+    "ANGI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:40:00"
+   ],
+   [
+    "AEBI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:41:18"
+   ],
+   [
+    "CVEO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:41:18"
+   ],
+   [
+    "CHRN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:41:18"
+   ],
+   [
+    "ALKT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:41:18"
+   ],
+   [
+    "DRUG",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:41:18"
+   ],
+   [
+    "MTRN",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:46:03"
+   ],
+   [
+    "RPAY",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:46:03"
+   ],
+   [
+    "DUOL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:46:03"
+   ],
+   [
+    "PROK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:46:03"
+   ],
+   [
+    "ELVR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:46:03"
+   ],
+   [
+    "NRXP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:55:05"
+   ],
+   [
+    "SCZM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:55:05"
+   ],
+   [
+    "ADNT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:55:05"
+   ],
+   [
+    "ODC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "18:55:51"
+   ],
+   [
+    "FATE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:00:54"
+   ],
+   [
+    "CTGO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:00:54"
+   ],
+   [
+    "LOPE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:10:10"
+   ],
+   [
+    "GVA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:10:10"
+   ],
+   [
+    "ESTC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:10:10"
+   ],
+   [
+    "AIR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:16:13"
+   ],
+   [
+    "ELE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:16:13"
+   ],
+   [
+    "KNTK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "EPAC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "FLS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "BCML",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "GIS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "SAIA",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "WHR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "RBRK",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "EVEX",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "SGHT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "LCID",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "CXM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "TOYO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "SND",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:24:45"
+   ],
+   [
+    "CHE",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:26:01"
+   ],
+   [
+    "CXDO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:26:01"
+   ],
+   [
+    "MED",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:26:01"
+   ],
+   [
+    "JEF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "ATRC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "COLD",
+    "NEW",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "FRPT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "AMP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "SIMO",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "EVER",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "AGNT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "EDHL",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:31:16"
+   ],
+   [
+    "LXRX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:40:01"
+   ],
+   [
+    "AIAI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:40:01"
+   ],
+   [
+    "PBF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:41:31"
+   ],
+   [
+    "NVCT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:41:31"
+   ],
+   [
+    "CVLT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "FTNT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "GTLB",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "TREX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "ARQT",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "HUBS",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "BDSX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:46:04"
+   ],
+   [
+    "KNX",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "HLF",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "GTM",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "OABI",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "KLC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "RC",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:54:49"
+   ],
+   [
+    "CAR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:56:07"
+   ],
+   [
+    "KDP",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:56:07"
+   ],
+   [
+    "XAIR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:56:07"
+   ],
+   [
+    "PRQR",
+    "UPGRADE",
+    "BUDGET_RESERVED_LATER_PHASE",
+    "19:56:07"
+   ],
+   [
+    "TPB",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "AXON",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "TONX",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "MBUU",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "TLSI",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "MTW",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:01:07"
+   ],
+   [
+    "ALV",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "PHIN",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "WD",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "DASH",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "ADTN",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "NCMI",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:10:12"
+   ],
+   [
+    "WOR",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "FLGT",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "GCMG",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "CRI",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "BGS",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "DKNG",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "NGEN",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "AEO",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "LPL",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "SHAK",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "GLAS",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "ADIG",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "DNA",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "UPB",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "JELD",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "RXT",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "KGEI",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "IOT",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "EDN",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "EAF",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:16:44"
+   ],
+   [
+    "HP",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "EXFY",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "OVID",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "SPIR",
+    "NEW",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "BRNX",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "UPST",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "FBYD",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "DH",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "XPOF",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "AEYE",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:24:51"
+   ],
+   [
+    "RVLV",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:26:06"
+   ],
+   [
+    "NVA",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:26:06"
+   ],
+   [
+    "FAC",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:26:06"
+   ],
+   [
+    "VTRS",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:35:38"
+   ],
+   [
+    "ZENA",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:35:38"
+   ],
+   [
+    "BRCC",
+    "NEW",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:35:38"
+   ],
+   [
+    "AMPL",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:41:08"
+   ],
+   [
+    "BOX",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:50:12"
+   ],
+   [
+    "RYAAY",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:50:12"
+   ],
+   [
+    "CVRX",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:50:12"
+   ],
+   [
+    "TRVI",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:50:12"
+   ],
+   [
+    "GO",
+    "UPGRADE",
+    "BUDGET_EXHAUSTED_TOTAL",
+    "20:50:12"
+   ]
+  ],
+  "held_by_policy": 2604,
+  "persistence_independent": true
+ },
+ "stale_shadow": {
+  "STALE_CLOSED_TOTAL": 46,
+  "RESUMED_TOTAL": 46,
+  "WOULD_REQUALIFY": 28,
+  "WOULD_BECOME_WATCH": 11,
+  "WOULD_BECOME_BULLISH": 11,
+  "WOULD_BECOME_BEARISH": 6,
+  "POTENTIAL_USEFUL_ALERTS_LOST": 28,
+  "detail": [
+   {
+    "symbol": "AESI",
+    "invalidated": "09:15",
+    "last_fresh": "08:00",
+    "age_min": 57.0,
+    "move_at_inval": 13.7,
+    "resumed": true,
+    "latest_print": "20:39",
+    "move_now": 15.2,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 100.0,
+    "useful_alert": true,
+    "missed_min": 701,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 3.28,
+     "ret_1h_pct": 2.88,
+     "mfe_pct": 6.72,
+     "mae_pct": -2.0
+    }
+   },
+   {
+    "symbol": "MFG",
+    "invalidated": "09:15",
+    "last_fresh": "08:02",
+    "age_min": 55.0,
+    "move_at_inval": 3.5,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 4.8,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 100.0,
+    "useful_alert": true,
+    "missed_min": 701,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.052,
+     "ret_1h_pct": 1.144,
+     "mfe_pct": 1.281,
+     "mae_pct": 0.549
+    }
+   },
+   {
+    "symbol": "MUFG",
+    "invalidated": "09:15",
+    "last_fresh": "08:01",
+    "age_min": 56.0,
+    "move_at_inval": 3.7,
+    "resumed": true,
+    "latest_print": "20:35",
+    "move_now": 4.0,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 94.0,
+    "useful_alert": true,
+    "missed_min": 701,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.064,
+     "ret_1h_pct": -0.064,
+     "mfe_pct": 0.675,
+     "mae_pct": -1.623
+    }
+   },
+   {
+    "symbol": "SCHL",
+    "invalidated": "09:15",
+    "last_fresh": "08:07",
+    "age_min": 50.0,
+    "move_at_inval": -11.4,
+    "resumed": true,
+    "latest_print": "20:22",
+    "move_now": -7.1,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 100.0,
+    "useful_alert": true,
+    "missed_min": 701,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -5.833,
+     "ret_1h_pct": -4.634,
+     "mfe_pct": 3.176,
+     "mae_pct": -9.203
+    }
+   },
+   {
+    "symbol": "WTTR",
+    "invalidated": "09:15",
+    "last_fresh": "08:05",
+    "age_min": 52.0,
+    "move_at_inval": 6.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 1.6,
+    "would_be_now": "SCORED",
+    "would_be_score": 52.84,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -2.931,
+     "ret_1h_pct": -2.259,
+     "mfe_pct": 1.201,
+     "mae_pct": -5.574
+    }
+   },
+   {
+    "symbol": "KLXE",
+    "invalidated": "09:30",
+    "last_fresh": "08:25",
+    "age_min": 47.0,
+    "move_at_inval": 2.0,
+    "resumed": true,
+    "latest_print": "20:35",
+    "move_now": 13.6,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 80.63,
+    "useful_alert": true,
+    "missed_min": 686,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -19.706,
+     "ret_1h_pct": -19.706,
+     "mfe_pct": -4.118,
+     "mae_pct": -20.588
+    }
+   },
+   {
+    "symbol": "NKTR",
+    "invalidated": "09:45",
+    "last_fresh": "08:42",
+    "age_min": 46.0,
+    "move_at_inval": 6.0,
+    "resumed": true,
+    "latest_print": "20:02",
+    "move_now": -3.3,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 76.62,
+    "useful_alert": true,
+    "missed_min": 671,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -7.11,
+     "ret_1h_pct": -5.378,
+     "mfe_pct": -3.114,
+     "mae_pct": -9.374
+    }
+   },
+   {
+    "symbol": "TWST",
+    "invalidated": "09:45",
+    "last_fresh": "08:39",
+    "age_min": 49.0,
+    "move_at_inval": 2.2,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.7,
+    "would_be_now": "SCORED",
+    "would_be_score": 47.26,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -6.576,
+     "ret_1h_pct": -5.055,
+     "mfe_pct": -2.818,
+     "mae_pct": -7.414
+    }
+   },
+   {
+    "symbol": "PHI",
+    "invalidated": "10:00",
+    "last_fresh": "08:47",
+    "age_min": 56.0,
+    "move_at_inval": -3.7,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -1.4,
+    "would_be_now": "SCORED",
+    "would_be_score": 66.24,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -1.958,
+     "ret_1h_pct": -2.255,
+     "mfe_pct": -0.95,
+     "mae_pct": -6.409
+    }
+   },
+   {
+    "symbol": "HESM",
+    "invalidated": "10:30",
+    "last_fresh": "09:18",
+    "age_min": 55.0,
+    "move_at_inval": 4.8,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.6,
+    "would_be_now": "SCORED",
+    "would_be_score": 60.37,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -5.272,
+     "ret_1h_pct": -5.607,
+     "mfe_pct": -4.784,
+     "mae_pct": -6.028
+    }
+   },
+   {
+    "symbol": "PPLI",
+    "invalidated": "10:30",
+    "last_fresh": "09:15",
+    "age_min": 58.0,
+    "move_at_inval": 8.5,
+    "resumed": true,
+    "latest_print": "20:25",
+    "move_now": 11.6,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 100.0,
+    "useful_alert": true,
+    "missed_min": 626,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.534,
+     "ret_1h_pct": 1.677,
+     "mfe_pct": 5.276,
+     "mae_pct": -0.364
+    }
+   },
+   {
+    "symbol": "COOK",
+    "invalidated": "11:00",
+    "last_fresh": "09:48",
+    "age_min": 55.0,
+    "move_at_inval": -2.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.3,
+    "would_be_now": "SCORED",
+    "would_be_score": 46.41,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -2.637,
+     "ret_1h_pct": -2.637,
+     "mfe_pct": 0.418,
+     "mae_pct": -5.495
+    }
+   },
+   {
+    "symbol": "CGNT",
+    "invalidated": "11:10",
+    "last_fresh": "10:05",
+    "age_min": 48.0,
+    "move_at_inval": 6.8,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -2.1,
+    "would_be_now": "WATCH",
+    "would_be_score": 62.78,
+    "useful_alert": true,
+    "missed_min": 586,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -6.459,
+     "ret_1h_pct": -6.351,
+     "mfe_pct": -6.028,
+     "mae_pct": -8.934
+    }
+   },
+   {
+    "symbol": "HAFN",
+    "invalidated": "11:50",
+    "last_fresh": "10:44",
+    "age_min": 49.0,
+    "move_at_inval": -2.0,
+    "resumed": true,
+    "latest_print": "20:21",
+    "move_now": 0.2,
+    "would_be_now": "SCORED",
+    "would_be_score": 56.18,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -1.091,
+     "ret_1h_pct": -1.263,
+     "mfe_pct": -0.574,
+     "mae_pct": -2.639
+    }
+   },
+   {
+    "symbol": "PSBD",
+    "invalidated": "12:05",
+    "last_fresh": "11:00",
+    "age_min": 47.0,
+    "move_at_inval": -2.9,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -4.6,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 88.57,
+    "useful_alert": true,
+    "missed_min": 531,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.7,
+     "ret_1h_pct": 1.8,
+     "mfe_pct": 2.799,
+     "mae_pct": 0.101
+    }
+   },
+   {
+    "symbol": "NMR",
+    "invalidated": "12:10",
+    "last_fresh": "11:07",
+    "age_min": 46.0,
+    "move_at_inval": 2.4,
+    "resumed": true,
+    "latest_print": "20:35",
+    "move_now": 3.0,
+    "would_be_now": "WATCH",
+    "would_be_score": 95.17,
+    "useful_alert": true,
+    "missed_min": 526,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.5,
+     "ret_1h_pct": 0.05,
+     "mfe_pct": 0.923,
+     "mae_pct": -0.4
+    }
+   },
+   {
+    "symbol": "NATH",
+    "invalidated": "12:20",
+    "last_fresh": "11:14",
+    "age_min": 48.0,
+    "move_at_inval": 6.7,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 7.7,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 100.0,
+    "useful_alert": true,
+    "missed_min": 516,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.617,
+     "ret_1h_pct": 0.711,
+     "mfe_pct": 1.392,
+     "mae_pct": 0.596
+    }
+   },
+   {
+    "symbol": "FLR",
+    "invalidated": "12:35",
+    "last_fresh": "11:30",
+    "age_min": 48.0,
+    "move_at_inval": 6.0,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.5,
+    "would_be_now": "SCORED",
+    "would_be_score": 57.55,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -5.364,
+     "ret_1h_pct": -5.606,
+     "mfe_pct": -4.936,
+     "mae_pct": -6.742
+    }
+   },
+   {
+    "symbol": "LION",
+    "invalidated": "12:35",
+    "last_fresh": "11:28",
+    "age_min": 50.0,
+    "move_at_inval": -3.6,
+    "resumed": true,
+    "latest_print": "20:03",
+    "move_now": -1.2,
+    "would_be_now": "SCORED",
+    "would_be_score": 56.48,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -1.228,
+     "ret_1h_pct": -0.094,
+     "mfe_pct": 1.228,
+     "mae_pct": -3.73
+    }
+   },
+   {
+    "symbol": "ACIC",
+    "invalidated": "12:40",
+    "last_fresh": "11:34",
+    "age_min": 48.0,
+    "move_at_inval": 4.2,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 3.6,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 90.73,
+    "useful_alert": true,
+    "missed_min": 496,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -1.597,
+     "ret_1h_pct": -1.491,
+     "mfe_pct": 0.639,
+     "mae_pct": -1.917
+    }
+   },
+   {
+    "symbol": "CMCL",
+    "invalidated": "12:40",
+    "last_fresh": "11:33",
+    "age_min": 49.0,
+    "move_at_inval": 2.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.1,
+    "would_be_now": "SCORED",
+    "would_be_score": 46.87,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -4.49,
+     "ret_1h_pct": -3.082,
+     "mfe_pct": -1.837,
+     "mae_pct": -4.734
+    }
+   },
+   {
+    "symbol": "HCM",
+    "invalidated": "12:55",
+    "last_fresh": "11:48",
+    "age_min": 50.0,
+    "move_at_inval": 3.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 0.3,
+    "would_be_now": "SCORED",
+    "would_be_score": 43.89,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -2.847,
+     "ret_1h_pct": -2.778,
+     "mfe_pct": -1.806,
+     "mae_pct": -3.368
+    }
+   },
+   {
+    "symbol": "SMFG",
+    "invalidated": "12:55",
+    "last_fresh": "11:50",
+    "age_min": 48.0,
+    "move_at_inval": 3.5,
+    "resumed": true,
+    "latest_print": "20:01",
+    "move_now": 4.0,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 85.0,
+    "useful_alert": true,
+    "missed_min": 481,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.521,
+     "ret_1h_pct": 0.427,
+     "mfe_pct": 1.165,
+     "mae_pct": 0.105
+    }
+   },
+   {
+    "symbol": "DRS",
+    "invalidated": "13:30",
+    "last_fresh": "12:22",
+    "age_min": 51.0,
+    "move_at_inval": 1.1,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -1.1,
+    "would_be_now": "SCORED",
+    "would_be_score": 53.29,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "INVALIDATED",
+     "ret_30m_pct": -4.826,
+     "ret_1h_pct": -5.602,
+     "mfe_pct": -4.344,
+     "mae_pct": -6.192
+    }
+   },
+   {
+    "symbol": "HHH",
+    "invalidated": "13:40",
+    "last_fresh": "12:37",
+    "age_min": 46.0,
+    "move_at_inval": 3.2,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 6.0,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 94.0,
+    "useful_alert": true,
+    "missed_min": 436,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.045,
+     "ret_1h_pct": -0.722,
+     "mfe_pct": 4.068,
+     "mae_pct": -1.504
+    }
+   },
+   {
+    "symbol": "FBK",
+    "invalidated": "13:45",
+    "last_fresh": "12:39",
+    "age_min": 49.0,
+    "move_at_inval": 28.8,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.1,
+    "would_be_now": "SCORED",
+    "would_be_score": 51.24,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -21.853,
+     "ret_1h_pct": -21.647,
+     "mfe_pct": -21.368,
+     "mae_pct": -22.485
+    }
+   },
+   {
+    "symbol": "GRFS",
+    "invalidated": "13:45",
+    "last_fresh": "12:38",
+    "age_min": 50.0,
+    "move_at_inval": 2.4,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 2.1,
+    "would_be_now": "WATCH",
+    "would_be_score": 73.22,
+    "useful_alert": true,
+    "missed_min": 431,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.475,
+     "ret_1h_pct": -0.543,
+     "mfe_pct": 0.259,
+     "mae_pct": -1.03
+    }
+   },
+   {
+    "symbol": "WYY",
+    "invalidated": "13:45",
+    "last_fresh": "12:42",
+    "age_min": 46.0,
+    "move_at_inval": -3.0,
+    "resumed": true,
+    "latest_print": "20:34",
+    "move_now": -52.1,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 85.0,
+    "useful_alert": true,
+    "missed_min": 431,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 35.261,
+     "ret_1h_pct": 54.218,
+     "mfe_pct": 58.768,
+     "mae_pct": -3.602
+    }
+   },
+   {
+    "symbol": "JOUT",
+    "invalidated": "14:35",
+    "last_fresh": "13:31",
+    "age_min": 46.0,
+    "move_at_inval": 2.5,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 1.5,
+    "would_be_now": "SCORED",
+    "would_be_score": 47.45,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "OUTCOME_PENDING",
+     "ret_30m_pct": null,
+     "ret_1h_pct": null,
+     "mfe_pct": -0.815,
+     "mae_pct": -3.746
+    }
+   },
+   {
+    "symbol": "CMDB",
+    "invalidated": "15:40",
+    "last_fresh": "14:35",
+    "age_min": 48.0,
+    "move_at_inval": -3.5,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -3.9,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 66.14,
+    "useful_alert": true,
+    "missed_min": 316,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.0,
+     "ret_1h_pct": 0.0,
+     "mfe_pct": 1.863,
+     "mae_pct": -2.227
+    }
+   },
+   {
+    "symbol": "ACFN",
+    "invalidated": "16:55",
+    "last_fresh": "15:51",
+    "age_min": 47.0,
+    "move_at_inval": 3.9,
+    "resumed": true,
+    "latest_print": "19:54",
+    "move_now": 0.9,
+    "would_be_now": "SCORED",
+    "would_be_score": 40.12,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.783,
+     "ret_1h_pct": 1.971,
+     "mfe_pct": 3.332,
+     "mae_pct": -1.619
+    }
+   },
+   {
+    "symbol": "TRBG",
+    "invalidated": "16:55",
+    "last_fresh": "15:51",
+    "age_min": 47.0,
+    "move_at_inval": -6.0,
+    "resumed": true,
+    "latest_print": "20:05",
+    "move_now": -6.3,
+    "would_be_now": "WATCH",
+    "would_be_score": 47.85,
+    "useful_alert": true,
+    "missed_min": 241,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.675,
+     "ret_1h_pct": 0.348,
+     "mfe_pct": 4.897,
+     "mae_pct": -0.366
+    }
+   },
+   {
+    "symbol": "RDIB",
+    "invalidated": "17:15",
+    "last_fresh": "16:11",
+    "age_min": 46.0,
+    "move_at_inval": -2.1,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -3.9,
+    "would_be_now": "WATCH",
+    "would_be_score": 50.9,
+    "useful_alert": true,
+    "missed_min": 221,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.361,
+     "ret_1h_pct": -0.361,
+     "mfe_pct": 6.017,
+     "mae_pct": -2.888
+    }
+   },
+   {
+    "symbol": "CLFD",
+    "invalidated": "17:35",
+    "last_fresh": "16:27",
+    "age_min": 51.0,
+    "move_at_inval": 2.9,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 1.8,
+    "would_be_now": "SCORED",
+    "would_be_score": 59.0,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.637,
+     "ret_1h_pct": 0.64,
+     "mfe_pct": 1.344,
+     "mae_pct": -0.72
+    }
+   },
+   {
+    "symbol": "RCKY",
+    "invalidated": "17:40",
+    "last_fresh": "16:34",
+    "age_min": 48.0,
+    "move_at_inval": 2.1,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 1.0,
+    "would_be_now": "SCORED",
+    "would_be_score": 53.14,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.044,
+     "ret_1h_pct": -0.044,
+     "mfe_pct": 0.0,
+     "mae_pct": -1.205
+    }
+   },
+   {
+    "symbol": "EPSM",
+    "invalidated": "18:05",
+    "last_fresh": "17:02",
+    "age_min": 46.0,
+    "move_at_inval": -12.0,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -9.9,
+    "would_be_now": "WATCH",
+    "would_be_score": 59.31,
+    "useful_alert": true,
+    "missed_min": 171,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 5.703,
+     "ret_1h_pct": -6.411,
+     "mfe_pct": 8.053,
+     "mae_pct": -6.411
+    }
+   },
+   {
+    "symbol": "CHCI",
+    "invalidated": "18:10",
+    "last_fresh": "17:05",
+    "age_min": 47.0,
+    "move_at_inval": 1.5,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -0.4,
+    "would_be_now": "SCORED",
+    "would_be_score": 46.28,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.796,
+     "ret_1h_pct": -0.796,
+     "mfe_pct": -0.363,
+     "mae_pct": -3.832
+    }
+   },
+   {
+    "symbol": "INTG",
+    "invalidated": "18:10",
+    "last_fresh": "17:04",
+    "age_min": 48.0,
+    "move_at_inval": -5.2,
+    "resumed": true,
+    "latest_print": "19:59",
+    "move_now": -9.4,
+    "would_be_now": "BEARISH_SETUP",
+    "would_be_score": 77.76,
+    "useful_alert": true,
+    "missed_min": 166,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -1.685,
+     "ret_1h_pct": -0.948,
+     "mfe_pct": 5.629,
+     "mae_pct": -3.329
+    }
+   },
+   {
+    "symbol": "YAAS",
+    "invalidated": "18:20",
+    "last_fresh": "17:12",
+    "age_min": 51.0,
+    "move_at_inval": -5.8,
+    "resumed": true,
+    "latest_print": "20:37",
+    "move_now": -10.9,
+    "would_be_now": "WATCH",
+    "would_be_score": 51.09,
+    "useful_alert": true,
+    "missed_min": 156,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -7.9,
+     "ret_1h_pct": -8.639,
+     "mfe_pct": -6.032,
+     "mae_pct": -12.115
+    }
+   },
+   {
+    "symbol": "KIDZ",
+    "invalidated": "18:30",
+    "last_fresh": "17:23",
+    "age_min": 50.0,
+    "move_at_inval": -4.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": -4.2,
+    "would_be_now": "WATCH",
+    "would_be_score": 47.82,
+    "useful_alert": true,
+    "missed_min": 146,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -1.24,
+     "ret_1h_pct": -2.888,
+     "mfe_pct": 0.0,
+     "mae_pct": -6.198
+    }
+   },
+   {
+    "symbol": "USLM",
+    "invalidated": "18:40",
+    "last_fresh": "17:33",
+    "age_min": 50.0,
+    "move_at_inval": 2.0,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 1.8,
+    "would_be_now": "SCORED",
+    "would_be_score": 65.59,
+    "useful_alert": false,
+    "missed_min": null,
+    "outcome": {
+     "status": "FAILED_CONFIRMATION",
+     "ret_30m_pct": -0.027,
+     "ret_1h_pct": -0.349,
+     "mfe_pct": 0.071,
+     "mae_pct": -0.84
+    }
+   },
+   {
+    "symbol": "SLGL",
+    "invalidated": "18:50",
+    "last_fresh": "17:45",
+    "age_min": 48.0,
+    "move_at_inval": 6.6,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 10.1,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 78.21,
+    "useful_alert": true,
+    "missed_min": 126,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 3.898,
+     "ret_1h_pct": 3.898,
+     "mfe_pct": 6.413,
+     "mae_pct": 0.34
+    }
+   },
+   {
+    "symbol": "MGN",
+    "invalidated": "18:55",
+    "last_fresh": "17:50",
+    "age_min": 47.0,
+    "move_at_inval": 7.5,
+    "resumed": true,
+    "latest_print": "20:33",
+    "move_now": 4.5,
+    "would_be_now": "WATCH",
+    "would_be_score": 43.97,
+    "useful_alert": true,
+    "missed_min": 121,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.606,
+     "ret_1h_pct": -4.429,
+     "mfe_pct": 3.494,
+     "mae_pct": -10.256
+    }
+   },
+   {
+    "symbol": "CIX",
+    "invalidated": "19:30",
+    "last_fresh": "18:22",
+    "age_min": 50.0,
+    "move_at_inval": 2.9,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 4.2,
+    "would_be_now": "BULLISH_SETUP",
+    "would_be_score": 60.69,
+    "useful_alert": true,
+    "missed_min": 86,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 0.836,
+     "ret_1h_pct": 2.116,
+     "mfe_pct": 3.585,
+     "mae_pct": -0.135
+    }
+   },
+   {
+    "symbol": "NIKI",
+    "invalidated": "19:40",
+    "last_fresh": "18:35",
+    "age_min": 47.0,
+    "move_at_inval": -4.2,
+    "resumed": true,
+    "latest_print": "19:55",
+    "move_now": -4.2,
+    "would_be_now": "WATCH",
+    "would_be_score": 44.75,
+    "useful_alert": true,
+    "missed_min": 76,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 1.848,
+     "ret_1h_pct": 1.848,
+     "mfe_pct": 4.31,
+     "mae_pct": -1.643
+    }
+   },
+   {
+    "symbol": "SQFT",
+    "invalidated": "19:50",
+    "last_fresh": "18:45",
+    "age_min": 48.0,
+    "move_at_inval": 1.1,
+    "resumed": true,
+    "latest_print": "20:00",
+    "move_now": 6.4,
+    "would_be_now": "WATCH",
+    "would_be_score": 49.38,
+    "useful_alert": true,
+    "missed_min": 66,
+    "outcome": {
+     "status": "CONFIRMED",
+     "ret_30m_pct": 2.703,
+     "ret_1h_pct": 0.0,
+     "mfe_pct": 4.054,
+     "mae_pct": -3.635
+    }
+   }
+  ]
+ },
+ "backpressure": {
+  "db_mb": {
+   "opportunity.db": 33.28,
+   "market.db": 59.57,
+   "notification.db": 6.17,
+   "outcomes.db": 4.74,
+   "runtime.db": 4.23
+  },
+  "events": 4333,
+  "outbox": 275,
+  "outcome_rows": 2002,
+  "heartbeat_age_s": {
+   "ingestion": 1.4,
+   "evaluator:INTRADAY": 2.7,
+   "evaluator:SAME_DAY": 2.8,
+   "discovery": 51.5,
+   "evaluator:SHORT_TERM": 2.7,
+   "evaluator:LONG_TERM": 2.8,
+   "notifier": 2.7,
+   "outcomes": -0.6,
+   "reporting": 2.9,
+   "promotion": 2.6
+  },
+  "cursor_lag": {
+   "notifier": 0,
+   "intraday": 0,
+   "same_day": 0,
+   "short_term": 0,
+   "long_term": 0
+  },
+  "scan_duration_last8": [
+   64.11,
+   300.11,
+   94.41,
+   289.62,
+   52.28,
+   326.95,
+   56.02,
+   310.5
+  ],
+  "ingest_cycle_s_last8": [
+   12.2,
+   12.78,
+   12.8,
+   12.11,
+   11.69,
+   11.59,
+   11.56,
+   12.34
+  ],
+  "tick_errors_today": 0,
+  "note": "SQLite busy/lock waits and per-tick durations of evaluators/notifier/outcomes are not instrumented; cursor lag + heartbeat are the proxies"
+ },
+ "provider": {
+  "eligible_requested": 5653,
+  "symbols_with_bars": 5504,
+  "no_prints_yet": 149,
+  "stale_gt45m_names": 351,
+  "incomplete_now": 0,
+  "as_of": "2026-09-25T20:40:00+00:00",
+  "requests": 16930,
+  "cycles_today": [
+   593,
+   0,
+   0,
+   1
+  ],
+  "liquid_names_lag_min": {
+   "n": 1491,
+   "p50": 35.0,
+   "p90": 39.0,
+   "max": 39.0
+  },
+  "classification": "no PROVIDER_FAILURE; non-printing names = EXPECTED_NO_PRINT_THIN_NAME unless liquid lag grows"
+ },
+ "transition": {
+  "T0": "13:30:00",
+  "T1_first_regular_bar_available": "13:46:00",
+  "T2_first_ingest_with_regular_data": "13:47:36",
+  "T2_as_of": "13:32:00",
+  "T3_first_scan_with_regular_data": "13:50:00",
+  "T3_scan_phase_label": "REGULAR",
+  "T4_first_decision_on_regular_data": "13:51:16",
+  "T5_first_lab_send_on_regular_data": "13:51:17",
+  "T1-T0 (provider entitlement)": 960,
+  "T2-T1": 97,
+  "T3-T2": 143,
+  "T4-T3": 77,
+  "T5-T4": 1,
+  "scans_labelled_REGULAR_before_regular_data": 4
+ },
+ "regular_first_seen": {
+  "REGULAR_FIRST_SEEN_COUNT": 1755,
+  "REGULAR_FIRST_SEEN_SETUP_COUNT": 19,
+  "REGULAR_FIRST_SEEN_SENT": 4,
+  "REGULAR_FIRST_SEEN_HELD": 1751,
+  "detail": [
+   {
+    "symbol": "ISPC",
+    "cid": "2026-09-25:ISPC:GAP_UP",
+    "first_seen": "13:30:00",
+    "data_as_of": "13:14",
+    "move_pct": 4.0,
+    "liquidity": {
+     "activity_adv_fraction": 0.08426910338837651,
+     "adv20_dollars": 2155309.319,
+     "pm_dollars": 152775.858762,
+     "pm_volume": 120358.0
+    },
+    "catalyst": "none found",
+    "score": 46.33,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "CLS",
+    "cid": "2026-09-25:CLS:GAP_UP",
+    "first_seen": "13:30:00",
+    "data_as_of": "13:14",
+    "move_pct": 2.1,
+    "liquidity": {
+     "activity_adv_fraction": 0.0044792466222446665,
+     "adv20_dollars": 736487292.342,
+     "pm_dollars": 3843504.78102,
+     "pm_volume": 10116.0
+    },
+    "catalyst": "2 other SEC filing(s): 4",
+    "score": 45.69,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "AAL",
+    "cid": "2026-09-25:AAL:GAP_UP",
+    "first_seen": "13:30:00",
+    "data_as_of": "13:14",
+    "move_pct": 2.2,
+    "liquidity": {
+     "activity_adv_fraction": 0.0061713369710485275,
+     "adv20_dollars": 924266718.537,
+     "pm_dollars": 5893220.612063,
+     "pm_volume": 434207.0
+    },
+    "catalyst": "none found",
+    "score": 43.74,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "FRVO",
+    "cid": "2026-09-25:FRVO:GAP_UP",
+    "first_seen": "13:30:00",
+    "data_as_of": "13:14",
+    "move_pct": 6.7,
+    "liquidity": {
+     "activity_adv_fraction": 0.022390302869058975,
+     "adv20_dollars": 136710507.53599998,
+     "pm_dollars": 3065801.674592,
+     "pm_volume": 175586.0
+    },
+    "catalyst": "none found",
+    "score": 41.9,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "RDW",
+    "cid": "2026-09-25:RDW:GAP_UP",
+    "first_seen": "13:30:00",
+    "data_as_of": "13:14",
+    "move_pct": 2.4,
+    "liquidity": {
+     "activity_adv_fraction": 0.02524062153274042,
+     "adv20_dollars": 136356334.936,
+     "pm_dollars": 3716905.726799,
+     "pm_volume": 314523.0
+    },
+    "catalyst": "none found",
+    "score": 41.58,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "VBIO",
+    "cid": "2026-09-25:VBIO:GAP_DOWN",
+    "first_seen": "13:35:00",
+    "data_as_of": "13:18",
+    "move_pct": -5.2,
+    "liquidity": {
+     "activity_adv_fraction": 0.07974337249668668,
+     "adv20_dollars": 2712238.9311,
+     "pm_dollars": 231676.780044,
+     "pm_volume": 67022.0
+    },
+    "catalyst": "2 other SEC filing(s): 4",
+    "score": 43.88,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "ANET",
+    "cid": "2026-09-25:ANET:GAP_UP",
+    "first_seen": "13:35:00",
+    "data_as_of": "13:18",
+    "move_pct": 2.0,
+    "liquidity": {
+     "activity_adv_fraction": 0.007225939227071572,
+     "adv20_dollars": 942277082.5639999,
+     "pm_dollars": 7240912.031208,
+     "pm_volume": 34628.0
+    },
+    "catalyst": "none found",
+    "score": 42.17,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "SEZL",
+    "cid": "2026-09-25:SEZL:GAP_UP",
+    "first_seen": "13:35:00",
+    "data_as_of": "13:18",
+    "move_pct": 2.6,
+    "liquidity": {
+     "activity_adv_fraction": 0.009403925058325638,
+     "adv20_dollars": 57214010.02150001,
+     "pm_dollars": 517060.14,
+     "pm_volume": 4635.0
+    },
+    "catalyst": "2 other SEC filing(s): 4",
+    "score": 40.26,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "DDOG",
+    "cid": "2026-09-25:DDOG:GAP_UP",
+    "first_seen": "13:40:00",
+    "data_as_of": "13:24",
+    "move_pct": 2.1,
+    "liquidity": {
+     "activity_adv_fraction": 0.012005523661458404,
+     "adv20_dollars": 834556266.98075,
+     "pm_dollars": 11394061.894686,
+     "pm_volume": 43712.0
+    },
+    "catalyst": "none found",
+    "score": 42.64,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "YMAT",
+    "cid": "2026-09-25:YMAT:GAP_UP",
+    "first_seen": "13:40:00",
+    "data_as_of": "13:24",
+    "move_pct": 10.5,
+    "liquidity": {
+     "activity_adv_fraction": 0.08612310368600586,
+     "adv20_dollars": 6965131.04945,
+     "pm_dollars": 509916.23482899996,
+     "pm_volume": 327632.0
+    },
+    "catalyst": "none found",
+    "score": 40.08,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "KDK",
+    "cid": "2026-09-25:KDK:GAP_DOWN",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": -2.9,
+    "liquidity": {
+     "activity_adv_fraction": 2.0816417274243078,
+     "adv20_dollars": 5931867.9555,
+     "pm_dollars": 9073040.940194,
+     "pm_volume": 3588910.0
+    },
+    "catalyst": "none found",
+    "score": 61.15,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "RZLT",
+    "cid": "2026-09-25:RZLT:GAP_DOWN",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": -10.4,
+    "liquidity": {
+     "activity_adv_fraction": 0.0026581862487516567,
+     "adv20_dollars": 5827627.459000001,
+     "pm_dollars": 14453.829515,
+     "pm_volume": 3726.0
+    },
+    "catalyst": "8-K earnings (item 2.02) filed 2026-09-24; 1 other SEC filing(s): 10-K",
+    "score": 57.66,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "NTES",
+    "cid": "2026-09-25:NTES:GAP_DOWN",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": -2.0,
+    "liquidity": {
+     "activity_adv_fraction": 0.004139347246983012,
+     "adv20_dollars": 72477293.33225,
+     "pm_dollars": 292285.97488,
+     "pm_volume": 2535.0
+    },
+    "catalyst": "6-K filed 2026-09-24",
+    "score": 53.89,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "GRAL",
+    "cid": "2026-09-25:GRAL:GAP_DOWN",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": -2.2,
+    "liquidity": {
+     "activity_adv_fraction": 0.0958753846887358,
+     "adv20_dollars": 117188700.399,
+     "pm_dollars": 15108784.450073,
+     "pm_volume": 120854.0
+    },
+    "catalyst": "none found",
+    "score": 52.35,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "UGP",
+    "cid": "2026-09-25:UGP:GAP_DOWN",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": -3.3,
+    "liquidity": {
+     "activity_adv_fraction": 0.014415120137955985,
+     "adv20_dollars": 24314778.946000002,
+     "pm_dollars": 355260.393669,
+     "pm_volume": 47830.0
+    },
+    "catalyst": "none found",
+    "score": 46.64,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "FSLY",
+    "cid": "2026-09-25:FSLY:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 5.2,
+    "liquidity": {
+     "activity_adv_fraction": 0.039292405082147576,
+     "adv20_dollars": 199408859.352,
+     "pm_dollars": 8580770.89061,
+     "pm_volume": 310191.0
+    },
+    "catalyst": "none found",
+    "score": 45.9,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "HMC",
+    "cid": "2026-09-25:HMC:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 2.4,
+    "liquidity": {
+     "activity_adv_fraction": 0.013313897606274163,
+     "adv20_dollars": 26763677.075999998,
+     "pm_dollars": 364438.03611000004,
+     "pm_volume": 11080.0
+    },
+    "catalyst": "none found",
+    "score": 45.23,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "FFBC",
+    "cid": "2026-09-25:FFBC:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 2.0,
+    "liquidity": {
+     "activity_adv_fraction": 0.016533078608884928,
+     "adv20_dollars": 28264667.105,
+     "pm_dollars": 462769.590408,
+     "pm_volume": 14506.0
+    },
+    "catalyst": "none found",
+    "score": 44.52,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "RMBS",
+    "cid": "2026-09-25:RMBS:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 3.3,
+    "liquidity": {
+     "activity_adv_fraction": 0.005341379551756024,
+     "adv20_dollars": 250018344.9285,
+     "pm_dollars": 1584448.075972,
+     "pm_volume": 14828.0
+    },
+    "catalyst": "1 other SEC filing(s): 4",
+    "score": 44.07,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "OCGN",
+    "cid": "2026-09-25:OCGN:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 6.0,
+    "liquidity": {
+     "activity_adv_fraction": 0.03227543822725292,
+     "adv20_dollars": 9077921.179085,
+     "pm_dollars": 279049.196112,
+     "pm_volume": 270966.0
+    },
+    "catalyst": "none found",
+    "score": 43.11,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "AGO",
+    "cid": "2026-09-25:AGO:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 3.8,
+    "liquidity": {
+     "activity_adv_fraction": 0.003818199917441167,
+     "adv20_dollars": 37011127.9845,
+     "pm_dollars": 137297.39448299998,
+     "pm_volume": 1960.0
+    },
+    "catalyst": "none found",
+    "score": 42.74,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "FUL",
+    "cid": "2026-09-25:FUL:GAP_UP",
+    "first_seen": "13:45:00",
+    "data_as_of": "13:29",
+    "move_pct": 2.4,
+    "liquidity": {
+     "activity_adv_fraction": 0.0029145622161331234,
+     "adv20_dollars": 40587293.39,
+     "pm_dollars": 116903.56005900001,
+     "pm_volume": 2297.0
+    },
+    "catalyst": "8-K earnings (item 2.02) filed 2026-09-24; 1 other SEC filing(s): 10-Q",
+    "score": 41.51,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "SNX",
+    "cid": "2026-09-25:SNX:GAP_UP",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": 4.4,
+    "liquidity": {
+     "activity_adv_fraction": 0.033948228898537255,
+     "adv20_dollars": 254619185.39450002,
+     "pm_dollars": 8640936.350034,
+     "pm_volume": 32398.0
+    },
+    "catalyst": "8-K earnings (item 2.02) filed 2026-09-24",
+    "score": 74.1,
+    "cls": "BULLISH",
+    "decision": "SELECTED",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": "13:51:20",
+    "used_regular_reserve": true
+   },
+   {
+    "symbol": "WRD",
+    "cid": "2026-09-25:WRD:GAP_DOWN",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": -2.2,
+    "liquidity": {
+     "activity_adv_fraction": 0.08351368143170355,
+     "adv20_dollars": 13082780.1685,
+     "pm_dollars": 1086788.249702,
+     "pm_volume": 189980.0
+    },
+    "catalyst": "6-K filed 2026-09-24",
+    "score": 70.99,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "META",
+    "cid": "2026-09-25:META:GAP_DOWN",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": -2.6,
+    "liquidity": {
+     "activity_adv_fraction": 0.0875804098726216,
+     "adv20_dollars": 15026611901.791,
+     "pm_dollars": 1506994060.464737,
+     "pm_volume": 1965497.0
+    },
+    "catalyst": "1 other SEC filing(s): 144",
+    "score": 66.12,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "SLI",
+    "cid": "2026-09-25:SLI:GAP_DOWN",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": -5.3,
+    "liquidity": {
+     "activity_adv_fraction": 0.26250780175438765,
+     "adv20_dollars": 3570667.6805,
+     "pm_dollars": 819427.289124,
+     "pm_volume": 405660.0
+    },
+    "catalyst": "none found",
+    "score": 62.7,
+    "cls": "BEARISH",
+    "decision": "SELECTED",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": "13:51:23",
+    "used_regular_reserve": true
+   },
+   {
+    "symbol": "SRZN",
+    "cid": "2026-09-25:SRZN:GAP_UP",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": 4.9,
+    "liquidity": {
+     "activity_adv_fraction": 0.1463318828460797,
+     "adv20_dollars": 22886949.748999998,
+     "pm_dollars": 3906370.727084,
+     "pm_volume": 109897.0
+    },
+    "catalyst": "none found",
+    "score": 61.55,
+    "cls": "BULLISH",
+    "decision": "SELECTED",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": "13:51:24",
+    "used_regular_reserve": true
+   },
+   {
+    "symbol": "GPOR",
+    "cid": "2026-09-25:GPOR:GAP_DOWN",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": -2.5,
+    "liquidity": {
+     "activity_adv_fraction": 0.060922782896691494,
+     "adv20_dollars": 45684621.008999996,
+     "pm_dollars": 2579189.939617,
+     "pm_volume": 16353.0
+    },
+    "catalyst": "1 other SEC filing(s): 144",
+    "score": 61.42,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "ZH",
+    "cid": "2026-09-25:ZH:GAP_UP",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": 2.1,
+    "liquidity": {
+     "activity_adv_fraction": 0.08726417364349305,
+     "adv20_dollars": 1972677.788,
+     "pm_dollars": 210786.57428,
+     "pm_volume": 55306.0
+    },
+    "catalyst": "6-K filed 2026-09-24",
+    "score": 61.31,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   },
+   {
+    "symbol": "PONY",
+    "cid": "2026-09-25:PONY:GAP_DOWN",
+    "first_seen": "13:50:00",
+    "data_as_of": "13:33",
+    "move_pct": -3.5,
+    "liquidity": {
+     "activity_adv_fraction": 0.07865051699080869,
+     "adv20_dollars": 25032163.011249997,
+     "pm_dollars": 1930050.489086,
+     "pm_volume": 280906.0
+    },
+    "catalyst": "none found",
+    "score": 59.97,
+    "cls": "WATCH",
+    "decision": "BUDGET_EXHAUSTED_WATCH",
+    "policy": "LAB_NOTIFY_POLICY_V1_PHASE_RESERVED_20260925",
+    "sent": null,
+    "used_regular_reserve": false
+   }
+  ]
+ },
+ "score_buckets": {
+  "SETUP_60_70": {
+   "n_all": 18,
+   "n_mature": 16,
+   "cls": {
+    "BULLISH": 9,
+    "BEARISH": 9
+   },
+   "score_p50": 65.0,
+   "ret30_dir": {
+    "n": 16,
+    "mean": 1.839,
+    "median": 0.451
+   },
+   "ret1h_dir": {
+    "n": 15,
+    "mean": 1.344,
+    "median": -0.121
+   },
+   "mfe": {
+    "n": 16,
+    "mean": 7.484,
+    "median": 2.149
+   },
+   "mae": {
+    "n": 16,
+    "mean": -2.607,
+    "median": -1.872
+   },
+   "confirm_rate(upgrade)": 0.0,
+   "invalidation_rate": 0.222,
+   "stale_rate": 0.0
+  },
+  "SETUP_70_80": {
+   "n_all": 5,
+   "n_mature": 5,
+   "cls": {
+    "BULLISH": 4,
+    "BEARISH": 1
+   },
+   "score_p50": 74.1,
+   "ret30_dir": {
+    "n": 5,
+    "mean": 1.077,
+    "median": -0.641
+   },
+   "ret1h_dir": {
+    "n": 4,
+    "mean": -3.07,
+    "median": -2.249
+   },
+   "mfe": {
+    "n": 5,
+    "mean": 5.869,
+    "median": 0.911
+   },
+   "mae": {
+    "n": 5,
+    "mean": -5.522,
+    "median": -3.813
+   },
+   "confirm_rate(upgrade)": 0.0,
+   "invalidation_rate": 0.4,
+   "stale_rate": 0.0
+  },
+  "SETUP_80_90": {
+   "n_all": 2,
+   "n_mature": 2,
+   "cls": {
+    "BULLISH": 1,
+    "BEARISH": 1
+   },
+   "score_p50": 84.1,
+   "ret30_dir": {
+    "n": 2,
+    "mean": -12.977,
+    "median": -12.977
+   },
+   "ret1h_dir": {
+    "n": 2,
+    "mean": -11.685,
+    "median": -11.685
+   },
+   "mfe": {
+    "n": 2,
+    "mean": -2.469,
+    "median": -2.469
+   },
+   "mae": {
+    "n": 2,
+    "mean": -15.373,
+    "median": -15.373
+   },
+   "confirm_rate(upgrade)": 0.0,
+   "invalidation_rate": 0.0,
+   "stale_rate": 0.0
+  },
+  "SETUP_90+": {
+   "n_all": 4,
+   "n_mature": 4,
+   "cls": {
+    "BULLISH": 3,
+    "BEARISH": 1
+   },
+   "score_p50": 97.3,
+   "ret30_dir": {
+    "n": 4,
+    "mean": -18.646,
+    "median": -11.543
+   },
+   "ret1h_dir": {
+    "n": 4,
+    "mean": -14.947,
+    "median": -6.334
+   },
+   "mfe": {
+    "n": 4,
+    "mean": 2.65,
+    "median": 6.653
+   },
+   "mae": {
+    "n": 4,
+    "mean": -24.984,
+    "median": -19.732
+   },
+   "confirm_rate(upgrade)": 0.0,
+   "invalidation_rate": 0.5,
+   "stale_rate": 0.0
+  },
+  "WATCH_50+": {
+   "n_all": 1186,
+   "n_mature": 1072,
+   "cls": {
+    "WATCH": 1186
+   },
+   "score_p50": 59.6,
+   "ret30_dir": {
+    "n": 1072,
+    "mean": -0.139,
+    "median": -0.054
+   },
+   "ret1h_dir": {
+    "n": 1024,
+    "mean": -0.185,
+    "median": -0.139
+   },
+   "mfe": {
+    "n": 1072,
+    "mean": 1.357,
+    "median": 0.821
+   },
+   "mae": {
+    "n": 1072,
+    "mean": -1.693,
+    "median": -1.102
+   },
+   "confirm_rate(upgrade)": 0.345,
+   "invalidation_rate": 0.391,
+   "stale_rate": 0.013
+  },
+  "WATCH_lt50": {
+   "n_all": 787,
+   "n_mature": 769,
+   "cls": {
+    "WATCH": 787
+   },
+   "score_p50": 43.2,
+   "ret30_dir": {
+    "n": 769,
+    "mean": -0.323,
+    "median": -0.249
+   },
+   "ret1h_dir": {
+    "n": 760,
+    "mean": -0.374,
+    "median": -0.35
+   },
+   "mfe": {
+    "n": 769,
+    "mean": 2.248,
+    "median": 1.326
+   },
+   "mae": {
+    "n": 769,
+    "mean": -2.821,
+    "median": -1.979
+   },
+   "confirm_rate(upgrade)": 0.349,
+   "invalidation_rate": 0.531,
+   "stale_rate": 0.038
+  }
+ },
+ "sent_vs_held": {
+  "SENT": {
+   "n_all": 75,
+   "n_mature": 75,
+   "cls": {
+    "WATCH": 63,
+    "BEARISH": 2,
+    "BULLISH": 10
+   },
+   "score_p50": 50.9,
+   "ret30_dir": {
+    "n": 75,
+    "mean": -0.241,
+    "median": 0.624
+   },
+   "ret1h_dir": {
+    "n": 75,
+    "mean": -0.142,
+    "median": 0.1
+   },
+   "mfe": {
+    "n": 75,
+    "mean": 6.376,
+    "median": 3.49
+   },
+   "mae": {
+    "n": 75,
+    "mean": -5.146,
+    "median": -1.637
+   },
+   "confirm_rate(upgrade)": 0.733,
+   "invalidation_rate": 0.36,
+   "stale_rate": 0.093
+  },
+  "HELD_BY_POLICY": {
+   "n_all": 1927,
+   "n_mature": 1793,
+   "cls": {
+    "WATCH": 1910,
+    "BEARISH": 10,
+    "BULLISH": 7
+   },
+   "score_p50": 53.4,
+   "ret30_dir": {
+    "n": 1793,
+    "mean": -0.248,
+    "median": -0.133
+   },
+   "ret1h_dir": {
+    "n": 1734,
+    "mean": -0.31,
+    "median": -0.214
+   },
+   "mfe": {
+    "n": 1793,
+    "mean": 1.595,
+    "median": 0.914
+   },
+   "mae": {
+    "n": 1793,
+    "mean": -2.118,
+    "median": -1.385
+   },
+   "confirm_rate(upgrade)": 0.326,
+   "invalidation_rate": 0.448,
+   "stale_rate": 0.02
+  },
+  "NEVER_SURFACED": {
+   "n_all": 0,
+   "n_mature": 0,
+   "cls": {},
+   "score_p50": null,
+   "ret30_dir": {
+    "n": 0
+   },
+   "ret1h_dir": {
+    "n": 0
+   },
+   "mfe": {
+    "n": 0
+   },
+   "mae": {
+    "n": 0
+   },
+   "confirm_rate(upgrade)": 0.0,
+   "invalidation_rate": 0.0,
+   "stale_rate": 0.0
+  }
+ },
+ "capacity": {
+  "TOTAL_NEW_USED": "75/40",
+  "WATCH_USED": "15/15",
+  "PREMARKET_EXTRA_USED": "3/5",
+  "REGULAR_EXTRA_USED": 44,
+  "AFTER_HOURS_EXTRA_USED": 3,
+  "REGULAR_RESERVED_REMAINING": 0,
+  "AFTER_HOURS_RESERVED_REMAINING": -35,
+  "held_reserved_later_phase": 588,
+  "msgs_per_hour_last": [
+   [
+    "17",
+    15
+   ],
+   [
+    "18",
+    9
+   ],
+   [
+    "19",
+    9
+   ],
+   [
+    "20",
+    14
+   ]
+  ]
+ }
+}

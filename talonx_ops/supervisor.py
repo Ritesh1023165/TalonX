@@ -10,9 +10,14 @@ runs any strategy / execution / ingest business logic -- it launches the
 existing entrypoints as child processes and watches them:
 
     ORIGINAL      python run_talonx.py                         (MANDATORY)
-    EXPERIMENTAL  python -m talonx_signals.run                 (OPTIONAL)
     INTELLIGENCE  python -m talonx_ingest.intelligence.service poll --with-backfill   (OPTIONAL)
     DASHBOARD     python dashboard_web.py                      (OPTIONAL)
+
+EXPERIMENTAL (``python -m talonx_signals.run``) is RETIRED from active startup (2026-09-24, S14 legacy cleanup): its
+directional consumer silently failed to subscribe on 8 of 9 starts since 2026-09-15 (Session-04 forensic s6), its
+research role is superseded by the Continuous Opportunity Engine (``python -m talonx_opportunity``, its own process
+set), and it never sent externally. Its shared utility modules (external_boundary, market_sessions, premarket_store,
+reply) remain in use. Health reports it as RETIRED, never as a failure.
 
 Design split so the whole state machine is deterministically unit-testable
 offline:
@@ -584,7 +589,8 @@ class Supervisor:
             return c.state.value if c else "NOT_STARTED"
 
         original = cstate("original")
-        experimental = cstate("experimental")
+        # Experimental lane retired from active startup (S14): RETIRED, never counted as a failure
+        experimental = cstate("experimental") if "experimental" in self.components else "RETIRED"
         intelligence = cstate("intelligence")
         dashboard = cstate("dashboard")
 
@@ -622,8 +628,8 @@ class Supervisor:
             except Exception:  # noqa: BLE001
                 pass
 
-        # forward outcomes track the Experimental lane
-        forward_outcomes = {
+        # forward outcomes tracked the (retired) Experimental lane
+        forward_outcomes = "RETIRED" if experimental == "RETIRED" else {
             "READY": "READY", "DEGRADED": "DEGRADED", "RESTARTING": "DEGRADED",
             "FAILED": "DOWN", "STOPPED": "DOWN", "STOPPING": "DEGRADED",
             "NOT_STARTED": "NOT_STARTED", "STARTING": "STARTING",
@@ -635,7 +641,7 @@ class Supervisor:
         if self.mandatory_failed or original == "FAILED":
             overall = "FAILED"
         elif (original not in ("READY",) or market in ("DEGRADED", "FAILED")
-              or experimental not in ("READY",) or intelligence not in ("READY",)
+              or experimental not in ("READY", "RETIRED") or intelligence not in ("READY",)
               or telegram_receive != "READY" or telegram_send != "READY"):
             overall = "DEGRADED"
         else:
@@ -794,17 +800,6 @@ def default_talonx_components(
             graceful_stop_s=45.0,
         ),
         ComponentSpec(
-            name="experimental",
-            argv=[py, "-m", "talonx_signals.run"],
-            classification=Classification.OPTIONAL,
-            start_order=20,
-            stop_order=10,
-            readiness_timeout_s=45.0,
-            readiness_grace_s=5.0,
-            restart_policy=RestartPolicy(max_restarts=None, backoff_base_s=10.0),
-            graceful_stop_s=25.0,
-        ),
-        ComponentSpec(
             name="intelligence",
             argv=intel_argv,
             classification=Classification.OPTIONAL,
@@ -830,7 +825,7 @@ def default_talonx_components(
                 name="v2",
                 argv=v2_argv,
                 classification=Classification.OPTIONAL,
-                start_order=25,          # after experimental, before intelligence
+                start_order=25,          # after original, before intelligence
                 stop_order=8,            # stop early in shutdown, before intelligence/original
                 readiness_timeout_s=60.0,
                 readiness_grace_s=5.0,
@@ -961,6 +956,7 @@ def _status_snapshot() -> dict[str, Any]:
             "market_feed_healthy": mstate in ("HEALTHY", "IDLE"),
             "market_feed_state": mstate,
             "experimental_shadow_alive": bool(prod.get("experimental", {}).get("live")),
+            "experimental_lane_status": (prod.get("experimental") or {}).get("status", "RETIRED"),
             "intelligence_alive": bool(prod.get("intelligence", {}).get("live")),
             "telegram_send_ok": not (oa.get("failed_today") and not oa.get("sent_today")),
             "telegram_receive_owner_count": out.get("telegram_get_updates_owners"),
@@ -972,6 +968,12 @@ def _status_snapshot() -> dict[str, Any]:
             "dashboard_url": "http://localhost:8787",
             "intelligence_deep_viewer": "http://localhost:8760",
         }
+        try:
+            from talonx_ops.opportunity_read import read_opportunity_status
+
+            out["answers"]["opportunity_engine"] = read_opportunity_status()["system"]["overall"]
+        except Exception as exc:  # noqa: BLE001 -- research-lane visibility must never break status
+            out["answers"]["opportunity_engine"] = f"UNKNOWN ({type(exc).__name__})"
     except Exception as exc:  # noqa: BLE001
         out["answers_error"] = repr(exc)
     return out

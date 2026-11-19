@@ -708,11 +708,12 @@ def test_45_replay_canary_passes():
 def test_46_default_components_classification():
     specs = {s.name: s for s in default_talonx_components()}
     assert specs["original"].classification is Classification.MANDATORY
-    for opt in ("experimental", "intelligence", "dashboard"):
+    # SUPERSEDED 2026-09-24 (S14): the Experimental lane is RETIRED from active startup
+    assert "experimental" not in specs
+    for opt in ("intelligence", "dashboard"):
         assert specs[opt].classification is Classification.OPTIONAL
-    # intelligence + experimental retry forever (never FAILED on their own)
+    # intelligence retries forever (never FAILED on its own)
     assert specs["intelligence"].restart_policy.max_restarts is None
-    assert specs["experimental"].restart_policy.max_restarts is None
     # intelligence invocation is the unchanged poll --with-backfill entrypoint
     assert specs["intelligence"].argv[-3:] == ["talonx_ingest.intelligence.service", "poll", "--with-backfill"]
 

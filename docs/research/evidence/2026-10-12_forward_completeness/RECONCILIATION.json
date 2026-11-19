@@ -1,0 +1,475 @@
+{
+ "period": "2026-09-30 .. 2026-10-31 (inclusive)",
+ "schedule": "start-up cycle 2026-09-30, then daily 06:00Z every calendar day (weekends included)",
+ "as_of_utc": "2026-10-12T19:52:12.881831+00:00",
+ "slots": 32,
+ "counts": {
+  "success": 6,
+  "incomplete_or_missing": 2,
+  "unverified": 5,
+  "running_or_due": 0,
+  "not_yet_due": 19,
+  "unreadable_or_unknown": 0
+ },
+ "affected": [
+  {
+   "day": "2026-09-30",
+   "state": "UNVERIFIED",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)",
+   "provenance": "LEGACY_LOG",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-01",
+   "state": "UNVERIFIED",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)",
+   "provenance": "LEGACY_LOG",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-02",
+   "state": "UNVERIFIED",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)",
+   "provenance": "LEGACY_LOG",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-03",
+   "state": "UNVERIFIED",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)",
+   "provenance": "LEGACY_LOG",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-04",
+   "state": "UNVERIFIED",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)",
+   "provenance": "LEGACY_LOG",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-05",
+   "state": "PARTIAL",
+   "reason": "terminal recorded state",
+   "provenance": "RECONSTRUCTED",
+   "conflicts": []
+  },
+  {
+   "day": "2026-10-11",
+   "state": "ABANDONED",
+   "reason": "verified process absent and deadline passed",
+   "provenance": "RUNNER_RECORD",
+   "conflicts": []
+  }
+ ],
+ "slots_detail": [
+  {
+   "day": "2026-09-30",
+   "weekday": "Wed",
+   "evidence": [
+    "legacy cycle_done 2026-09-30T15:02:15Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-09-30 (start-up cycle after the EDGAR backfill marker (not a 06:00Z slot))",
+   "output_file": "2026-09-30T15:02:15.925235+00:00",
+   "recorded_state": null,
+   "state": "UNVERIFIED",
+   "provenance": "LEGACY_LOG",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)"
+  },
+  {
+   "day": "2026-10-01",
+   "weekday": "Thu",
+   "evidence": [
+    "legacy cycle_done 2026-10-01T06:04:01Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-01T06:00:00+00:00",
+   "output_file": "2026-10-01T06:04:01.593554+00:00",
+   "recorded_state": null,
+   "state": "UNVERIFIED",
+   "provenance": "LEGACY_LOG",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)"
+  },
+  {
+   "day": "2026-10-02",
+   "weekday": "Fri",
+   "evidence": [
+    "legacy cycle_done 2026-10-02T06:05:29Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-02T06:00:00+00:00",
+   "output_file": "2026-10-02T06:05:29.687957+00:00",
+   "recorded_state": null,
+   "state": "UNVERIFIED",
+   "provenance": "LEGACY_LOG",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)"
+  },
+  {
+   "day": "2026-10-03",
+   "weekday": "Sat",
+   "evidence": [
+    "legacy cycle_done 2026-10-03T06:08:38Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-03T06:00:00+00:00",
+   "output_file": "2026-10-03T06:08:38.078082+00:00",
+   "recorded_state": null,
+   "state": "UNVERIFIED",
+   "provenance": "LEGACY_LOG",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)"
+  },
+  {
+   "day": "2026-10-04",
+   "weekday": "Sun",
+   "evidence": [
+    "legacy cycle_done 2026-10-04T06:02:06Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-04T06:00:00+00:00",
+   "output_file": "2026-10-04T06:02:06.270538+00:00",
+   "recorded_state": null,
+   "state": "UNVERIFIED",
+   "provenance": "LEGACY_LOG",
+   "reason": "no run record; legacy loop recorded no exit status or validation; an output file was written during that cycle (not opened; never proof)"
+  },
+  {
+   "day": "2026-10-05",
+   "weekday": "Mon",
+   "evidence": [
+    "run record (RECONSTRUCTED from log)",
+    "legacy cycle_done 2026-10-05T06:01:02Z (written unconditionally)"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-05T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": "PARTIAL",
+   "state": "PARTIAL",
+   "reason": "terminal recorded state",
+   "artifact_validated": false,
+   "provenance": "RECONSTRUCTED"
+  },
+  {
+   "day": "2026-10-06",
+   "weekday": "Tue",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-06T06:00:00+00:00",
+   "output_file": "2026-10-06T06:14:18.664627+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-07",
+   "weekday": "Wed",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-07T06:00:00+00:00",
+   "output_file": "2026-10-07T06:03:55.025285+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-08",
+   "weekday": "Thu",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-08T06:00:00+00:00",
+   "output_file": "2026-10-08T06:03:28.204350+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-09",
+   "weekday": "Fri",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-09T06:00:00+00:00",
+   "output_file": "2026-10-09T06:03:30.006731+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-10",
+   "weekday": "Sat",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-10T06:00:00+00:00",
+   "output_file": "2026-10-10T06:03:48.777179+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-11",
+   "weekday": "Sun",
+   "evidence": [
+    "run record",
+    "orphaned temp record (not authoritative, not read)",
+    "loop cycle_end RUNNING/exit 1"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-11T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": "RUNNING",
+   "state": "ABANDONED",
+   "reason": "verified process absent and deadline passed",
+   "artifact_validated": null,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-12",
+   "weekday": "Mon",
+   "evidence": [
+    "run record",
+    "loop cycle_end SUCCESS/exit 0"
+   ],
+   "conflicts": [],
+   "expected_utc": "2026-10-12T06:00:00+00:00",
+   "output_file": "2026-10-12T06:02:44.635889+00:00",
+   "recorded_state": "SUCCESS",
+   "state": "SUCCESS",
+   "reason": "terminal recorded state",
+   "artifact_validated": true,
+   "provenance": "RUNNER_RECORD"
+  },
+  {
+   "day": "2026-10-13",
+   "weekday": "Tue",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-13T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-14",
+   "weekday": "Wed",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-14T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-15",
+   "weekday": "Thu",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-15T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-16",
+   "weekday": "Fri",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-16T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-17",
+   "weekday": "Sat",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-17T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-18",
+   "weekday": "Sun",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-18T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-19",
+   "weekday": "Mon",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-19T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-20",
+   "weekday": "Tue",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-20T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-21",
+   "weekday": "Wed",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-21T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-22",
+   "weekday": "Thu",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-22T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-23",
+   "weekday": "Fri",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-23T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-24",
+   "weekday": "Sat",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-24T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-25",
+   "weekday": "Sun",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-25T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-26",
+   "weekday": "Mon",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-26T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-27",
+   "weekday": "Tue",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-27T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-28",
+   "weekday": "Wed",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-28T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-29",
+   "weekday": "Thu",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-29T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-30",
+   "weekday": "Fri",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-30T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  },
+  {
+   "day": "2026-10-31",
+   "weekday": "Sat",
+   "evidence": [],
+   "conflicts": [],
+   "expected_utc": "2026-10-31T06:00:00+00:00",
+   "output_file": null,
+   "recorded_state": null,
+   "state": "NOT_YET_DUE",
+   "reason": "slot in the future"
+  }
+ ]
+}

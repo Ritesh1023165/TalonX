@@ -104,6 +104,38 @@ def _age_seconds(ts: str | None, now: datetime) -> float | None:
         return None
 
 
+V2_ACCOUNTING_BASIS = {
+    "label": "Before fees, spread and slippage",
+    "detail": ("V2 live paper accounting fills at the Alpaca SIP daily open (entry) and close (exit) with zero fees "
+               "(talonx_v2.sizing.zero_fee; the service passes no fee model) and no spread or slippage. "
+               "INSIDER_BUY_CLUSTER_V2 research results subtract 20 bps round trip and are reported separately; the "
+               "two are not directly comparable."),
+    "modeled": False,
+}
+_V2_OLD_COST_SUMMARY = ("Realized P&L = exit net minus persisted entry total, including recorded fees. Costs remain "
+                        "uncalibrated.")
+
+
+def _relabel_v2_costs(perf):
+    """Presentation-only correction of the V2 cost wording (values untouched): the source breakdown in
+    talonx_ops/paper_performance.py says fees are 'included', but no fee is ever recorded (zero-fee accounting)."""
+    if not isinstance(perf, dict):
+        return perf
+    perf["costs"] = {"summary": V2_ACCOUNTING_BASIS["label"] + " -- " + V2_ACCOUNTING_BASIS["detail"],
+                     "modeled": False, "spread_slippage": "NOT modelled (fills at SIP daily open/close)",
+                     "explicit_commissions_fees": "zero (talonx_v2.sizing.zero_fee)",
+                     "research_comparison": "research results are net of 20 bps round trip; reported separately"}
+    for key in ("closed_trades",):
+        for t in perf.get(key) or []:
+            if isinstance(t, dict) and t.get("costs") == _V2_OLD_COST_SUMMARY:
+                t["costs"] = V2_ACCOUNTING_BASIS["label"]
+    od = (perf.get("open_positions") or {}).get("detail") if isinstance(perf.get("open_positions"), dict) else None
+    for p in od or []:
+        if isinstance(p, dict) and p.get("unrealized_status") == _V2_OLD_COST_SUMMARY:
+            p["unrealized_status"] = V2_ACCOUNTING_BASIS["label"]
+    return perf
+
+
 class DashboardReadModel:
     """One instance per request batch. Cheap to construct."""
 
@@ -150,14 +182,17 @@ class DashboardReadModel:
                 return "READY"
             return "FAILED" if mandatory else "DEGRADED"
 
+        exp_retired = bool(exp.get("retired")) and not exp["live"]
         runtime = {
-            "overall": self._overall_health(orig["live"], exp["live"], intel["live"], mh.state),
+            # S14: the Experimental lane is RETIRED from active startup -> never degrades overall health
+            "overall": self._overall_health(orig["live"], exp["live"] or exp_retired, intel["live"], mh.state),
             "original": cstate(orig["live"], True),
-            "experimental": cstate(exp["live"], False),
+            "experimental": "RETIRED" if exp_retired else cstate(exp["live"], False),
             "intelligence": cstate(intel["live"], False),
             "telegram_send": self._telegram_send_state(oa),
             "telegram_receive": self._telegram_receive_state(orig["live"], sup),
-            "forward_outcomes": "READY" if exp["live"] else "DEGRADED",
+            "forward_outcomes": "RETIRED" if exp_retired else ("READY" if exp["live"] else "DEGRADED"),
+            "opportunity_engine": self._opportunity_overall(),
             "eod": eod.values.get("status", "NOT_DUE") if eod.values else "NOT_DUE",
             "notes": {
                 "original": orig["reason"], "experimental": exp["reason"],
@@ -226,6 +261,7 @@ class DashboardReadModel:
                 "allocated_capital": ldg.get("allocated_capital"),
                 "available_capital": ldg.get("available_capital"),
                 "realized_pnl_usd": ldg.get("realized_pnl_usd"),
+                "realized_pnl_basis": V2_ACCOUNTING_BASIS["label"],
                 "exit_unresolved": ldg.get("exit_unresolved"),
                 "eod_state": v2.get("eod", {}).get("state"),
                 "eod_forced_flatten": "OFF",
@@ -301,6 +337,9 @@ class DashboardReadModel:
         rt = runtime.get("telegram_receive")
         if rt == "DEGRADED":
             out.append("Telegram receive: >1 getUpdates owner reported (check logical/network owner)")
+        opp = runtime.get("opportunity_engine")
+        if opp in ("DEGRADED", "DOWN"):      # NOT_RUNNING is a valid state for the optional research lane
+            out.append(f"Opportunity Engine {opp} -- see the Opportunity Engine tab (components restart independently)")
         return out
 
     def _overall_health(self, orig_live: bool, exp_live: bool, intel_live: bool, market_state: str) -> str:
@@ -436,12 +475,18 @@ class DashboardReadModel:
         except Exception as exc:  # noqa: BLE001
             return {"status": "UNKNOWN", "source": source, "note": f"read error: {exc!r}"}
 
-        exp_live = self.arm.experimental_producer().get("live")
+        exp_prod = self.arm.experimental_producer()
+        exp_live = exp_prod.get("live")
         status = sess.get("status", "UNKNOWN")
         if status in ("NO_SESSION_TODAY",) and not exp_live:
             status = "NO_ACTIVE_PRODUCER"
+        retired = bool(exp_prod.get("retired")) and not exp_live
         return {
             "status": status,
+            # S14: the producer of this 43-name view (the Experimental lane) is RETIRED; the rows below are
+            # historical once it stops. Broad pre-market (and all-phase) discovery lives in the Opportunity Engine.
+            "producer_retired": retired,
+            "superseded_by": "opportunity_engine" if retired else None,
             "source": source,
             "session_date": sess.get("session_date"),
             "generated_at": sess.get("generated_at"),
@@ -586,7 +631,8 @@ class DashboardReadModel:
         }
         exp = self.arm.experimental_alerts()
         exp_prod = self.arm.experimental_producer()
-        out["experimental_state"] = "READY" if exp_prod["live"] else "DOWN"
+        out["experimental_state"] = ("READY" if exp_prod["live"] else
+                                     "RETIRED" if exp_prod.get("retired") else "DOWN")   # S14: lane retired
         out["experimental_state_reason"] = exp_prod["reason"]
         out["by_family"] = exp.values.get("by_family", {})
         out["external_boundary"] = "BLOCKED -- structural (Task 100B Phase 6)"
@@ -650,6 +696,15 @@ class DashboardReadModel:
         out["reject_reasons"] = [{"reason": k, "count": v} for k, v in
                                  sorted(reject_reasons.items(), key=lambda kv: -kv[1])]
         out["experimental_trades_recent"] = exp_trades
+
+        # V2@1 shadow forward tracker run records (2026-10-12): recorded vs conservatively derived state; operational
+        # metadata only -- talonx_paperperf.forward_status never opens forward/ or any research output.
+        try:
+            from talonx_paperperf import forward_status as _fs
+            out["v2_forward_runs"] = _fs.view_cached(Path(__file__).resolve().parents[1])
+        except Exception as exc:  # noqa: BLE001 -- unreadable is surfaced, never shown healthy
+            out["v2_forward_runs"] = {"error": f"{type(exc).__name__}: {exc}", "current_health": "UNREADABLE",
+                                      "runs": []}
 
         # forward outcomes (Task 99G)
         out["forward_outcomes"] = self._forward_outcomes_block()
@@ -1108,8 +1163,8 @@ class DashboardReadModel:
                     # a second "Paper Performance" tab duplicating it.
                     try:
                         from talonx_ops.paper_performance import build_v2_paper_performance
-                        out["ledger"]["performance"] = build_v2_paper_performance(
-                            Path(db), home=self.home, now=self.now)
+                        out["ledger"]["performance"] = _relabel_v2_costs(build_v2_paper_performance(
+                            Path(db), home=self.home, now=self.now))
                     except Exception as exc:  # noqa: BLE001
                         out["ledger"]["performance"] = {"status": "UNKNOWN",
                                                         "note": f"{type(exc).__name__}: {exc}"}
@@ -1238,8 +1293,20 @@ class DashboardReadModel:
         from talonx_ops.operator_read import operator_snapshot, redact_output
         operator = operator_snapshot(Path(db), now=self.now, status=svc_status,
                                      intel_path=self.home / "ingestion_ledger.db")
+        # 2026-10-07: these per-destination counts come only from the V2 alert outbox, the operations outbox and (for
+        # TRADE_EVENT) Intelligence delivery rows. Say so, so the Signal-bot number is not read as "all Signal sends":
+        # research lanes (PAPER_SIGNAL promotion, Lab, VR) are counted per lane in the Opportunity section.
+        _src = operator.get("notifications") or {}
+        for _d, _n in _src.items():
+            _parts = [k for k, v in (_n.get("sources_available") or {}).items() if v]
+            _n["counts_scope"] = ("rows from " + (", ".join(_parts) or "no") + " store(s) only"
+                                  + ("; EXCLUDES the PAPER_SIGNAL promotion lane (see Opportunity > Notification lanes)"
+                                     if _d == "TRADE_EVENT" else "")
+                                  + ("; EXCLUDES the Lab and VR research lanes (see Opportunity > Notification lanes)"
+                                     if _d == "RESEARCH" else ""))
         out["operator"] = operator
         account = operator["account"]
+        out["ledger"]["accounting_basis"] = V2_ACCOUNTING_BASIS
         out["ledger"].update(
             cash=account["settled_cash"],
             realized_pnl_usd=account["realized_pnl"],
@@ -1592,6 +1659,7 @@ class DashboardReadModel:
                         "n_open": len(bd_open),
                         "n_closed": len(bd_closed),
                         "realized_pnl_usd": bd_realized,
+                        "accounting_basis": V2_ACCOUNTING_BASIS,
                         "open_symbols": sorted({r["symbol"] for r in bd_open}),
                         "administrative_adjustments_note": (
                             "the V2 positions table carries no administrative-adjustment "
@@ -1839,9 +1907,26 @@ class DashboardReadModel:
             now=self.now, check_processes=self.check_processes,
         )
 
+    def _opportunity_overall(self) -> str:
+        try:
+            from talonx_ops.opportunity_read import read_opportunity_status
+            return read_opportunity_status()["system"]["overall"]
+        except Exception as exc:  # noqa: BLE001 -- research-lane visibility must never break the dashboard
+            return f"UNKNOWN ({type(exc).__name__})"
+
+    def opportunity_engine(self) -> dict[str, Any]:
+        """S14 Continuous Opportunity Engine: SYSTEM / DATA (capability per phase) / DISCOVERY / HORIZONS /
+        NOTIFICATION / PAPER / REPORTING, read-only (talonx_ops.opportunity_read; no research-lane import)."""
+        try:
+            from talonx_ops.opportunity_read import read_opportunity_status
+            return read_opportunity_status()
+        except Exception as exc:  # noqa: BLE001
+            return {"available": False, "error": f"{type(exc).__name__}: {exc}"[:200]}
+
     def all_sections(self) -> dict[str, Any]:
         return {
             "overview": self.overview(),
+            "opportunity_engine": self.opportunity_engine(),         # S14 -- continuous research lane
             "premarket": self.premarket(),
             "original_quant": self.original_quant(),
             "v2_active_strategy": self.v2_active_strategy(),   # Task 112 -- UNCHANGED, the

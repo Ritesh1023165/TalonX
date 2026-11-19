@@ -561,6 +561,7 @@ class IntelligenceService:
                 "delivery": delivery,
                 "delivery_ok": (delivery or {}).get("ok", True),
                 "errors": res.errors[:10],
+                "identity_drops": res.identity_drops,
             }
             try:
                 from talonx_ops.notify.producers import (
@@ -648,6 +649,7 @@ class IntelligenceService:
             "new_form4": res.new_form4_filings,
             "freshness": res.submissions_freshness,
             "errors": res.errors[:20],
+            "identity_drops": res.identity_drops,
         }
         out["metrics"] = self.metrics.snapshot()
         self._heartbeat(mode="once:done", last_cycle=out["poll"])

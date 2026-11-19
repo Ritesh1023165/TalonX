@@ -86,7 +86,7 @@ python -m talonx_ops.prospective close
 #   = python -m talonx_ops.supervisor run
 #   launches, under one supervision model:
 #     Original CONTROL      run_talonx.py                                   (MANDATORY)
-#     Experimental shadow   python -m talonx_signals.run                    (OPTIONAL)
+#     (Experimental shadow  python -m talonx_signals.run -- RETIRED from active startup 2026-09-24)
 #     Intelligence service  ... intelligence.service poll --with-backfill   (OPTIONAL)
 #     :8787 cockpit         dashboard_web.py                                (OPTIONAL)
 #   Ctrl+C = controlled shutdown (10-step order) + EOD reconciliation persist.
@@ -144,7 +144,8 @@ injected. Idempotent per session date.
 | `scripts/start_dashboard_web.ps1` | `:8787` only, if you want the cockpit without the supervisor |
 | `scripts/stop_talonx.ps1` / `stop_dashboard_web.ps1` | legacy stop helpers |
 | `scripts/register_scheduled_tasks.ps1` | schedules the LEGACY path (unchanged) |
-| `python -m talonx_signals.run` | Experimental lane + its embedded `:8770` telemetry dashboard — `[COMPATIBILITY]` |
+| `python -m talonx_signals.run` | Experimental lane + `:8770` — **RETIRED** (refuses a live start without `--allow-retired`) |
+| `python -m talonx_opportunity up [--deliver] [--supervise]` | Continuous Opportunity Engine — see `docs/runbooks/CONTINUOUS_ENGINE.md` |
 | `python -m talonx_piv.cli` | opt-in Alpaca PAPER validation harness (see `docs/COMPATIBILITY.md`) |
 
 ## Live qualification (pending)

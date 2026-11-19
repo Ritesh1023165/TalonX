@@ -1,0 +1,441 @@
+{
+ "time_utc": "2026-09-28T07:05:51+00:00",
+ "branch": "feature/continuous-opportunity-engine",
+ "head": "cf0cffb",
+ "main": "696370e",
+ "tracked_changes": [],
+ "components": {
+  "ingestion": {
+   "pid": 18792,
+   "state": "RUNNING",
+   "hb_age_s": 0.9,
+   "version": "429d877fee26",
+   "config_fps": {},
+   "deployment": "20260928T070433Z-ingestion-fc0c4f"
+  },
+  "evaluator:INTRADAY": {
+   "pid": 6384,
+   "state": "RUNNING",
+   "hb_age_s": 3.1,
+   "version": "31f79a510fb8",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "PREMARKET,REGULAR"
+   },
+   "deployment": "20260928T070433Z-evaluator:INTRADAY-60a565"
+  },
+  "evaluator:SAME_DAY": {
+   "pid": 19552,
+   "state": "RUNNING",
+   "hb_age_s": 2.8,
+   "version": "31f79a510fb8",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "OVERNIGHT,PREMARKET,REGULAR,AFTER_HOURS"
+   },
+   "deployment": "20260928T070433Z-evaluator:SAME_DAY-d9b210"
+  },
+  "discovery": {
+   "pid": 13540,
+   "state": "RUNNING",
+   "hb_age_s": 3.4,
+   "version": "eb716fb149b8",
+   "config_fps": {
+    "CONTINUOUS_RESEARCH": "2ef115ee19f99574",
+    "PREMARKET_RESEARCH_V1": "62ba413daf85e674",
+    "SEC_CATALYST_CACHE": "BACKGROUND_REFRESH_V1"
+   },
+   "deployment": "20260928T070433Z-discovery-582299"
+  },
+  "evaluator:SHORT_TERM": {
+   "pid": 1624,
+   "state": "RUNNING",
+   "hb_age_s": 2.1,
+   "version": "31f79a510fb8",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "AFTER_HOURS,OVERNIGHT"
+   },
+   "deployment": "20260928T070434Z-evaluator:SHORT_TERM-a6accc"
+  },
+  "evaluator:LONG_TERM": {
+   "pid": 20464,
+   "state": "RUNNING",
+   "hb_age_s": 1.6,
+   "version": "31f79a510fb8",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": ""
+   },
+   "deployment": "20260928T070435Z-evaluator:LONG_TERM-da1b80"
+  },
+  "notifier": {
+   "pid": 12016,
+   "state": "RUNNING",
+   "hb_age_s": -0.1,
+   "version": "07045afceef8",
+   "config_fps": {
+    "LAB_NOTIFY_POLICY": "dec8d1a865f25424",
+    "deliver": "1",
+    "reserve_phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "deployment": "20260928T070435Z-notifier-71845b"
+  },
+  "outcomes": {
+   "pid": 17860,
+   "state": "RUNNING",
+   "hb_age_s": 1.7,
+   "version": "e7d155ffff30",
+   "config_fps": {
+    "models": "PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1",
+    "phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "deployment": "20260928T070435Z-outcomes-182bc8"
+  },
+  "reporting": {
+   "pid": 18144,
+   "state": "RUNNING",
+   "hb_age_s": 1.9,
+   "version": "43ed6fe35817",
+   "config_fps": {},
+   "deployment": "20260928T070435Z-reporting-450871"
+  },
+  "promotion": {
+   "pid": 2912,
+   "state": "RUNNING",
+   "hb_age_s": 4.5,
+   "version": "3dc2ce224318",
+   "config_fps": {
+    "PROMOTION_POLICY": "4926c12e5eace04e",
+    "mode": "PAPER_SIGNAL",
+    "promotion_src": "4702994ee7f8"
+   },
+   "deployment": "20260928T070436Z-promotion-d8fe13"
+  },
+  "sentinel": {
+   "pid": 16672,
+   "state": "RUNNING",
+   "hb_age_s": 10.4,
+   "version": "07ecde743d84",
+   "config_fps": {
+    "destination": "SENTINEL",
+    "enabled": "1",
+    "mutation_mode": "DRY_RUN"
+   },
+   "deployment": "20260928T070436Z-sentinel-9048c2"
+  }
+ },
+ "pending_declarations": [],
+ "engine": {
+  "max_event_seq": 4550,
+  "cursors": {
+   "notifier": 4550,
+   "promotion": 4550,
+   "intraday": 4550,
+   "same_day": 4550,
+   "short_term": 4550,
+   "long_term": 4550
+  },
+  "lag": {
+   "notifier": 0,
+   "promotion": 0,
+   "intraday": 0,
+   "same_day": 0,
+   "short_term": 0,
+   "long_term": 0
+  },
+  "candidates": 2065,
+  "events": 4550,
+  "outcome_rows": 2065
+ },
+ "promotion": {
+  "mode": "PAPER_SIGNAL",
+  "states": {
+   "EXPIRED": 1,
+   "PROMOTED_SHADOW": 6,
+   "PROMOTED_SIGNAL": 36,
+   "REJECTED_WHILE_QUEUED": 3
+  },
+  "queued": 0,
+  "distinct_candidates": 46
+ },
+ "outboxes": {
+  "lab": {
+   "RESEARCH|SENT": 294
+  },
+  "promotion_signal": {
+   "TRADE_EVENT|SENT": 36
+  },
+  "v2_release_ops": {
+   "OPERATIONS|EXPIRED": 2,
+   "OPERATIONS|SENT": 9
+  },
+  "shared_notifications": {
+   "OPERATIONS|EXPIRED": 1,
+   "OPERATIONS|SENT": 11
+  }
+ },
+ "pending_or_failed": {
+  "lab": {},
+  "promotion_signal": {},
+  "v2_release_ops": {},
+  "shared_notifications": {}
+ },
+ "sentinel": {
+  "enabled": true,
+  "mode": "DRY_RUN",
+  "handled": 0,
+  "saved_offset": 920191867,
+  "ledger_lines": 14
+ },
+ "operator_control": {
+  "exclusions": [
+   {
+    "symbol": "TSLA",
+    "status": "RESTORED",
+    "activation": "PENDING_ACTIVATION"
+   }
+  ],
+  "universe": [],
+  "audit_rows": 2
+ },
+ "provider": {
+  "fetch_universe": {
+   "window_id": "2026-09-25",
+   "symbols": 5653,
+   "cycle_utc": "2026-09-25T23:59:25.398767+00:00"
+  },
+  "sec_refresh_fp": "BACKGROUND_REFRESH_V1"
+ },
+ "v2": {
+  "campaign_id": "V2-PAPER-RC1",
+  "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+  "config_fingerprint": "e2acf6454789217e",
+  "execution_mode": "PAPER",
+  "provider_fp": "ac5e51aa3599d6c9",
+  "cash": 100000.0,
+  "positions": 0,
+  "trades": 0,
+  "intents": 0,
+  "alert_outbox_rows": 0,
+  "db_sha": "891cddac6ce2a1a6",
+  "status_hb_age_s": 0.9,
+  "status_tick": 2,
+  "eod_09_25_closed": true
+ },
+ "db_integrity": {
+  "evaluator_intraday.db": "ok",
+  "evaluator_long_term.db": "ok",
+  "evaluator_same_day.db": "ok",
+  "evaluator_short_term.db": "ok",
+  "market.db": "ok",
+  "notification.db": "ok",
+  "opportunity.db": "ok",
+  "opportunity_research_notifications.db": "ok",
+  "outcomes.db": "ok",
+  "promotion.db": "ok",
+  "promotion_signal_notifications.db": "ok",
+  "runtime.db": "ok",
+  "v2_release_rc1.db": "ok",
+  "v2_release_rc1_notifications.db": "ok",
+  "notifications.db": "ok",
+  "operator_control.db": "ok",
+  "eod_reconciliation.db": "ok",
+  "ingestion_ledger.db": "ok",
+  "paper_trading.db": "ok"
+ },
+ "processes": [
+  {
+   "pid": 1624,
+   "ppid": 5928,
+   "cmd": "\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component evaluator:SHORT_TERM"
+  },
+  {
+   "pid": 2912,
+   "ppid": 14992,
+   "cmd": "pData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component promotion"
+  },
+  {
+   "pid": 3624,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component sentinel"
+  },
+  {
+   "pid": 5928,
+   "ppid": 19096,
+   "cmd": "space\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:SHORT_TERM"
+  },
+  {
+   "pid": 6184,
+   "ppid": 19096,
+   "cmd": "rkspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:INTRADAY"
+  },
+  {
+   "pid": 6384,
+   "ppid": 6184,
+   "cmd": "al\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component evaluator:INTRADAY"
+  },
+  {
+   "pid": 8028,
+   "ppid": 2016,
+   "cmd": "orkspace\\TalonX\\.venv\\Scripts\\python.exe -u -m talonx_opportunity up --deliver --supervise"
+  },
+  {
+   "pid": 8752,
+   "ppid": 10276,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_ops.supervisor run"
+  },
+  {
+   "pid": 8772,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component notifier"
+  },
+  {
+   "pid": 10888,
+   "ppid": 19096,
+   "cmd": "rkspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:SAME_DAY"
+  },
+  {
+   "pid": 11044,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component ingestion"
+  },
+  {
+   "pid": 12016,
+   "ppid": 8772,
+   "cmd": "ppData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component notifier"
+  },
+  {
+   "pid": 13540,
+   "ppid": 18968,
+   "cmd": "pData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component discovery"
+  },
+  {
+   "pid": 14992,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component promotion"
+  },
+  {
+   "pid": 16208,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component outcomes"
+  },
+  {
+   "pid": 16596,
+   "ppid": 19096,
+   "cmd": "kspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component evaluator:LONG_TERM"
+  },
+  {
+   "pid": 16672,
+   "ppid": 3624,
+   "cmd": "ppData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component sentinel"
+  },
+  {
+   "pid": 17860,
+   "ppid": 16208,
+   "cmd": "ppData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component outcomes"
+  },
+  {
+   "pid": 18144,
+   "ppid": 19952,
+   "cmd": "pData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component reporting"
+  },
+  {
+   "pid": 18548,
+   "ppid": 8752,
+   "cmd": "sers\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_ops.supervisor run"
+  },
+  {
+   "pid": 18792,
+   "ppid": 11044,
+   "cmd": "pData\\Local\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component ingestion"
+  },
+  {
+   "pid": 18968,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component discovery"
+  },
+  {
+   "pid": 19096,
+   "ppid": 8028,
+   "cmd": "cal\\Python\\pythoncore-3.12-64\\python.exe -u -m talonx_opportunity up --deliver --supervise"
+  },
+  {
+   "pid": 19488,
+   "ppid": 18548,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe run_talonx.py"
+  },
+  {
+   "pid": 19504,
+   "ppid": 19488,
+   "cmd": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe run_talonx.py"
+  },
+  {
+   "pid": 19524,
+   "ppid": 18548,
+   "cmd": "TalonX\\.venv\\Scripts\\python.exe -m talonx_ingest.intelligence.service poll --with-backfill"
+  },
+  {
+   "pid": 19540,
+   "ppid": 19524,
+   "cmd": "n\\pythoncore-3.12-64\\python.exe -m talonx_ingest.intelligence.service poll --with-backfill"
+  },
+  {
+   "pid": 19552,
+   "ppid": 10888,
+   "cmd": "al\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component evaluator:SAME_DAY"
+  },
+  {
+   "pid": 19628,
+   "ppid": 10276,
+   "cmd": "e sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+  },
+  {
+   "pid": 19636,
+   "ppid": 18548,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe dashboard_web.py"
+  },
+  {
+   "pid": 19660,
+   "ppid": 10276,
+   "cmd": "session-loop --session-dir C:\\workspace\\TalonX\\results\\prospective_2026-09-28 --every 1800"
+  },
+  {
+   "pid": 19668,
+   "ppid": 19636,
+   "cmd": "C:\\Users\\rites\\AppData\\Local\\Python\\pythoncore-3.12-64\\python.exe dashboard_web.py"
+  },
+  {
+   "pid": 19676,
+   "ppid": 19628,
+   "cmd": "e sip --execution-scope resolved-active-watchlist --release --deliver --transport telegram"
+  },
+  {
+   "pid": 19712,
+   "ppid": 19660,
+   "cmd": "session-loop --session-dir C:\\workspace\\TalonX\\results\\prospective_2026-09-28 --every 1800"
+  },
+  {
+   "pid": 19952,
+   "ppid": 19096,
+   "cmd": "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe -m talonx_opportunity component reporting"
+  },
+  {
+   "pid": 20464,
+   "ppid": 16596,
+   "cmd": "l\\Python\\pythoncore-3.12-64\\python.exe -m talonx_opportunity component evaluator:LONG_TERM"
+  }
+ ],
+ "process_count": 36,
+ "pollers": {
+  "verdict": "EXPECTED_DISTINCT_POLLERS",
+  "roles": {
+   "SIGNAL_COMMANDS": 1,
+   "SENTINEL_COMMANDS": 1,
+   "SENDER": 0,
+   "UNKNOWN": 0,
+   "UNRESOLVED": 0
+  },
+  "healthy": true
+ }
+}

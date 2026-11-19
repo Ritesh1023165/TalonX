@@ -520,7 +520,7 @@ def test_dashboard_read_model_exposes_paper_performance(tmp_path, monkeypatch):
     # v2_active_strategy() (V2), the ONE destination for each lane.
     all_sec = dr.all_sections()
     assert "paper_performance" not in all_sec
-    assert set(all_sec) == {"overview", "premarket", "original_quant", "v2_active_strategy",
+    assert set(all_sec) == {"overview", "opportunity_engine", "premarket", "original_quant", "v2_active_strategy",
                             "v2_broad_discovery", "validation", "intelligence", "paper_eod"}
     eod = dr.paper_eod()
     assert eod["original_local_paper"]["performance"]["lane"] == "ORIGINAL"

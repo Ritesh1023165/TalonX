@@ -1,0 +1,32 @@
+{
+ "calendar_id": "EDGAR_CLOSURES_V1",
+ "purpose": "Which dates EDGAR publishes no daily index because EDGAR does not receive, process or accept filings. Used ONLY by talonx_paperperf.form4_edgar to decide which daily indexes are expected; it never changes the forward tracker's run schedule.",
+ "supported_years": [2026],
+ "weekend_rule": "Saturday and Sunday are non-filing days (no daily index expected); pre-existing crawler behaviour, unchanged.",
+ "scheduled_closures": [
+  {"date": "2026-01-01", "name": "New Year's Day"},
+  {"date": "2026-01-19", "name": "Birthday of Martin Luther King, Jr."},
+  {"date": "2026-02-16", "name": "Washington's Birthday"},
+  {"date": "2026-05-25", "name": "Memorial Day"},
+  {"date": "2026-06-19", "name": "Juneteenth"},
+  {"date": "2026-07-03", "name": "Independence Day"},
+  {"date": "2026-09-07", "name": "Labor Day"},
+  {"date": "2026-10-12", "name": "Columbus Day"},
+  {"date": "2026-11-11", "name": "Veterans Day"},
+  {"date": "2026-11-26", "name": "Thanksgiving Day"},
+  {"date": "2026-12-25", "name": "Christmas Day"}
+ ],
+ "exceptional_closures": [],
+ "exceptional_closures_basis": "SEC EDGAR News & Announcements (https://www.sec.gov/submit-filings/edgar-news-announcements) checked 2026-10-13: announcements shown through 2026-10-07 contain no 2026 EDGAR closure. The only exceptional closure listed (2025-12-24..2025-12-26, announced 2025-12-22) is outside supported_years. A future official notice must be added here as a new calendar version.",
+ "sources": [
+  {"url": "https://www.sec.gov/submit-filings/filer-support-resources/edgar-calendar",
+   "statement": "The EDGAR system will not receive, process, or accept filings in observance of the following federal holidays.",
+   "covers": "2026 only"},
+  {"url": "https://www.sec.gov/submit-filings/edgar-news-announcements",
+   "covers": "announcements 2025-07-28 .. 2026-10-07"},
+  {"url": "https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data",
+   "statement": "Indexes incorporating the current business day's filings are updated nightly starting about 10:00 p.m., ET; the process is usually completed within a few hours."}
+ ],
+ "archive": "docs/research/evidence/2026-10-13_edgar_closure_calendar/ (raw page captures + sha256)",
+ "not_derived_from": "the stock-exchange (XNYS) calendar or a generic federal-holiday library"
+}

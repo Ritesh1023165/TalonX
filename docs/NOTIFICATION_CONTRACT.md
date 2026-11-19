@@ -36,6 +36,28 @@ Isolation is therefore enforced by **logical destination + bot identity + event 
 
 A Lab chat_id equal to the Signal/Sentinel chat_id is **allowed**. (Before 2026-09-24 this was rejected; that rule was retired as an obsolete assumption.)
 
+## Research producers and the attention budget (S14, 2026-09-24)
+
+| Producer | Outbox (research-only; the protected V2/shared outboxes are refused) | Event types |
+|---|---|---|
+| `talonx_opportunity.notifier` (Continuous Opportunity Engine) | `results/opportunity/opportunity_research_notifications.db` | `OPPORTUNITY_RESEARCH_{NEW,UPGRADE,MATERIAL_UPDATE,INVALIDATED}` |
+| `talonx_premarket` (V1 pre-market canary; SUPERSEDED for live use, kept for history) | `results/premarket_research/premarket_research_notifications.db` | `PREMARKET_RESEARCH_*` |
+
+Every row has `destination=RESEARCH` and provenance `not_a_trade_event: true`. The text ends with "Research alert only. Not a V2 trade event. Paper execution not started."
+
+**Candidate detection and durable persistence are independent from notification limits.**
+
+The attention budget exists only in the notification worker (`LAB_NOTIFY_POLICY_V1`, versioned and fingerprinted):
+
+- **Total:** 25 new surfacings per trading window. This is V1's figure, kept for a controlled comparison; it is configuration, not an evidence-derived value.
+- **WATCH share:** WATCH may use at most 15. 10 are reserved so that later BULLISH/BEARISH setups stay deliverable.
+- **Priority:** setups come before WATCH within one discovery evaluation.
+- **Updates and invalidations:** MATERIAL_UPDATE and INVALIDATED are sent only for candidates that were surfaced.
+- **Bookkeeping:** EXPIRED and REFERENCE_ROLLED are never sent.
+- **Recorded decisions:** every decision is persisted (`SELECTED` / `BUDGET_EXHAUSTED_*` / `NOT_SURFACED_PARENT` / `POLICY_SILENT` / `PHASE_DISABLED`), together with the real outbox state. ENQUEUED is not SENT.
+
+This **SUPERSEDES** the V1 contract's "at most 25 new candidates per session (highest score first)". That cap sat inside candidate lifecycle creation, where it froze suppressed identities. It never limited raw detection.
+
 ## Signal roadmap (NOT implemented)
 
 Signal may later become an opt-in subscriber bot. Possible future work:

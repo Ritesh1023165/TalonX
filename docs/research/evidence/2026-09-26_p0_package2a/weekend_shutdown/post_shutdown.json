@@ -1,0 +1,315 @@
+{
+ "time_utc": "2026-09-26T17:49:19+00:00",
+ "branch": "feature/continuous-opportunity-engine",
+ "head": "1098633",
+ "main": "696370e",
+ "tracked_changes": [],
+ "components": {
+  "ingestion": {
+   "pid": 19072,
+   "state": "STOPPED",
+   "hb_age_s": 98.7,
+   "version": "fded2ee1b565",
+   "config_fps": {},
+   "deployment": "20260925T070859Z-ingestion-88a873"
+  },
+  "evaluator:INTRADAY": {
+   "pid": 12596,
+   "state": "STOPPED",
+   "hb_age_s": 99.4,
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "PREMARKET,REGULAR"
+   },
+   "deployment": "20260925T070859Z-evaluator:INTRADAY-d7f909"
+  },
+  "evaluator:SAME_DAY": {
+   "pid": 21528,
+   "state": "STOPPED",
+   "hb_age_s": 99.3,
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "OVERNIGHT,PREMARKET,REGULAR,AFTER_HOURS"
+   },
+   "deployment": "20260925T070859Z-evaluator:SAME_DAY-42bdc7"
+  },
+  "discovery": {
+   "pid": 18600,
+   "state": "STOPPED",
+   "hb_age_s": 102.0,
+   "version": "a5bd67035a4d",
+   "config_fps": {
+    "CONTINUOUS_RESEARCH": "2ef115ee19f99574",
+    "PREMARKET_RESEARCH_V1": "62ba413daf85e674",
+    "SEC_CATALYST_CACHE": "BACKGROUND_REFRESH_V1"
+   },
+   "deployment": "20260926T090536Z-discovery-efcad5"
+  },
+  "evaluator:SHORT_TERM": {
+   "pid": 23280,
+   "state": "STOPPED",
+   "hb_age_s": 99.0,
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": "AFTER_HOURS,OVERNIGHT"
+   },
+   "deployment": "20260925T070859Z-evaluator:SHORT_TERM-b7567d"
+  },
+  "evaluator:LONG_TERM": {
+   "pid": 14440,
+   "state": "STOPPED",
+   "hb_age_s": 99.7,
+   "version": "622140e9e504",
+   "config_fps": {
+    "authorized_strategies": "none",
+    "phase_scope": ""
+   },
+   "deployment": "20260925T070859Z-evaluator:LONG_TERM-8cf87c"
+  },
+  "notifier": {
+   "pid": 9384,
+   "state": "STOPPED",
+   "hb_age_s": 101.8,
+   "version": "e4c8cc285ff6",
+   "config_fps": {
+    "LAB_NOTIFY_POLICY": "dec8d1a865f25424",
+    "deliver": "1",
+    "reserve_phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "deployment": "20260926T085833Z-notifier-4c02a5"
+  },
+  "outcomes": {
+   "pid": 2052,
+   "state": "STOPPED",
+   "hb_age_s": 99.9,
+   "version": "98480e88130f",
+   "config_fps": {
+    "models": "PREMARKET_RESEARCH_V1.measure+SINCE_FIRST_SEEN_V1",
+    "phase_basis": "CAUSAL_DATA_PHASE_V1"
+   },
+   "deployment": "20260925T131932Z-outcomes-d0b191"
+  },
+  "reporting": {
+   "pid": 15840,
+   "state": "STOPPED",
+   "hb_age_s": 99.0,
+   "version": "3480557b7485",
+   "config_fps": {},
+   "deployment": "20260925T114339Z-reporting-60556c"
+  },
+  "promotion": {
+   "pid": 16348,
+   "state": "STOPPED",
+   "hb_age_s": 102.3,
+   "version": "ce9d915e611a",
+   "config_fps": {
+    "PROMOTION_POLICY": "4926c12e5eace04e",
+    "mode": "PAPER_SIGNAL",
+    "promotion_src": "bf0dea2167d9"
+   },
+   "deployment": "20260925T180733Z-promotion-d10677"
+  },
+  "sentinel": {
+   "pid": 12332,
+   "state": "STOPPED",
+   "hb_age_s": 94.1,
+   "version": "07ecde743d84",
+   "config_fps": {
+    "destination": "SENTINEL",
+    "enabled": "1",
+    "mutation_mode": "DRY_RUN"
+   },
+   "deployment": "20260926T102000Z-sentinel-79eaee"
+  }
+ },
+ "pending_declarations": [
+  {
+   "id": 8,
+   "component": "discovery",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "eb716fb149b8"
+  },
+  {
+   "id": 9,
+   "component": "evaluator:INTRADAY",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "31f79a510fb8"
+  },
+  {
+   "id": 10,
+   "component": "evaluator:LONG_TERM",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "31f79a510fb8"
+  },
+  {
+   "id": 11,
+   "component": "evaluator:SAME_DAY",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "31f79a510fb8"
+  },
+  {
+   "id": 12,
+   "component": "evaluator:SHORT_TERM",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "31f79a510fb8"
+  },
+  {
+   "id": 13,
+   "component": "notifier",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "07045afceef8"
+  },
+  {
+   "id": 14,
+   "component": "outcomes",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "e7d155ffff30"
+  },
+  {
+   "id": 15,
+   "component": "promotion",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "3dc2ce224318"
+  },
+  {
+   "id": 16,
+   "component": "reporting",
+   "classification": "OPERATIONS_ONLY",
+   "expected_version": "43ed6fe35817"
+  }
+ ],
+ "engine": {
+  "max_event_seq": 4550,
+  "cursors": {
+   "notifier": 4550,
+   "promotion": 4550,
+   "intraday": 4550,
+   "same_day": 4550,
+   "short_term": 4550,
+   "long_term": 4550
+  },
+  "lag": {
+   "notifier": 0,
+   "promotion": 0,
+   "intraday": 0,
+   "same_day": 0,
+   "short_term": 0,
+   "long_term": 0
+  },
+  "candidates": 2065,
+  "events": 4550,
+  "outcome_rows": 2065
+ },
+ "promotion": {
+  "mode": "PAPER_SIGNAL",
+  "states": {
+   "EXPIRED": 1,
+   "PROMOTED_SHADOW": 6,
+   "PROMOTED_SIGNAL": 36,
+   "REJECTED_WHILE_QUEUED": 3
+  },
+  "queued": 0,
+  "distinct_candidates": 46
+ },
+ "outboxes": {
+  "lab": {
+   "RESEARCH|SENT": 294
+  },
+  "promotion_signal": {
+   "TRADE_EVENT|SENT": 36
+  },
+  "v2_release_ops": {
+   "OPERATIONS|EXPIRED": 2,
+   "OPERATIONS|SENT": 8
+  },
+  "shared_notifications": {
+   "OPERATIONS|EXPIRED": 1,
+   "OPERATIONS|SENT": 11
+  }
+ },
+ "pending_or_failed": {
+  "lab": {},
+  "promotion_signal": {},
+  "v2_release_ops": {},
+  "shared_notifications": {}
+ },
+ "sentinel": {
+  "enabled": true,
+  "mode": "DRY_RUN",
+  "handled": 14,
+  "saved_offset": 920191867,
+  "ledger_lines": 14
+ },
+ "operator_control": {
+  "exclusions": [
+   {
+    "symbol": "TSLA",
+    "status": "RESTORED",
+    "activation": "PENDING_ACTIVATION"
+   }
+  ],
+  "universe": [],
+  "audit_rows": 2
+ },
+ "provider": {
+  "fetch_universe": {
+   "window_id": "2026-09-25",
+   "symbols": 5653,
+   "cycle_utc": "2026-09-25T23:59:25.398767+00:00"
+  },
+  "sec_refresh_fp": "BACKGROUND_REFRESH_V1"
+ },
+ "v2": {
+  "campaign_id": "V2-PAPER-RC1",
+  "strategy_version": "INSIDER_BUY_CLUSTER_V2@1",
+  "config_fingerprint": "e2acf6454789217e",
+  "execution_mode": "PAPER",
+  "provider_fp": "ac5e51aa3599d6c9",
+  "cash": 100000.0,
+  "positions": 0,
+  "trades": 0,
+  "intents": 0,
+  "alert_outbox_rows": 0,
+  "db_sha": "891cddac6ce2a1a6",
+  "status_hb_age_s": 90.7,
+  "status_tick": 621,
+  "eod_09_25_closed": true
+ },
+ "db_integrity": {
+  "evaluator_intraday.db": "ok",
+  "evaluator_long_term.db": "ok",
+  "evaluator_same_day.db": "ok",
+  "evaluator_short_term.db": "ok",
+  "market.db": "ok",
+  "notification.db": "ok",
+  "opportunity.db": "ok",
+  "opportunity_research_notifications.db": "ok",
+  "outcomes.db": "ok",
+  "promotion.db": "ok",
+  "promotion_signal_notifications.db": "ok",
+  "runtime.db": "ok",
+  "v2_release_rc1.db": "ok",
+  "v2_release_rc1_notifications.db": "ok",
+  "notifications.db": "ok",
+  "operator_control.db": "ok",
+  "eod_reconciliation.db": "ok",
+  "ingestion_ledger.db": "ok",
+  "paper_trading.db": "ok"
+ },
+ "processes": [],
+ "process_count": 0,
+ "pollers": {
+  "verdict": "EXPECTED_DISTINCT_POLLERS",
+  "roles": {
+   "SIGNAL_COMMANDS": 0,
+   "SENTINEL_COMMANDS": 0,
+   "SENDER": 0,
+   "UNKNOWN": 0,
+   "UNRESOLVED": 0
+  },
+  "healthy": true
+ }
+}

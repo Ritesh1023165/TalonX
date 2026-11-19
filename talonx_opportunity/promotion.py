@@ -1,0 +1,945 @@
+"""
+OPPORTUNITY PROMOTION -- Opportunity Engine setup -> PAPER opportunity (OPPORTUNITY_PROMOTION_V1, 2026-09-25).
+
+A separate downstream component (own process ``python -m talonx_opportunity component promotion``, own store
+``promotion.db``, own heartbeat). It reads the durable candidate store READ-ONLY through its own cursor and NEVER
+writes discovery / lifecycle / notifier / V2 state. A crash here cannot affect discovery, Lab delivery or V2.
+
+v1 contract (deliberately narrow; no new alpha threshold, no change to classification):
+* only a candidate's FIRST setup surfacing after ``PROMOTION_START_UTC`` (event NEW or UPGRADE, classification
+  BULLISH) -- nothing that predates the boundary is ever considered (the cursor starts at the store's max seq);
+* processing phase REGULAR and data phase REGULAR (the causal bar horizon is inside the regular session);
+* long-only: BEARISH is recorded as REJECTED_BEARISH and never becomes actionable; WATCH is REJECTED_WATCH;
+* the candidate is still an active BULLISH_SETUP when promoted (invalidated / stale / faded / expired -> REJECTED);
+* the data is fresh under the existing 15-min provider-lag contract and causal (data_as_of <= event time <= now);
+* reference price > 0;
+* at most ONE promotion per candidate identity, ever (promotion_id = ``OPPORTUNITY_ENGINE:<candidate_id>``).
+
+Delivery: a durable queue ordered score-descending, max 3 promotions per rolling 5 min, queue expiry 30 min.
+Mode (``TALONX_OPPORTUNITY_PROMOTION_MODE``): SHADOW (default) records PROMOTED_SHADOW / WOULD_SIGNAL and sends
+NOTHING; PAPER_SIGNAL enqueues a "PAPER OPPORTUNITY" message to the TRADE_EVENT (TalonX Signal) destination via
+``talonx_ops.notify`` -- never the Lab bot, never the legacy default client. Never a broker order, never V2.
+
+This is NOT proven profitable and NOT BUY/SELL advice: it creates a measurable paper Signal-quality cohort.
+Paper outcomes (+15m/+30m/+1h/close/MFE/MAE, long direction) are tracked for every promotion.
+
+SIGNAL-DELIVERY PAUSE (owner decision 2026-10-07). A durable control file ``<root>/control/promotion_signal_delivery.json``
+with ``"paused": true`` overrides a PAPER_SIGNAL environment: the component runs record-only (state PROMOTED_SHADOW,
+reason_code SIGNAL_DELIVERY_PAUSED), never drains its Signal outbox, and at start retires any not-yet-sent
+PAPER_OPPORTUNITY row (PENDING / RETRY / HELD -> EXPIRED, last_error ``SUPPRESSED_POLICY_PAUSE: ...``) so nothing can
+replay later. SENT and AMBIGUOUS rows are never touched. Promotion records and paper outcomes continue unchanged. A
+malformed control file is treated as PAUSED (fail safe: no send). Resuming needs an explicit edit (``"paused": false``)
+plus a restart; rows queued while paused then expire (MODE_SWITCH_NO_CARRYOVER) instead of being sent.
+
+RESEARCH-REVIEW DELIVERY (owner direction 2026-10-07). Resumption is ``"paused": false`` + ``"delivery_mode":
+"RESEARCH_REVIEW"`` + a timezone-aware ``"delivery_boundary_utc"``. Only promotions QUEUED at/after that boundary can
+enter the Signal outbox; anything older is recorded PROMOTED_SHADOW / PRE_RESTORATION_RECORD_ONLY. Messages are
+labelled "TALONX — RESEARCH OPPORTUNITY / UNVALIDATED — not a buy instruction" with the policy's negative research
+verdict, event_type RESEARCH_OPPORTUNITY. ``paused: false`` without a valid boundary stays PAUSED (fail safe). Alert
+delivery is independent of any paper-trading admission (it never consults VR, V2 or a paper ledger).
+"""
+from __future__ import annotations
+
+import hashlib
+import html
+import json
+import os
+import re
+import sqlite3
+from dataclasses import asdict, dataclass
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from talonx_opportunity.db import connect, iso, j, root_dir, utcnow
+from talonx_opportunity.phases import phase_at, trading_window
+from talonx_opportunity.store import OpportunityStore, opportunity_db
+
+MODE_ENV = "TALONX_OPPORTUNITY_PROMOTION_MODE"
+SHADOW, PAPER_SIGNAL = "SHADOW", "PAPER_SIGNAL"
+PAUSE_REASON = "SIGNAL_DELIVERY_PAUSED"            # promotions recorded while Signal delivery is paused
+PRE_RESTORATION = "PRE_RESTORATION_RECORD_ONLY"     # queued before the review-delivery boundary: never sent
+REVIEW_REASON = "RESEARCH_REVIEW_ALERT"             # delivered as a research-review alert (not a trade event)
+REVIEW_EVENT_TYPE = "RESEARCH_OPPORTUNITY"
+SIGNAL_EVENT_TYPES = ("PAPER_OPPORTUNITY", REVIEW_EVENT_TYPE)
+SUPPRESS_PREFIX = "SUPPRESSED_POLICY_PAUSE"        # outbox rows retired by the pause (policy, never a transport error)
+SOURCE = "OPPORTUNITY_ENGINE"
+PRODUCER = "talonx_opportunity.promotion"
+ACTIVE_SETUP = "BULLISH_SETUP"
+
+
+@dataclass(frozen=True)
+class PromotionPolicy:
+    version: str = "OPPORTUNITY_PROMOTION_V1"
+    processing_phases: tuple[str, ...] = ("REGULAR",)
+    data_phases: tuple[str, ...] = ("REGULAR",)
+    long_only: bool = True
+    classes: tuple[str, ...] = ("BULLISH",)
+    surfacing_events: tuple[str, ...] = ("NEW", "UPGRADE")
+    freshness_s: int = 900                  # discovery's PROVIDER_LAG_LIMIT: data older than this vs the SIP as-of
+    rate_max: int = 3
+    rate_window_s: int = 300
+    queue_expiry_s: int = 1800
+    queue_order: str = "SCORE_DESC"
+    one_promotion_per_candidate: bool = True
+
+    def fingerprint(self) -> str:
+        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True).encode()).hexdigest()[:16]
+
+
+PROMOTION_V1 = PromotionPolicy()
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS cursor (name TEXT PRIMARY KEY, last_seq INTEGER, updated_utc TEXT);
+CREATE TABLE IF NOT EXISTS evaluations (
+    event_id TEXT PRIMARY KEY, seq INTEGER, candidate_id TEXT, symbol TEXT, event_type TEXT, classification TEXT,
+    processing_phase TEXT, data_phase TEXT, data_as_of_utc TEXT, event_utc TEXT, evaluated_utc TEXT,
+    decision TEXT, reason_code TEXT, policy_fp TEXT
+);
+CREATE TABLE IF NOT EXISTS promotions (
+    promotion_id TEXT PRIMARY KEY, candidate_id TEXT UNIQUE, event_id TEXT, symbol TEXT, direction TEXT,
+    classification TEXT, score REAL, processing_phase TEXT, data_phase TEXT, data_as_of_utc TEXT,
+    event_utc TEXT, queued_utc TEXT, decision_utc TEXT, reference_price REAL, horizons_json TEXT,
+    lifecycle_state TEXT, promotion_mode TEXT, state TEXT, reason_code TEXT, queue_rank INTEGER,
+    policy_version TEXT, policy_fp TEXT, source_strategy TEXT, source_candidate_version TEXT,
+    signal_event_id TEXT, family TEXT, window_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_promotions_state ON promotions(state);
+CREATE TABLE IF NOT EXISTS paper_outcomes (
+    promotion_id TEXT PRIMARY KEY, candidate_id TEXT, symbol TEXT, ref_time_utc TEXT, ref_price REAL,
+    px_15m REAL, ret_15m_pct REAL, px_30m REAL, ret_30m_pct REAL, px_1h REAL, ret_1h_pct REAL, close_px REAL,
+    close_ret_pct REAL, mfe_pct REAL, mae_pct REAL, status TEXT, lifecycle_end_state TEXT, session_complete INTEGER,
+    updated_utc TEXT
+);
+"""
+# promotion states: QUEUED -> PROMOTED_SHADOW | PROMOTED_SIGNAL | EXPIRED | REJECTED_WHILE_QUEUED
+
+
+def promotion_db(root=None) -> Path:
+    return root_dir(root) / "promotion.db"
+
+
+def signal_outbox_path(root=None) -> Path:
+    return root_dir(root) / "promotion_signal_notifications.db"
+
+
+def pause_path(root=None) -> Path:
+    return root_dir(root) / "control" / "promotion_signal_delivery.json"
+
+
+def signal_delivery_pause(root=None) -> dict | None:
+    """The durable Signal-delivery pause, or None when delivery is not paused. Fail safe: unreadable -> PAUSED."""
+    f = pause_path(root)
+    if not f.exists():
+        return None
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE", "detail": type(exc).__name__}
+    if not isinstance(d, dict):
+        return {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE", "detail": "not an object"}
+    if d.get("paused") is False:
+        if delivery_boundary(d) is None:             # a resumption must name its boundary, else stay paused
+            return {**d, "paused": True, "decision": "RESUME_WITHOUT_VALID_BOUNDARY_FAIL_SAFE"}
+        return None
+    return d if d.get("paused") is True else {**d, "paused": True, "decision": "PAUSED_FLAG_NOT_BOOLEAN_FAIL_SAFE"}
+
+
+def delivery_boundary(d: dict | None) -> datetime | None:
+    try:
+        b = datetime.fromisoformat(str((d or {}).get("delivery_boundary_utc")).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return b if b.tzinfo is not None else None
+
+
+def signal_delivery_control(root=None) -> dict | None:
+    f = pause_path(root)
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except (OSError, ValueError):
+        return None
+
+
+def trace_path(root=None) -> Path:
+    return root_dir(root) / "promotion_delivery_trace.db"
+
+
+def mode_from_env(env=None) -> str:
+    m = str((env if env is not None else os.environ).get(MODE_ENV, SHADOW)).strip().upper() or SHADOW
+    if m not in (SHADOW, PAPER_SIGNAL):
+        raise SystemExit(f"{MODE_ENV}={m!r}: allowed {SHADOW} | {PAPER_SIGNAL}")
+    return m
+
+
+def _ts(s):
+    return datetime.fromisoformat(s.replace("Z", "+00:00")) if s else None
+
+
+SIGNAL_FOOTER = "Paper opportunity only · no order placed · not proven profitable"
+
+
+def _ref(px) -> str:
+    px = float(px or 0)
+    return f"${px:,.2f}" if px >= 1 else f"${px:.4f}"
+
+
+REVIEW_VERDICT = ("NEGATIVE: this policy's evaluated paper results were negative after costs "
+                  "(VR replay 2026-09-28/29 net -0.61%; forward 2026-09-30 net -0.46%)")
+
+
+def _age_min(asof: str | None, now: datetime) -> str:
+    try:
+        return f"{int((now - _ts(asof)).total_seconds() // 60)}m"
+    except (TypeError, ValueError):
+        return "UNKNOWN"
+
+
+def render_review(p: dict, now: datetime, policy: str) -> str:
+    """Research-review alert (owner direction 2026-10-07). Plain text. Unknown data is shown as UNKNOWN."""
+    asof = p.get("data_as_of_utc")
+    data = f"{asof[11:16]}Z (age {_age_min(asof, now)})" if asof else "UNKNOWN (age UNKNOWN)"
+    horizons = " / ".join(json.loads(p.get("horizons_json") or "[]")) or "UNKNOWN"
+    return "\n".join([
+        "🔎 TALONX — RESEARCH OPPORTUNITY",
+        "⚠️ UNVALIDATED — not a buy instruction", "",
+        f"🟢 {p['symbol']} · BULLISH setup",
+        f"⭐ Score {round(p['score'] or 0, 1)}",
+        f"💵 Ref {_ref(p.get('reference_price'))}",
+        f"🕒 Signal {now.astimezone(timezone.utc).strftime('%H:%MZ')} · {p.get('processing_phase') or 'UNKNOWN'} · data {data}",
+        f"⏱ Horizon {horizons}",
+        f"🧪 Policy {policy} (Opportunity Engine)",
+        f"📉 Research verdict: {REVIEW_VERDICT}", "",
+        "For review only · not a trade event · no order placed",
+    ])
+
+
+# 2026-10-09 (owner-approved, PRESENTATION ONLY): compact research-review template. Every value comes from records that
+# exist when the message is rendered -- the promotion row, the generation-time candidate event (features / score /
+# catalyst / provenance), the exchange-calendar close of the window, earlier CONFIRMED (outbox SENT) deliveries and the
+# DTU policy schedule. The Telegram acknowledgement time is not known at render time and is never shown. Plain text
+# (the worker sends parse_mode=None). Missing evidence renders as UNKNOWN (or the optional Repeat line is omitted).
+# Previous wording: ``render_review`` (kept unchanged for rollback). Detailed score arithmetic stays in the
+# candidate_events record (score_json) and the deployment evidence.
+REVIEW_TEMPLATE_VERSION_V2 = "RESEARCH_REVIEW_COMPACT_V2"   # V1 2026-10-09 16:53Z; V2 = approved visual layout
+#                                                             (icons, bullets, direction from the RECORDED change)
+# 2026-10-17 (owner-approved, PRESENTATION ONLY): V3 = a short visible summary + the unchanged V2 wording inside a
+# Telegram expandable quote (HTML). Same evidence, same values; only layout and parse mode differ. Rollback = V2.
+REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_EXPANDABLE_V3"
+_ET = ZoneInfo("America/New_York")
+_FORM_WORDS = {"144": "Form 144 proposed-sale notice", "3": "Form 3 initial ownership report",
+               "4": "Form 4 insider transaction report", "5": "Form 5 annual insider report"}
+_INCOMPLETE = "catalyst lookup incomplete"
+
+
+def _num(v):
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if x == x else None
+
+
+def _et(v) -> str:
+    try:
+        t = v if isinstance(v, datetime) else _ts(v)
+        return t.astimezone(_ET).strftime("%H:%M") + " ET"
+    except (TypeError, ValueError, AttributeError):
+        return "UNKNOWN"
+
+
+SEC_MAX_GROUPS = 4                 # 2026-10-22: frequent filers (bank 424B2 programmes) produced >5,000-char lines
+
+
+def _compact_labels(found: list[str], max_groups: int = SEC_MAX_GROUPS) -> list[str]:
+    """Presentation only: identical labels (ignoring their ' filed <date>' suffix) collapse into one entry with a count
+    and the date range; at most ``max_groups`` entries, then '+N more filing types'. A list without repeats and within
+    the cap renders exactly as before."""
+    groups: dict[str, list[str]] = {}
+    for lab in found:
+        m = re.fullmatch(r"(.+) filed (\d{4}-\d{2}-\d{2})", lab)
+        key, d = (m.group(1), m.group(2)) if m else (lab, None)
+        groups.setdefault(key, []).append(d or "")
+    out = []
+    for key, dates in groups.items():
+        if len(dates) == 1:
+            out.append(f"{key} filed {dates[0]}" if dates[0] else key)
+            continue
+        ds = sorted(x for x in dates if x)
+        span = "" if not ds else f" (filed {ds[0]})" if ds[0] == ds[-1] else f" (filed {ds[0]} to {ds[-1]})"
+        out.append(f"{key} ×{len(dates)}{span}")
+    if len(out) > max_groups:
+        out = out[:max_groups] + [f"+{len(out) - max_groups} more filing types"]
+    return out
+
+
+def _sec_context(cat) -> str:
+    c = str(cat).strip() if cat is not None else ""
+    if not c:
+        return "SEC context: UNKNOWN (no catalyst record). News not checked."
+    if c == "none found":
+        return "SEC context: No matching SEC/insider record found in the checked sources. News not checked."
+    labels = [x.strip() for x in c.split("; ") if x.strip()]
+    gaps = [x for x in labels if x.startswith(_INCOMPLETE)]
+    found = []
+    for lab in (x for x in labels if not x.startswith(_INCOMPLETE)):
+        m = re.fullmatch(r"\d+ other SEC filing\(s\): (.+)", lab)
+        found.append("other filing(s): " + ", ".join(_FORM_WORDS.get(f.strip(), f"Form {f.strip()}")
+                                                   for f in m.group(1).split(",")) if m else lab)
+    if not found:
+        return f"SEC context: UNKNOWN ({'; '.join(gaps) or c}). News not checked."
+    found = _compact_labels(found)
+    tail = f"; other sources UNKNOWN ({'; '.join(gaps)})" if gaps else ""
+    return f"SEC context: {'; '.join(found)}{tail}. Connection to the move unverified; news not checked."
+
+
+def _direction(gap) -> str:
+    """Observed movement vs the prior close (never a forecast; never derived from the score or a setup label)."""
+    g = _num(gap)
+    if g is None or g in (float("inf"), float("-inf")):
+        return "❔ DIRECTION UNKNOWN"
+    if g == 0:
+        return "⚪ ▬ UNCHANGED 0.00%"
+    if abs(g) < 0.005:                                     # nonzero but below display precision: never "0.00%"
+        return "🟢 ▲ UP <0.01%" if g > 0 else "🔴 ▼ DOWN <0.01%"
+    return f"🟢 ▲ UP +{g:.2f}%" if g > 0 else f"🔴 ▼ DOWN −{abs(g):.2f}%"
+
+
+def _why(f: dict) -> str:
+    return "Why flagged: " + " · ".join(_why_items(f))
+
+
+def _why_items(f: dict) -> list[str]:
+    out = []
+    gap, atr = _num(f.get("gap_pct")), _num(f.get("atr20_pct"))
+    out.append(f"move = {abs(gap) / atr:.1f}× its 20-day average true range ({atr:.2f}% of price)"
+               if gap is not None and atr else "move vs 20-day range UNKNOWN")
+    vol, frac = _num(f.get("pm_volume")), _num(f.get("activity_adv_fraction"))
+    out.append(f"volume since 04:00 ET {vol:,.0f} sh = {frac * 100:.1f}% of 20-day avg daily volume"
+               if vol is not None and frac is not None else
+               (f"volume since 04:00 ET {vol:,.0f} sh" if vol is not None else "volume UNKNOWN"))
+    pos, d = f.get("range_position"), _num(f.get("range_distance_pct"))
+    ph, pl = _num(f.get("prev_high")), _num(f.get("prev_low"))
+    if pos == "ABOVE_PREV_HIGH" and d is not None and ph:
+        out.append(f"{d:.2f}% above prior-day high {_ref(ph)}")
+    elif pos == "INSIDE_PREV_RANGE" and ph:
+        out.append(f"inside prior-day range (high {_ref(ph)})")
+    elif pos == "BELOW_PREV_LOW" and d is not None and pl:
+        out.append(f"{d:.2f}% below prior-day low {_ref(pl)}")
+    else:
+        out.append("position vs prior-day high UNKNOWN")
+    return out
+
+
+def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
+    """V2 research-review text (REVIEW_TEMPLATE_VERSION_V2; since V3 it is the expandable detail body). ``ctx``: {"event": candidate_events row or None,
+    "close_utc": window close or None, "prior_delivery_date": ET date of the latest earlier CONFIRMED delivery for the
+    symbol or None, "universe": policy name or None}. Never raises on missing evidence. Plain text (parse_mode=None)."""
+    ctx = ctx or {}
+    ev = ctx.get("event") or {}
+    try:
+        f = json.loads(ev.get("features_json") or "{}")
+    except (TypeError, ValueError):
+        f = {}
+    f = f if isinstance(f, dict) else {}
+    try:
+        prov = json.loads(ev.get("provenance_json") or "{}")
+    except (TypeError, ValueError):
+        prov = {}
+    prov = prov if isinstance(prov, dict) else {}
+    pc = _num(f.get("prev_close"))
+    asof = p.get("data_as_of_utc")
+    try:
+        age = f"{int((now - _ts(asof)).total_seconds() // 60)} min"
+    except (TypeError, ValueError):
+        age = "UNKNOWN age"
+    delay = prov.get("delay_minutes")
+    ref = _num(p.get("reference_price"))
+    score = _num(p.get("score"))
+    lines = [
+        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        f"{p.get('symbol') or 'UNKNOWN'} · {_direction(f.get('gap_pct'))}",
+        f"Previous close: {_ref(pc) if pc else 'UNKNOWN'}",
+        "",
+        "📊 Why flagged",
+        *([f"• {x[:1].upper()}{x[1:]}" for x in _why_items(f)] if f else ["• UNKNOWN (generation record unavailable)"]),
+        "",
+        f"💵 Historical price: {_ref(ref) if ref else 'UNKNOWN'} at {_et(asof)}",
+        f"• {f'{delay}-min delayed feed' if delay else 'Delayed feed'} · not a live quote",
+        "",
+        f"🕒 Data {age} old when written",
+        f"• Detected {_et(p.get('event_utc'))} · written {_et(now)}",
+        "",
+        "📄 " + _sec_context(ev.get("catalyst") if ev else None),
+        "",
+        f"⏱️ Scope: Today’s session, closing {_et(ctx.get('close_utc'))}. No entry, exit or holding rule.",
+        f"🧮 Rule score: {score:.1f}/100; not a probability." if score is not None else "🧮 Rule score: UNKNOWN.",
+    ]
+    if ctx.get("prior_delivery_date"):
+        lines.append(f"🔁 Earlier alert for {p.get('symbol')} delivered {ctx['prior_delivery_date']}")
+    lines += ["",
+              "⚠️ This policy’s evaluated paper results were negative after costs.",
+              "For review only · not a buy instruction · no order placed",
+              "",
+              f"🏷️ Policy {policy}",
+              f"🌐 Universe {ctx.get('universe') or 'UNKNOWN'}",
+              f"🔖 Reference {p.get('promotion_id') or 'UNKNOWN'}"]
+    return "\n".join(lines)
+
+
+HTML_DETAILS_OPEN = "<blockquote expandable>"      # marker: only a payload containing it is sent with parse_mode=HTML
+
+
+def _short_why(f: dict) -> str:
+    """One-line digest of ``_why_items`` (same values, shorter wording); UNKNOWN per missing part."""
+    gap, atr = _num(f.get("gap_pct")), _num(f.get("atr20_pct"))
+    parts = [f"{abs(gap) / atr:.1f}× ATR" if gap is not None and atr else "ATR multiple UNKNOWN"]
+    frac = _num(f.get("activity_adv_fraction"))
+    parts.append(f"vol {frac * 100:.1f}% of 20d avg" if frac is not None else "volume UNKNOWN")
+    pos, d = f.get("range_position"), _num(f.get("range_distance_pct"))
+    if pos == "ABOVE_PREV_HIGH" and d is not None:
+        parts.append(f"{d:.2f}% above prior-day high")
+    elif pos == "INSIDE_PREV_RANGE":
+        parts.append("inside prior-day range")
+    elif pos == "BELOW_PREV_LOW" and d is not None:
+        parts.append(f"{d:.2f}% below prior-day low")
+    else:
+        parts.append("prior-day range UNKNOWN")
+    return " · ".join(parts)
+
+
+def render_review_expandable(p: dict, now: datetime, policy: str, ctx: dict | None = None) -> str:
+    """REVIEW_TEMPLATE_VERSION (V3): five visible summary lines, then the complete V2 text (minus its header line) in a
+    collapsed Telegram expandable quote. Telegram HTML: every dynamic value is escaped; the only tags are <b> and the
+    blockquote. Never raises on missing evidence (same contract as ``render_review_compact``)."""
+    ctx = ctx or {}
+    ev = ctx.get("event") or {}
+    try:
+        f = json.loads(ev.get("features_json") or "{}")
+    except (TypeError, ValueError):
+        f = {}
+    f = f if isinstance(f, dict) else {}
+    try:
+        prov = json.loads(ev.get("provenance_json") or "{}")
+    except (TypeError, ValueError):
+        prov = {}
+    prov = prov if isinstance(prov, dict) else {}
+    e = lambda s: html.escape(str(s), quote=False)  # noqa: E731
+    ref, score, delay = _num(p.get("reference_price")), _num(p.get("score")), prov.get("delay_minutes")
+    summary = [
+        f"🔎 <b>{e(p.get('symbol') or 'UNKNOWN')}</b> · {e(_direction(f.get('gap_pct')))} · UNVALIDATED",
+        f"💵 {e(_ref(ref) if ref else 'UNKNOWN')} at {e(_et(p.get('data_as_of_utc')))} · "
+        f"{e(f'{delay}-min delayed' if delay else 'delayed')}, not live",
+        f"📊 {e(_short_why(f)) if f else 'Reasons UNKNOWN'}",
+        f"🧮 Score {score:.1f}/100 · not a probability" if score is not None else "🧮 Score UNKNOWN",
+        "⚠️ Paper results negative after costs · review only · no order",
+    ]
+    details = render_review_compact(p, now, policy, ctx).split("\n", 1)[-1].strip("\n")
+    details = _fit_details(html.unescape(re.sub(r"<[^>]*>", "", "\n".join(summary))), details)
+    return "\n".join(summary) + "\n" + HTML_DETAILS_OPEN + e(details) + "</blockquote>"
+
+
+TELEGRAM_TEXT_LIMIT = 4096         # UTF-16 code units of the parsed (visible) text
+_FIT_BUDGET = 3900                 # margin below the limit
+_TRUNCATED = "… (details shortened to fit Telegram's message limit)"
+
+
+def _u16(s: str) -> int:
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _fit_details(visible_summary: str, details: str) -> str:
+    """Hard guard (2026-10-22): the visible message must stay under Telegram's limit. Overlong details are cut at a line
+    boundary (a single overlong line is cut by characters) and marked. The last three lines (policy / universe /
+    reference) are always kept."""
+    budget = _FIT_BUDGET - _u16(visible_summary) - 1
+    if _u16(details) <= budget:
+        return details
+    lines = details.split("\n")
+    keep_tail = lines[-3:]
+    tail_cost = _u16("\n".join(["", _TRUNCATED, "", *keep_tail]))
+    room = budget - tail_cost
+    head: list[str] = []
+    for ln in lines[:-3]:
+        cost = _u16(ln) + (1 if head else 0)
+        if cost <= room:
+            head.append(ln)
+            room -= cost
+            continue
+        if room > 20:                                    # partial line: cut by characters, never split a pair
+            cut = ln
+            while _u16(cut) + (1 if head else 0) > room:
+                cut = cut[:-1]
+            head.append(cut)
+        break
+    return "\n".join([*head, _TRUNCATED, "", *keep_tail])
+
+
+class ExpandableHtmlClient:
+    """Wraps the Signal client (normally TracedTransport). Sends parse_mode=HTML only for a payload that contains the V3
+    marker; anything else (V2/minimal plain text, rows enqueued before deployment) keeps parse_mode=None. The text is
+    passed through unchanged, so the delivery trace still joins on the outbox payload hash."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    @property
+    def is_configured(self) -> bool:
+        return getattr(self._inner, "is_configured", True)
+
+    async def send(self, text: str, parse_mode=None, **kw):
+        return await self._inner.send(text, parse_mode="HTML" if HTML_DETAILS_OPEN in text else parse_mode, **kw)
+
+
+def render_review_minimal(p: dict, policy: str) -> str:
+    """Last-resort fallback (no evidence lookups, no arithmetic): every essential warning, nothing else."""
+    sym = p.get("symbol") if isinstance(p, dict) else None
+    ref = p.get("promotion_id") if isinstance(p, dict) else None
+    return "\n".join([
+        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        f"{sym or 'UNKNOWN'} · ❔ DIRECTION UNKNOWN",
+        "",
+        "💵 Historical price: UNKNOWN · delayed feed · not a live quote",
+        "🧮 Rule score: UNKNOWN; not a probability.",
+        "",
+        "⚠️ This policy’s evaluated paper results were negative after costs.",
+        "For review only · not a buy instruction · no order placed",
+        "",
+        f"🏷️ Policy {policy}",
+        f"🔖 Reference {ref or 'UNKNOWN'}"])
+
+
+def render(p: dict) -> str:
+    """Compact mobile-first Signal message (presentation only, 2026-09-28). Plain text (parse_mode=None). Same fields
+    as before: symbol, direction, score, reference, phase + data time, horizons, paper/no-order status."""
+    return "\n".join([
+        "🚨 TALONX SIGNAL — PAPER", "",
+        f"🟢 {p['symbol']} · BULLISH",
+        f"⭐ Score {round(p['score'] or 0, 1)}",
+        f"💵 Ref {_ref(p['reference_price'])}",
+        f"🕒 {p.get('processing_phase') or 'REGULAR'} · data {(p['data_as_of_utc'] or '')[11:16]}Z",
+        f"⏱ {' / '.join(json.loads(p['horizons_json'] or '[]')) or 'SAME_DAY'}", "",
+        SIGNAL_FOOTER,
+    ])
+
+
+class Promoter:
+    def __init__(self, *, root=None, policy: PromotionPolicy = PROMOTION_V1, mode: str = SHADOW, clock=None,
+                 drain=None, data=None):
+        self.requested_mode = mode
+        self.pause = signal_delivery_pause(root) if mode == PAPER_SIGNAL else None
+        ctl = signal_delivery_control(root) if mode == PAPER_SIGNAL and not self.pause else None
+        self.delivery_boundary = delivery_boundary(ctl)   # None: legacy PAPER_SIGNAL (no control file at all)
+        if self.pause:                               # durable owner pause overrides a PAPER_SIGNAL environment
+            mode = SHADOW
+        self.root, self.policy, self.mode = root, policy, mode
+        self.clock = clock or utcnow
+        self.con = connect(promotion_db(root))
+        self.con.executescript(SCHEMA)
+        self._drain, self._data = drain, data
+        self.outbox = None
+        if mode == PAPER_SIGNAL:
+            from talonx_ops.notify.outbox import NotifyStore
+            self.outbox = NotifyStore(str(signal_outbox_path(root)))
+        self.last: dict = {}
+        self._init_boundary()
+        if mode == PAPER_SIGNAL:
+            self._no_mode_carryover()
+        self.suppressed_at_start = self._suppress_pending() if self.pause else 0
+
+    def _suppress_pending(self) -> int:
+        """Retire every not-yet-sent PAPER_OPPORTUNITY row once (idempotent): EXPIRED + an explicit policy reason, so a
+        later resumption cannot replay it. SENT / AMBIGUOUS / FAILED / EXPIRED rows are left exactly as they are."""
+        f = signal_outbox_path(self.root)
+        if not f.exists():
+            return 0
+        from talonx_ops.notify.outbox import NotifyStore
+        ob = NotifyStore(str(f))
+        why = (f"{SUPPRESS_PREFIX}: promotion Signal delivery paused by owner decision "
+               f"({self.pause.get('decision', 'owner')}; effective {self.pause.get('effective_utc', 'unknown')})")
+        n = 0
+        for r in ob.all_outbox():
+            if r.get("event_type") in SIGNAL_EVENT_TYPES and r.get("state") in ("PENDING", "RETRY", "HELD"):
+                ob.update_outbox(r["event_id"], state="EXPIRED",
+                                 last_error=f"{why}; was {r['state']} after {r.get('attempts') or 0} transport attempt(s)")
+                n += 1
+        return n
+
+    def _no_mode_carryover(self) -> None:
+        """SHADOW -> PAPER_SIGNAL: anything still QUEUED from a SHADOW run is never sent (only newly eligible
+        post-switch candidates reach Signal)."""
+        with self.con:
+            self.con.execute("UPDATE promotions SET state='EXPIRED', reason_code='MODE_SWITCH_NO_CARRYOVER', "
+                             "decision_utc=? WHERE state='QUEUED' AND promotion_mode!=?", (iso(self.clock()), PAPER_SIGNAL))
+
+    # -- activation boundary: never replay anything that predates the first start -------------------------------------
+    def _init_boundary(self) -> None:
+        if self.con.execute("SELECT 1 FROM cursor WHERE name='events'").fetchone():
+            return
+        start_seq = 0
+        if opportunity_db(self.root).exists():
+            s = OpportunityStore(self.root, readonly=True)
+            try:
+                r = s.con.execute("SELECT MAX(seq) FROM candidate_events").fetchone()
+                start_seq = int(r[0] or 0)
+            finally:
+                s.close()
+        with self.con:
+            self.con.execute("INSERT INTO cursor VALUES ('events', ?, ?)", (start_seq, iso(self.clock())))
+            self.con.execute("INSERT OR IGNORE INTO meta VALUES ('PROMOTION_START_UTC', ?)", (iso(self.clock()),))
+            self.con.execute("INSERT OR IGNORE INTO meta VALUES ('PROMOTION_START_SEQ', ?)", (str(start_seq),))
+
+    def meta(self, k: str) -> str | None:
+        r = self.con.execute("SELECT v FROM meta WHERE k=?", (k,)).fetchone()
+        return r[0] if r else None
+
+    def cursor(self) -> int:
+        return int(self.con.execute("SELECT last_seq FROM cursor WHERE name='events'").fetchone()[0])
+
+    # -- eligibility (pure over the event + current candidate row) ------------------------------------------------------
+    def eligibility(self, ev: dict, cand: dict | None, now: datetime) -> tuple[str, str]:
+        p = self.policy
+        if ev["event_type"] not in p.surfacing_events:
+            return "IGNORED", "NOT_A_SURFACING_EVENT"
+        cls = ev.get("classification")
+        if cls == "WATCH":
+            return "REJECTED", "WATCH"
+        if cls == "BEARISH":
+            return "REJECTED", "BEARISH"
+        if cls not in p.classes:
+            return "REJECTED", "CLASSIFICATION"
+        if ev["phase"] not in p.processing_phases:
+            return "REJECTED", "PHASE"
+        asof = _ts(ev.get("data_as_of_utc"))
+        if asof is None:
+            return "REJECTED", "NO_DATA_AS_OF"
+        if phase_at(asof - timedelta(minutes=1))[0] not in p.data_phases:
+            return "REJECTED", "DATA_PHASE"
+        evt = _ts(ev["at_utc"])
+        if asof > evt or evt > now + timedelta(seconds=5):
+            return "REJECTED", "CAUSALITY"
+        if self.con.execute("SELECT 1 FROM promotions WHERE candidate_id=?", (ev["candidate_id"],)).fetchone():
+            return "REJECTED", "DUPLICATE"
+        from talonx_ops.operator_control.gates import is_excluded           # always False unless ACTIVE
+        if is_excluded(ev["symbol"]):
+            return "REJECTED", "OPERATOR_EXCLUDED"
+        if cand is None:
+            return "REJECTED", "NO_CANDIDATE"
+        return self.still_valid(ev, cand, now)
+
+    def still_valid(self, ev: dict, cand: dict, now: datetime) -> tuple[str, str]:
+        st = cand.get("state")
+        if st != ACTIVE_SETUP:
+            why = (cand.get("closed_reason") or "").lower()
+            if "stale" in why:
+                return "REJECTED", "STALE"
+            if "fade" in why:
+                return "REJECTED", "FADED"
+            if st in ("INVALIDATED",):
+                return "REJECTED", "INVALIDATED"
+            if st in ("EXPIRED",):
+                return "REJECTED", "EXPIRED"
+            return "REJECTED", f"NOT_ACTIVE_SETUP:{st}"
+        from talonx_premarket.alpaca_data import data_as_of
+        asof = _ts(ev.get("data_as_of_utc"))
+        if (data_as_of(now) - asof).total_seconds() > self.policy.freshness_s:
+            return "REJECTED", "STALE"
+        if not (ev.get("last_price") or 0) > 0:
+            return "REJECTED", "BAD_PRICE"
+        return "ELIGIBLE", "OK"
+
+    # -- one tick -------------------------------------------------------------------------------------------------------
+    def tick(self) -> float:
+        now = self.clock()
+        evaluated = queued = 0
+        if opportunity_db(self.root).exists():
+            s = OpportunityStore(self.root, readonly=True)
+            try:
+                evs = s.events_after(self.cursor(), limit=2000)
+                for ev in evs:
+                    if self.con.execute("SELECT 1 FROM evaluations WHERE event_id=?", (ev["event_id"],)).fetchone():
+                        continue
+                    cand = s.candidate(ev["candidate_id"])
+                    dec, why = self.eligibility(ev, cand, now)
+                    if dec == "IGNORED":
+                        continue
+                    asof = _ts(ev.get("data_as_of_utc"))
+                    dph = phase_at(asof - timedelta(minutes=1))[0] if asof else None
+                    with self.con:
+                        self.con.execute("INSERT OR IGNORE INTO evaluations VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                         (ev["event_id"], ev["seq"], ev["candidate_id"], ev["symbol"], ev["event_type"],
+                                          ev.get("classification"), ev["phase"], dph, ev.get("data_as_of_utc"),
+                                          ev["at_utc"], iso(now), dec, why, self.policy.fingerprint()))
+                        if dec == "ELIGIBLE":
+                            self.con.execute(
+                                "INSERT OR IGNORE INTO promotions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                (f"{SOURCE}:{ev['candidate_id']}", ev["candidate_id"], ev["event_id"], ev["symbol"],
+                                 "LONG", ev.get("classification"), ev.get("score"), ev["phase"], dph,
+                                 ev.get("data_as_of_utc"), ev["at_utc"], iso(now), None, ev.get("last_price"),
+                                 cand.get("horizons_json"), cand.get("state"), self.mode, "QUEUED", "OK", None,
+                                 self.policy.version, self.policy.fingerprint(), SOURCE, cand.get("config_fp"), None,
+                                 cand.get("family"), ev.get("window_id")))
+                            queued += 1
+                    evaluated += 1
+                if evs:
+                    with self.con:
+                        self.con.execute("UPDATE cursor SET last_seq=?, updated_utc=? WHERE name='events'",
+                                         (max(e["seq"] for e in evs), iso(now)))
+                released = self._release(s, now)
+            finally:
+                s.close()
+        else:
+            released = {}
+        drained = self._drain_signal()
+        outc = self._outcomes(now)
+        self.last = {"mode": self.mode, "cursor": self.cursor(), "evaluated": evaluated, "queued": queued,
+                     "released": released, "drain": drained, "outcomes": outc, "policy": self.policy.version,
+                     "requested_mode": self.requested_mode,
+                     "signal_delivery": "PAUSED" if self.pause else (
+                         ("RESEARCH_REVIEW" if self.delivery_boundary else "ACTIVE") if self.mode == PAPER_SIGNAL
+                         else "OFF"),
+                     "delivery_boundary_utc": iso(self.delivery_boundary) if self.delivery_boundary else None,
+                     "pause": dict(self.pause) if self.pause else None,
+                     "suppressed_pending_at_start": self.suppressed_at_start}
+        return 30.0
+
+    def _release(self, s: OpportunityStore, now: datetime) -> dict:
+        """Expire, re-validate and release queued promotions: score-desc, <= rate_max per rolling window."""
+        p = self.policy
+        out = {"expired": 0, "rejected_while_queued": 0, "promoted": 0, "held_by_rate": 0}
+        for r in self.con.execute("SELECT promotion_id, queued_utc FROM promotions WHERE state='QUEUED'").fetchall():
+            if (now - _ts(r[1])).total_seconds() > p.queue_expiry_s:
+                with self.con:
+                    self.con.execute("UPDATE promotions SET state='EXPIRED', reason_code='QUEUE_EXPIRY_30M', "
+                                     "decision_utc=? WHERE promotion_id=?", (iso(now), r[0]))
+                out["expired"] += 1
+        since = iso(now - timedelta(seconds=p.rate_window_s))
+        used = self.con.execute("SELECT COUNT(*) FROM promotions WHERE state IN ('PROMOTED_SHADOW','PROMOTED_SIGNAL') "
+                                "AND decision_utc > ?", (since,)).fetchone()[0]
+        queue = [dict(zip([d[0] for d in self.con.execute("SELECT * FROM promotions LIMIT 0").description], row))
+                 for row in self.con.execute("SELECT * FROM promotions WHERE state='QUEUED' "
+                                             "ORDER BY score DESC, queued_utc ASC, promotion_id ASC").fetchall()]
+        for rank, q in enumerate(queue, start=1):
+            with self.con:
+                self.con.execute("UPDATE promotions SET queue_rank=? WHERE promotion_id=?", (rank, q["promotion_id"]))
+            if used >= p.rate_max:
+                out["held_by_rate"] += 1
+                continue
+            cand = s.candidate(q["candidate_id"])
+            ev = {"data_as_of_utc": q["data_as_of_utc"], "last_price": q["reference_price"]}
+            dec, why = self.still_valid(ev, cand or {"state": None}, now)
+            from talonx_ops.operator_control.gates import is_excluded
+            if dec == "ELIGIBLE" and is_excluded(q["symbol"]):
+                with self.con:
+                    self.con.execute("UPDATE promotions SET state='EXPIRED', reason_code='OPERATOR_EXCLUDED', "
+                                     "decision_utc=? WHERE promotion_id=?", (iso(now), q["promotion_id"]))
+                out["expired"] += 1
+                continue
+            if dec != "ELIGIBLE":
+                with self.con:
+                    self.con.execute("UPDATE promotions SET state='REJECTED_WHILE_QUEUED', reason_code=?, "
+                                     "decision_utc=?, lifecycle_state=? WHERE promotion_id=?",
+                                     (why, iso(now), (cand or {}).get("state"), q["promotion_id"]))
+                out["rejected_while_queued"] += 1
+                continue
+            state, sig, reason = "PROMOTED_SHADOW", None, (PAUSE_REASON if self.pause else None)
+            review = self.delivery_boundary is not None
+            if (self.mode == PAPER_SIGNAL and self.outbox is not None and review
+                    and _ts(q["queued_utc"]) < self.delivery_boundary):
+                reason = PRE_RESTORATION                  # queued before restoration: record-only, never sent
+            elif self.mode == PAPER_SIGNAL and self.outbox is not None:
+                from talonx_ops.notify import TRADE_EVENT
+                sig = q["promotion_id"]
+                self.outbox.enqueue(event_id=sig, destination=TRADE_EVENT,
+                                    event_type=REVIEW_EVENT_TYPE if review else "PAPER_OPPORTUNITY",
+                                    producer=PRODUCER, dedup_key=sig,
+                                    payload_text=self._render_review(s, q, now) if review else render(q),
+                                    provenance={"source_strategy": SOURCE, "candidate_id": q["candidate_id"],
+                                                "symbol": q["symbol"], "mode": PAPER_SIGNAL, "paper_only": True,
+                                                "not_a_v2_trade_event": True, "policy": self.policy.version,
+                                                "research_review_alert": review, "unvalidated": True,
+                                                **({"template_version": REVIEW_TEMPLATE_VERSION} if review else {})},
+                                    deliver_by_utc=iso(now + timedelta(minutes=30)))
+                state = "PROMOTED_SIGNAL"
+                reason = REVIEW_REASON if review else None
+            with self.con:
+                self.con.execute("UPDATE promotions SET state=?, decision_utc=?, promotion_mode=?, signal_event_id=?, "
+                                 "lifecycle_state=?, reason_code=COALESCE(?, reason_code) WHERE promotion_id=?",
+                                 (state, iso(now), self.mode, sig, cand.get("state"), reason, q["promotion_id"]))
+            used += 1
+            out["promoted"] += 1
+        return out
+
+    def _review_context(self, s: OpportunityStore, q: dict) -> dict:
+        """Render-time evidence for the compact review template (read-only; each part independently UNKNOWN on error)."""
+        ctx = {"event": None, "close_utc": None, "prior_delivery_date": None, "universe": None}
+        try:
+            cur = s.con.execute("SELECT features_json, score_json, catalyst, provenance_json, at_utc FROM "
+                                "candidate_events WHERE event_id=?", (q["event_id"],))
+            row = cur.fetchone()
+            ctx["event"] = dict(zip([d[0] for d in cur.description], row)) if row else None
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            ctx["close_utc"] = trading_window(date.fromisoformat(q["window_id"])).close_utc
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            ids = [r[0] for r in self.con.execute(
+                "SELECT signal_event_id FROM promotions WHERE symbol=? AND promotion_id!=? AND state='PROMOTED_SIGNAL' "
+                "AND signal_event_id IS NOT NULL", (q["symbol"], q["promotion_id"]))]
+            if ids:
+                ob = sqlite3.connect(f"file:{signal_outbox_path(self.root)}?mode=ro", uri=True, timeout=2)
+                try:
+                    last = ob.execute(f"SELECT MAX(sent_at_utc) FROM ops_notification_outbox WHERE state='SENT' AND "
+                                      f"event_id IN ({','.join('?' * len(ids))})", ids).fetchone()[0]
+                finally:
+                    ob.close()
+                if last:
+                    ctx["prior_delivery_date"] = _ts(last).astimezone(_ET).date().isoformat()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            sched = json.loads((root_dir(self.root) / "control" / "dtu_policy_schedule.json").read_text(encoding="utf-8"))
+            for e in sorted(sched["schedule"], key=lambda e: e["effective_from_window"]):
+                if e["effective_from_window"] <= q["window_id"]:
+                    ctx["universe"] = str(e["policy"])
+        except Exception:  # noqa: BLE001
+            pass
+        return ctx
+
+    def _render_review(self, s: OpportunityStore, q: dict, now: datetime) -> str:
+        try:
+            return render_review_expandable(q, now, self.policy.version, self._review_context(s, q))
+        except Exception:  # noqa: BLE001 -- a presentation fault must never block a release: evidence-free form
+            try:
+                return render_review_expandable(q, now, self.policy.version, None)
+            except Exception:  # noqa: BLE001 -- last resort keeps every essential warning
+                return render_review_minimal(q, self.policy.version)
+
+    def _drain_signal(self):
+        if self.mode != PAPER_SIGNAL or self.outbox is None:
+            return None
+        if self._drain is not None:
+            return self._drain(self.outbox)
+        from talonx_ops.notify import TRADE_EVENT
+        from talonx_ops.notify.worker import drain
+        client = self._traced_client()
+        if client is None:                       # tracing unavailable: the worker's own client, still HTML-aware
+            try:
+                from talonx_ops.notify import resolve_destination_config, telegram_client_for
+                client = telegram_client_for(TRADE_EVENT) if resolve_destination_config(TRADE_EVENT).enabled else None
+            except Exception:  # noqa: BLE001 -- fall back to the worker's unchanged default resolution
+                client = None
+        return drain(self.outbox, destination=TRADE_EVENT,
+                     client=ExpandableHtmlClient(client) if client is not None else None)
+
+    def _traced_client(self):
+        """2026-10-09 (POST_DELIVERY_ALERT_MARKOUT_V1 delivery tracing): the SAME client the worker would resolve,
+        wrapped by TracedTransport (records message id / server date / client-internal retries in a sidecar store).
+        None -- the worker's own unchanged default path -- whenever the destination is disabled or tracing cannot be
+        set up; tracing never changes routing, content, retries or deduplication."""
+        try:
+            from talonx_ops.notify import TRADE_EVENT, resolve_destination_config, telegram_client_for
+            if not resolve_destination_config(TRADE_EVENT).enabled:
+                return None
+            base = telegram_client_for(TRADE_EVENT)
+            if base is None:
+                return None
+            from talonx_opportunity.delivery_trace import TracedTransport, TraceStore
+            if getattr(self, "_trace_store", None) is None:
+                self._trace_store = TraceStore(trace_path(self.root))
+            return TracedTransport(base, self._trace_store)
+        except Exception:  # noqa: BLE001 -- tracing is optional; delivery never depends on it
+            return None
+
+    # -- paper outcomes (long only; reference = the causal data time + price of the promoted event) --------------------
+    def _outcomes(self, now: datetime) -> dict:
+        rows = self.con.execute("SELECT p.promotion_id, p.candidate_id, p.symbol, p.data_as_of_utc, p.reference_price, "
+                                "p.window_id FROM promotions p LEFT JOIN paper_outcomes o USING(promotion_id) "
+                                "WHERE p.state IN ('PROMOTED_SHADOW','PROMOTED_SIGNAL') "
+                                "AND (o.session_complete IS NULL OR o.session_complete=0)").fetchall()
+        if not rows:
+            return {"tracked": 0}
+        data = self._data
+        if data is None:
+            try:
+                from talonx_premarket import __main__ as M
+                M._env()
+                data = self._data = M._data()
+            except Exception as exc:  # noqa: BLE001 -- outcomes are hindsight only; retry next tick
+                return {"error": f"{type(exc).__name__}"}
+        from talonx_premarket.alpaca_data import data_as_of
+        asof = data_as_of(now)
+        n = 0
+        for pid, cid, sym, ref_t, ref_px, wid in rows:
+            w = trading_window(datetime.fromisoformat(wid).date() if len(wid) == 10 else _ts(ref_t).date())
+            end = min(asof, w.close_utc)
+            ref = _ts(ref_t)
+            if end <= ref:
+                continue
+            res = data.bars_ex([sym], timeframe="1Min", start=ref, end=end - timedelta(seconds=1))
+            if sym in res.failed:
+                continue
+            m = measure_long(ref, float(ref_px), res.bars.get(sym, []), w.close_utc)
+            s = OpportunityStore(self.root, readonly=True)
+            try:
+                life = (s.candidate(cid) or {}).get("state")
+            finally:
+                s.close()
+            with self.con:
+                self.con.execute("INSERT OR REPLACE INTO paper_outcomes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                 (pid, cid, sym, ref_t, ref_px, m["px_15m"], m["ret_15m_pct"], m["px_30m"],
+                                  m["ret_30m_pct"], m["px_1h"], m["ret_1h_pct"], m["close_px"], m["close_ret_pct"],
+                                  m["mfe_pct"], m["mae_pct"], m["status"], life, int(m["session_complete"]), iso(now)))
+            n += 1
+        return {"tracked": n}
+
+    def detail(self) -> dict:
+        return dict(self.last)
+
+
+def measure_long(ref_time: datetime, ref_price: float, bars: list[dict], close_utc: datetime) -> dict:
+    """Long-only paper outcome from the causal reference. +h values use the last bar COMPLETED by ref+h."""
+    after = sorted((b for b in bars if _ts(b["t"]) >= ref_time and _ts(b["t"]) < close_utc), key=lambda b: b["t"])
+    ret = lambda px: None if px is None else round((px / ref_price - 1.0) * 100.0, 3)  # noqa: E731
+    out = {"px_15m": None, "px_30m": None, "px_1h": None, "close_px": None, "mfe_pct": None, "mae_pct": None,
+           "status": "OUTCOME_PENDING", "session_complete": False}
+    if after:
+        last_end = _ts(after[-1]["t"]) + timedelta(minutes=1)
+
+        def at(m):
+            t = ref_time + timedelta(minutes=m)
+            if last_end < t:
+                return None
+            px = None
+            for b in after:
+                if _ts(b["t"]) + timedelta(minutes=1) <= t:
+                    px = float(b["c"])
+            return px
+        out.update(px_15m=at(15), px_30m=at(30), px_1h=at(60))
+        out["session_complete"] = last_end >= close_utc
+        out["close_px"] = float(after[-1]["c"]) if out["session_complete"] else None
+        out["mfe_pct"] = ret(max(float(b["h"]) for b in after))
+        out["mae_pct"] = ret(min(float(b["l"]) for b in after))
+        if out["px_30m"] is not None:
+            out["status"] = "CONFIRMED" if out["px_30m"] >= ref_price else "FAILED_CONFIRMATION"
+    out.update(ret_15m_pct=ret(out["px_15m"]), ret_30m_pct=ret(out["px_30m"]), ret_1h_pct=ret(out["px_1h"]),
+               close_ret_pct=ret(out["close_px"]))
+    return out
+
+
+def main(argv=None) -> int:
+    from talonx_opportunity.runtime import run_component
+    from talonx_premarket import __main__ as M
+    M._env()        # load .env (override=False) like the notifier: the TRADE_EVENT (Signal) credentials live there
+    root = os.environ.get("TALONX_OPP_ROOT")
+    mode = mode_from_env()
+    pr = Promoter(root=root, mode=mode)
+    src = hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:12]
+    run_component("promotion", tick=pr.tick, root=root, detail=pr.detail,
+                  config_fps={"PROMOTION_POLICY": PROMOTION_V1.fingerprint(), "mode": mode, "promotion_src": src,
+                              "signal_delivery": "PAUSED" if pr.pause else (
+                                  "RESEARCH_REVIEW@" + iso(pr.delivery_boundary) if pr.delivery_boundary else "ACTIVE")})
+    return 0

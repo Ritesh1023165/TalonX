@@ -1,0 +1,25 @@
+{
+ "deploy_utc": "2026-10-09T16:53:33.878022+00:00",
+ "post_deploy_rows": 1,
+ "vr_entry_control": "BLOCKED",
+ "problems": [],
+ "verdict": "PASS",
+ "items": [
+  {
+   "symbol": "KKR",
+   "reference": "OPPORTUNITY_ENGINE:2026-10-09:KKR:GAP_UP",
+   "state": "SENT",
+   "attempts": 1,
+   "template_version": "RESEARCH_REVIEW_COMPACT_V1",
+   "render_matches_recorded_evidence": true,
+   "trace_state": "TRACE_OK",
+   "hidden_retries": 0,
+   "data_as_of_utc": "2026-10-09T16:39:00+00:00",
+   "detected_utc": "2026-10-09T16:55:00.030566+00:00",
+   "written_utc": "2026-10-09T16:55:16.319929+00:00",
+   "api_ack_utc_audit_only": "2026-10-09T16:55:17.163587+00:00",
+   "dedup_unique": true,
+   "message": "🔎 RESEARCH OPPORTUNITY — UNVALIDATED\nKKR · price up 3.18% from prior close $89.56\n\nWhy flagged: move = 1.0× its 20-day average true range (3.08% of price) · volume since 04:00 ET 1,554,414 sh = 36.2% of 20-day avg daily volume · 3.11% above prior-day high $89.62\n\nHistorical price: $92.41 at 12:39 ET\n15-min delayed feed · data 16 min old when written · not a live quote\nDetected 12:55 ET · written 12:55 ET\n\nSEC context: No matching SEC/insider record found in the checked sources. News not checked.\n\nScope: Today’s session, closing 16:00 ET. No entry, exit or holding rule.\nRule score: 75.7/100; not a probability.\n\n⚠️ This policy’s evaluated paper results were negative after costs.\nFor review only · not a buy instruction · no order placed\nPolicy OPPORTUNITY_PROMOTION_V1 · universe DTU_V3_TOP600 · reference OPPORTUNITY_ENGINE:2026-10-09:KKR:GAP_UP"
+  }
+ ]
+}

@@ -3596,3 +3596,118 @@ Decisions recorded:
 2. **Secrets are redacted at log-record level for the whole process** (`talonx_ops/log_redaction.py`). Two Telegram bot tokens found in local logs are treated as compromised: a release start is refused until they are rotated (fingerprint check). Rotation itself is a user action.
 3. STARTUP notice carries the real campaign id; STARTUP/SHUTDOWN notices expire (+2 h). Frozen release identity remains `v2-paper-rc1 / a56ec8c`; the runtime delta is an explicit closed list of operational files (no strategy/provider/pricing/accounting/ledger file).
 4. Full-day session tomorrow is NO_GO until rotation + Sentinel re-validation.
+
+---
+
+## Continuous Opportunity Engine: requirement decision (2026-09-24, gatekeeper Stage-B authorization)
+
+Evidence: [`docs/research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md`](../research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md) (`FORENSIC_ANALYSIS: PASS_WITH_FINDINGS`).
+
+Decisions recorded:
+
+1. **Continuous discovery is authoritative (REQ-CONT-01).** "While TalonX is running, it continuously discovers and evaluates market opportunities across all supported trading phases and investment horizons. Market phase may alter data source, liquidity assumptions, classification, confidence and execution eligibility, but must not globally suspend opportunity discovery."
+   - Phases: OVERNIGHT, PREMARKET, REGULAR, AFTER_HOURS, and CLOSED / DATA_UNAVAILABLE.
+   - Horizons: INTRADAY, SAME_DAY, SHORT_TERM, LONG_TERM.
+   - This **SUPERSEDES** the pre-market-only research lane contract: `talonx_premarket run` scans only before the open (`PREMARKET_RESEARCH_V1`). `PREMARKET_RESEARCH_V1` stays frozen and reproducible for replay and history; it is not deleted.
+2. **Detection is independent of notification (REQ-CONT-02).** "Candidate detection and durable persistence are independent from notification limits."
+   - Stage-A correction: the V1 cap did **not** limit raw detection. 174 identities were detected and recorded: 25 delivered, 149 cap-suppressed.
+   - The cap constrained surfaced visibility and later lifecycle delivery: suppressed identities were frozen, never updated, invalidated or outcome-tracked.
+   - The budget now lives only in a versioned notification policy.
+3. **Independent restartability (REQ-CONT-03).** "Runtime components should be independently restartable so operational fixes can be deployed without unnecessarily terminating unrelated live flows."
+4. **Deployment boundaries (REQ-CONT-04).** Every live code or config change is recorded with a change classification and `affects_*` flags. Reports segment on material boundaries and never blend materially different strategy periods.
+5. **Provider honesty (REQ-CONT-05).**
+   - A phase without demonstrated consolidated data fails closed and is shown as such.
+   - Overnight consolidated (SIP) is **not supported** on the current subscription.
+   - BOATS (Blue Ocean ATS) is single-venue and sparse. It is never treated as SIP, and it is off by default.
+6. **BUY/SELL vocabulary.** BUY/SELL are actionable strategy states. They are never produced by the research lane to increase alert volume, and require an authorising strategy. WATCH/BULLISH/BEARISH are research states.
+7. **Unchanged:**
+   - V2 strategy `e2acf6454789217e`, provider `ac5e51aa3599d6c9`, campaign `V2-PAPER-RC1` ($100k/$10k).
+   - V1 scoring weights and thresholds, the 45-minute stale-price gate, and V1 lifecycle deltas.
+   - Paper only; no paid provider; Signal/Sentinel/Lab isolation.
+
+### Continuous Opportunity Engine: implementation decisions (2026-09-24, Stage B)
+
+1. **Isolated package, V1 untouched.** `talonx_opportunity` imports the frozen V1 feature/score/lifecycle/outcome functions. `talonx_premarket` is not edited, so `PREMARKET_RESEARCH_V1` stays reproducible.
+2. **Feature equivalence.** Window-to-date aggregates reproduce `features.compute` bit-for-bit (Neumaier float sums, as CPython ≥ 3.12 `sum()` does). PREMARKET classification equals V1.
+3. **`CONTINUOUS_RESEARCH_V1`.** Pre-registered before any continuous outcome existed, never tuned on Session-04 hindsight. It embeds V1 unchanged and adds only phase mechanics:
+   - cadence;
+   - `stale_invalidates_phases = (PREMARKET, REGULAR)`: in AFTER_HOURS a stale print HOLDS an identity rather than invalidating it. The 45-minute stale gate is unchanged, so a stale symbol can never create a candidate;
+   - idle expiry after one full trading window (EXPIRED is bookkeeping, never notified).
+4. **Reference price** is the previous session close for every phase of a trading window. Identity continues across 04:00, 09:30 and 16:00 ET and is carried across the 20:00 ET roll (REFERENCE_ROLLED).
+5. **Notification budget** `LAB_NOTIFY_POLICY_V1`: 25 per window (V1 figure), WATCH ≤ 15, setups have priority, no time-of-day buckets. These are configuration values, not evidence-derived.
+6. **Deployment classification rules.** An unchanged restart is OPERATIONS_ONLY. A config-fingerprint change forces the component's material class and cannot be declared down. An undeclared code change gets a conservative default (discovery and evaluators: STRATEGY_MATERIAL).
+7. **Experimental lane retired** from active startup (see OPS-029). Its shared utilities stay. The Original chain is **retained**: it hosts the single Telegram `getUpdates` poller and official dispatch. Retiring it needs a separate owner decision and a listener migration.
+8. **Intelligence.**
+   - The stale-at-enqueue guard applies the outbox rule verbatim.
+   - The digest default is unchanged (DIGEST_DISABLED made visible).
+   - The IMMEDIATE cutoff and routing are unchanged.
+9. **yfinance.** Incident accounting only. The V2 Alpaca contract is untouched.
+10. **V2 release allowlist.** `talonx_opportunity/` is added as an isolated lane prefix. Changed runtime files are listed in the closed `FREEZE_CONTINUOUS_ENGINE_FILES` (no strategy/provider/ledger file; guarded by tests). V2 fingerprints are unchanged.
+
+### Opportunity promotion lane: OPPORTUNITY_PROMOTION_V1 (2026-09-25, SHADOW first)
+
+**Purpose.** Turn validated research setups into measurable **PAPER** Signal opportunities. This closes the gap between the Opportunity Engine and TalonX Signal (found → promoted → paper-actionable → Signal → measured outcome) without touching discovery, scoring or lifecycle.
+
+1. **Separate component.** `talonx_opportunity/promotion.py` runs as `python -m talonx_opportunity component promotion`.
+   - It has its own `promotion.db`, heartbeat and deployment boundary.
+   - Its source hash is recorded in the component's config fingerprints (`promotion_src`), so the shared, version-stamped `runtime.py` is not edited.
+   - It reads `opportunity.db` read-only through its own cursor. A crash cannot stop discovery, Lab delivery or V2.
+2. **No replay.** The first start fixes `PROMOTION_START_UTC` and `PROMOTION_START_SEQ` (the store's current maximum sequence number). Only a candidate's first setup surfacing *after* that boundary is considered. Switching SHADOW → PAPER_SIGNAL never re-sends shadow history.
+3. **Eligibility (v1, narrow, no new alpha threshold).** All of the following must hold:
+   - The event is a NEW or UPGRADE with classification **BULLISH**.
+   - The processing phase is **REGULAR**, and so is the data phase (the causal bar horizon).
+   - The candidate is still an active BULLISH_SETUP at promotion time.
+   - The data is fresh under the existing 15-minute provider-lag contract.
+   - Timestamps are causal (data_as_of ≤ event time ≤ now).
+   - The reference price is above 0.
+   - At most **one promotion per candidate identity**: `promotion_id = OPPORTUNITY_ENGINE:<candidate_id>`.
+   - Otherwise the candidate is rejected, with one reason: WATCH, BEARISH, PHASE, DATA_PHASE, STALE, INVALIDATED, FADED, DUPLICATE, BAD_PRICE, CAUSALITY.
+4. **Long-only.** BEARISH is never actionable; it stays research/Lab.
+5. **Queue.** Durable, ordered by score descending, at most **3 per rolling 5 minutes**, with a **30-minute** expiry. A queued candidate is re-validated at release.
+   - This ordering exists to avoid missing the highest-scoring setups during bursts. Today's causal simulation found **no return advantage** for it.
+6. **Modes.** `TALONX_OPPORTUNITY_PROMOTION_MODE`:
+   - **SHADOW (default):** records PROMOTED_SHADOW (WOULD_SIGNAL) and sends nothing.
+   - **PAPER_SIGNAL (requires operator authorisation):** enqueues a `PAPER_OPPORTUNITY` message to the TRADE_EVENT (TalonX Signal) destination through `talonx_ops.notify`.
+   - It never uses the Lab bot or the legacy default client. Its outbox is `promotion_signal_notifications.db`.
+7. **Paper outcomes** (long direction) are tracked for every promotion from the causal reference: +15m / +30m / +1h / close / MFE / MAE, plus the lifecycle end state.
+8. **Not advice, not orders.** This is **not proven profitable** and **not BUY/SELL advice**. It **places no broker order** and uses no real capital. Messages are paper-development outputs labelled "PAPER OPPORTUNITY". **V2 remains an independent strategy**: no import, no ledger, no outbox, and a separate dedup namespace (`OPPORTUNITY_ENGINE:` vs V2 event ids).
+9. **Policy fingerprint** `OPPORTUNITY_PROMOTION_V1` covers phases, the long-only rule, classes, freshness, rate, expiry and ordering. No existing strategy fingerprint changes.
+
+### Sentinel operator control plane (2026-09-25, DRY_RUN until post-EOD activation)
+
+1. **Channel.** Operator commands belong to TalonX **Sentinel** (the OPERATIONS bot) only.
+   - Today the single primary listener (DispatchAgent inside run_talonx) polls the **Signal** bot.
+   - So the control plane has its own `SentinelCommandPoller`, which polls only the OPERATIONS bot (credentials from `telegram_client_for(OPERATIONS)`). It is off unless `TALONX_SENTINEL_COMMANDS_ENABLED=1`.
+   - Authorisation is owner chat-id equality, the same rule as the existing listener. Unauthorised requests never mutate and are audited without secrets.
+2. **Commands.**
+   - `/help`, `/help <universe|exclude|scanned|status>`
+   - `/universe add|remove|list|status <SYMBOL>`
+   - `/exclude add|remove|list|status <SYMBOL>`
+   - `/scanned [file|candidates|setups|signals]`: read-only, from the authoritative stores; the file is a CSV sent as a document.
+   - Invalid input gets concise usage text or a "did you mean" suggestion.
+3. **Durable intent.** `operator_control.db` holds operator_universe, symbol_exclusions and operator_audit. It survives restarts.
+4. **Effective universe.** `BASE + operator-added − removed − excluded`; an exclusion always wins.
+5. **Mutation mode `OPERATOR_UNIVERSE_MUTATION_MODE`.**
+   - **DRY_RUN (default):** intents persist as PENDING_ACTIVATION, and every gate is an exact identity.
+   - **ACTIVE (post-EOD authorisation only):**
+     - The gates run before the Alpaca batch is built (`Ingestion.tick`) and before the yfinance batch is built (`YFinancePoller.stream`), so excluded symbols are never fetched.
+     - Discovery's member map drops them (no scoring, SEC or candidates) and adds operator-added symbols (with no CIK, so no SEC lookup).
+     - Promotion rejects them with OPERATOR_EXCLUDED and expires queued unsent promotions. Already-sent outcomes keep tracking.
+     - Restoring or re-adding never replays history.
+   - Operator ADDs do not extend the Original yfinance watchlist stream (Original strategy input); exclusions do apply to it.
+6. **Frozen-release allowlist.** A closed list, `FREEZE_OPERATOR_CONTROL_FILES`. The control plane never imports the research lane.
+
+### SEC catalyst cache background refresh: enabled at a DATA_FIX boundary (2026-09-26)
+
+1. **Activation.** `TALONX_SEC_BACKGROUND_REFRESH_ENABLED=1` is set in discovery (and in the supervisor loop's environment so a respawn keeps it). Only `discovery.main` reads it.
+2. **Boundary.** `20260926T090536Z-discovery-efcad5`, **DATA_FIX** via the closed `CONFIG_KEY_CLASS` list (`SEC_CATALYST_CACHE` only, plus a matching declaration). Any other discovery config change stays forced STRATEGY_MATERIAL. Strategy fingerprints are unchanged.
+3. **Identity.** `sec_refresh.py` is part of discovery's version hash.
+4. **Evidence.** Same-data parity with real SEC: 0 mismatches over 5,653 symbols and 380 events; the refreshed scan took 15.9 s against 109.2 s for the sync reference. Benchmarks and failure tests are unchanged and green.
+5. **Status.** **Live acceptance pending** (first live session: 2026-09-28). Rollback: unset the flag, declare DATA_FIX, restart discovery only.
+
+### Later-phase notification reserve keyed on causal DATA_PHASE (2026-09-26)
+
+1. **Rule.** A NEW setup surfacing consumes the `later_phase_reserve` of its **data** phase, `phase_at(data_as_of − 1 min)`, not the phase in which it was processed. An undeterminable data phase fails closed.
+2. **Why.** On 2026-09-25, three REGULAR-data setups processed at 20:01Z took all three AFTER_HOURS slots, so no true after-hours setup reached Lab.
+3. **Boundary.** `20260926T085833Z-notifier-4c02a5`, ROUTING_FIX (config fingerprint gains `reserve_phase_basis=CAUSAL_DATA_PHASE_V1`). No replay. Caps, WATCH share, ranking and rates are unchanged.
+4. **Acceptance.** Accepted on a deterministic replay of the 2026-09-25 transition: HP, EXFY and OVID are served; VEON, CERT and DRVN are held. Live confirmation on the next after-hours window.

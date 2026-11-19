@@ -1,0 +1,34 @@
+{
+ "lab_new_rows": 50,
+ "lab_new_by_type": {
+  "OPPORTUNITY_RESEARCH_INVALIDATED": 50
+ },
+ "lab_all_new_format": true,
+ "lab_states": {
+  "SENT": 50
+ },
+ "signal_new_rows": 0,
+ "signal_all_new_format": true,
+ "lab_dup_dedup": 0,
+ "signal_dup_dedup": 0,
+ "pre_deploy_rows_created_after_deploy": 0,
+ "decisions_since_deploy": [
+  {
+   "decision": "NOT_SURFACED_PARENT",
+   "lab_route": null,
+   "route_reason": null,
+   "n": 1138
+  },
+  {
+   "decision": "SELECTED",
+   "lab_route": "IMMEDIATE",
+   "route_reason": "SENT_SETUP_INVALIDATED",
+   "n": 50
+  }
+ ],
+ "unrouted_legacy_rows_since_deploy": 0,
+ "digests": [],
+ "immediate_and_digested": 0,
+ "cursor_lag": 0,
+ "VERDICT": "PASS"
+}

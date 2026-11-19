@@ -554,7 +554,10 @@ verified shutdown and reconciliation), the `AMBIGUOUS`-delivery
 contract, and V2's own target-close-before-fall-forward ordering — all
 `Implemented`. Genuinely new and unbuilt: the five account states, a
 "Partially Ready" summary, an external outage watchdog, and
-configuration-effective-dates (immediate vs. versioned activation).
+configuration-effective-dates (immediate vs. versioned activation). *(2026-09-24: for the research lane,
+per-component **deployment/change boundaries** with classification and
+reporting-impact flags now implement the "versioned activation" record —
+§6m / S14-04; the V2 and Original lanes are unchanged.)*
 
 ## 6k. Research, tuning and promotion — `AGREED` (Session 12), implementation `MOSTLY NOT ASSESSED THIS SESSION`
 
@@ -624,6 +627,35 @@ Obligations), `S13-09`.
   baseline reproduction, not fixed here.
 - **Material-version cutover rules recorded** (documentation only) —
   no cutover performed or scheduled.
+
+## 6m. Continuous opportunity discovery, horizons and restartability — `AGREED` (gatekeeper Stage-B authorization, 2026-09-24), implementation `IMPLEMENTED ON BRANCH feature/continuous-opportunity-engine` (S14-01..S14-06)
+
+Evidence: `docs/research/evidence/SESSION04_MISSED_OPPORTUNITY_FORENSIC.md`. Runbook: `docs/runbooks/CONTINUOUS_ENGINE.md`.
+
+> **While TalonX is running, it continuously discovers and evaluates market opportunities across all supported trading phases and investment horizons. Market phase may alter data source, liquidity assumptions, classification, confidence and execution eligibility, but must not globally suspend opportunity discovery.**
+
+> **Candidate detection and durable persistence are independent from notification limits.**
+
+> **Runtime components should be independently restartable so operational fixes can be deployed without unnecessarily terminating unrelated live flows.**
+
+- **Phases:**
+  - OVERNIGHT / PREMARKET / REGULAR / AFTER_HOURS, plus CLOSED / DATA_UNAVAILABLE.
+  - A phase without demonstrated consolidated data **fails closed and says so**. Today OVERNIGHT is `NOT_SUPPORTED` on SIP, and BOATS is single-venue and disabled. Other phases continue.
+  - No 24/5 consolidated coverage is claimed.
+- **Horizons:**
+  - INTRADAY / SAME_DAY / SHORT_TERM / LONG_TERM evaluators consume one durable candidate stream independently.
+  - LONG_TERM is registered but not implemented.
+  - V2 remains the specialised multi-session strategy.
+- **Vocabulary:**
+  - WATCH / BULLISH / BEARISH / MATERIAL_UPDATE / INVALIDATED are research states.
+  - **BUY / SELL are actionable strategy states. They are only emitted by an authorising strategy, never to raise alert volume.** No research-lane strategy is authorised.
+- **Deployment boundaries:**
+  - Every live code or config change records a classification and its reporting impact.
+  - Reports segment at material boundaries. An operations-only restart is recorded as "comparability intact".
+- **Supersedes** (historical text kept, see `DECISION_LOG.md` 2026-09-24):
+  - the pre-market-only research lane contract (`PREMARKET_RESEARCH_V1` scans only before the open; kept frozen for replay and history);
+  - the V1 "25 new candidates per session" cap inside the candidate lifecycle, replaced by a notification-only budget;
+  - the Experimental lane as an active runtime component (retired from active startup; `docs/LEGACY_MANIFEST.md`).
 
 ## Implementation note — 2026-09-18, RI-3
 

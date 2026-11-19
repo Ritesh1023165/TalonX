@@ -186,7 +186,8 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
                                http_get: Callable | None = None, now: Callable[[], datetime] | None = None,
                                validation_path: str | Path | None = None,
                                profile: ReleaseProfile = RELEASE_PROFILE,
-                               insider_ledger_path: str | Path | None = None) -> ReleaseReadinessReport:
+                               insider_ledger_path: str | Path | None = None,
+                               bot_identity_check: Callable | None = None) -> ReleaseReadinessReport:
     from talonx_ops.notify import DESTINATIONS, resolve_destination_config
     from talonx_ops.operator_read import notification_validation_view
     from talonx_v2 import provider_contract as pc
@@ -259,6 +260,26 @@ def evaluate_release_readiness(*, db_path: str | Path, pricing_mode: str | None,
         ok = bool(deliver and (transport == profile.transport))
         rep.add("signal_delivery_enabled", "PASS" if ok else "FAIL",
                 f"deliver={deliver} transport={transport!r}; release requires --deliver --transport {profile.transport}")
+        # 6a. (2026-09-25) the credentials the V2 actionable transport ACTUALLY resolves must be exactly the Signal
+        #     destination's, and that bot must be live. The gate used to check only the configured destination while
+        #     the transport fell back to a revoked legacy TELEGRAM_BOT_TOKEN. Nothing is sent; nothing is printed.
+        from talonx_v2.delivery import OfficialTelegramTransport
+        with _scoped_env(env):
+            _cli = OfficialTelegramTransport(destination=profile.signal_destination)._resolve()
+        _cfg = getattr(_cli, "config", None)
+        _pair = (getattr(_cfg, "telegram_bot_token", None), getattr(_cfg, "telegram_chat_id", None))
+        _bound = bool(_cli is not None and sig.enabled and _pair == (sig.bot_token, sig.chat_id))
+        rep.add("signal_transport_binding", "PASS" if _bound else "FAIL",
+                f"V2 transport resolves the {profile.signal_destination} destination credentials" if _bound
+                else f"V2 transport does NOT resolve the {profile.signal_destination} destination "
+                     "(disabled, or a different credential source)")
+        if _bound and bot_identity_check is not None:
+            try:
+                _live, _who = bot_identity_check(_pair[0])
+            except Exception as exc:  # noqa: BLE001
+                _live, _who = False, f"identity check raised {type(exc).__name__}"
+            rep.add("signal_transport_bot_live", "PASS" if _live else "FAIL",
+                    f"getMe: {_who}" if _live else f"Signal transport token rejected/unreachable: {_who}")
 
     # 6b. Company-development (Intelligence) Telegram delivery is opt-in and NOT part of the V2 primary release:
     #     primary Telegram for company developments requires the Session 7 acceptance criteria (OPS-011, not built).
@@ -559,3 +580,19 @@ def main(argv=None) -> int:      # pragma: no cover - CLI, read-only
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+
+
+def telegram_bot_identity(token: str, *, timeout: float = 10.0) -> tuple[bool, str]:
+    """Read-only Telegram ``getMe`` (sends no message). Returns (live, username-or-reason); never returns the token."""
+    import json as _json
+    import urllib.error
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=timeout) as r:
+            res = _json.loads(r.read()).get("result") or {}
+        return True, f"@{res.get('username')}"
+    except urllib.error.HTTPError as exc:
+        return False, f"HTTP {exc.code}"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{type(exc).__name__}"
+

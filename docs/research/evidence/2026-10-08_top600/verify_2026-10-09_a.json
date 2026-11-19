@@ -1,0 +1,38 @@
+{
+ "window_id": "2026-10-09",
+ "checked_utc": "2026-10-09T00:05:54.143135+00:00",
+ "expected_policy": "DTU_V3_TOP600",
+ "expected_fp": "2849da5594f272db",
+ "checks": {
+  "policy_fp_is_v3": true,
+  "core_le_600": true,
+  "no_event_eligible": true,
+  "cap_reasons_only_above_600": true,
+  "independent_recompute_matches": true,
+  "ingestion_reports_v3": true,
+  "discovery_schedule_loaded": true,
+  "singleton_owners": true
+ },
+ "published": {
+  "version": "2026-10-09@2026-10-08#2849da5594f272db",
+  "created_utc": "2026-10-09T00:02:14.481501+00:00",
+  "policy_fp": "2849da5594f272db",
+  "counts": {
+   "ACTIVE_CORE": 600,
+   "AUTO_EXCLUDED": 5048,
+   "STRUCTURALLY_EXCLUDED": 8744
+  }
+ },
+ "latest_active": null,
+ "owners": {
+  "ingestion": [
+   332,
+   14916
+  ],
+  "discovery": [
+   15008,
+   15492
+  ]
+ },
+ "status": "VALID"
+}

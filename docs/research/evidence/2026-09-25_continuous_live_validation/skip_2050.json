@@ -1,0 +1,75 @@
+{
+ "SKIPPED_SLOT_TIME": "20:50:00",
+ "PREVIOUS_SCAN_START": "20:45:00",
+ "PREVIOUS_SCAN_END": "20:50:10",
+ "NEXT_ACTUAL_SCAN_START": "20:55:00",
+ "NEXT_SCAN_DATA_AS_OF": "20:39",
+ "SKIPPED_SLOT_WOULD_HAVE_USED_AS_OF": "20:34",
+ "EXTRA_DISCOVERY_LATENCY_S": 300,
+ "CANDIDATES_FIRST_SEEN_ON_NEXT_SCAN": 2,
+ "SETUPS_FIRST_SEEN_ON_NEXT_SCAN": 1,
+ "classes": {
+  "A": 0,
+  "B": 0,
+  "C": 3,
+  "D": 0
+ },
+ "MATERIALLY_DELAYED(C setups)": [
+  {
+   "symbol": "ADCT",
+   "type": "UPGRADE",
+   "actual": "BEARISH@64.1",
+   "move_now": -5.81,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@64.1 gap -5.81",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "FAILED_CONFIRMATION",
+    "ret_30m_pct": -0.397,
+    "ret_1h_pct": -0.04,
+    "mfe_pct": 1.19
+   }
+  }
+ ],
+ "detail": [
+  {
+   "symbol": "ADCT",
+   "type": "UPGRADE",
+   "actual": "BEARISH@64.1",
+   "move_now": -5.81,
+   "class": "C",
+   "estimated_at_skipped_slot": "BEARISH_SETUP@64.1 gap -5.81",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": {
+    "status": "FAILED_CONFIRMATION",
+    "ret_30m_pct": -0.397,
+    "ret_1h_pct": -0.04,
+    "mfe_pct": 1.19
+   }
+  },
+  {
+   "symbol": "OSS",
+   "type": "NEW",
+   "actual": "WATCH@50.7",
+   "move_now": -2.24,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@50.7 gap -2.24",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": null
+  },
+  {
+   "symbol": "ZTG",
+   "type": "NEW",
+   "actual": "WATCH@40.8",
+   "move_now": -16.03,
+   "class": "C",
+   "estimated_at_skipped_slot": "WATCH@40.8 gap -16.03",
+   "delay_s": 300,
+   "lab": "BUDGET_EXHAUSTED_TOTAL",
+   "outcome": null
+  }
+ ]
+}

@@ -287,7 +287,8 @@ def run_close(session_dir: str | Path, *, force: bool = False,
     sd.mkdir(parents=True, exist_ok=True)
 
     es = eod_state(now)
-    if es["state"] == "NOT_DUE_YET" and not force:
+    # a missed previous session (OVERDUE_EOD_CLOSE, F-P3) is surfaced, never closed implicitly: --force is required
+    if es["state"] in ("NOT_DUE_YET", "OVERDUE_EOD_CLOSE") and not force:
         return CloseResult(verdict="NOT_DUE_YET", asserts={"eod_state": es["state"]},
                            findings=[es["reason"]])
 

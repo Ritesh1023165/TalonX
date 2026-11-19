@@ -1,0 +1,13 @@
+captured_utc 2026-09-30T17:57:09.994222+00:00
+SENTINEL — UNIVERSE (2026-09-30)
+Core: 1162
+Event-promoted: 927 (protected 0)
+Event-eligible: 1787
+Auto-excluded: 1735
+Operator-added: 39 · Operator-excluded: 0
+Structurally excluded: 8728
+Effective active: 2128
+Snapshot: 2026-09-30@2026-09-29#da27de22a3bb839a
+operator_universe 0
+symbol_exclusions 1
+operator_audit 2

@@ -277,8 +277,12 @@ class YFinancePoller:
             # existing test that monkeypatches or calls it directly is
             # unaffected).
             failed_before, rate_limited_before = self._requests_failed, self._rate_limited
+            # Sentinel operator control: excluded symbols are dropped BEFORE the batch is built (identity unless
+            # OPERATOR_UNIVERSE_MUTATION_MODE=ACTIVE; operator ADDs do not extend this Original watchlist stream).
+            from talonx_ops.operator_control.gates import effective_symbols
+            cycle_symbols = effective_symbols(symbols, include_added=False)
             try:
-                snapshots = await asyncio.to_thread(self._fetch_snapshots, symbols)
+                snapshots = await asyncio.to_thread(self._fetch_snapshots, cycle_symbols)
             except Exception as exc:  # noqa: BLE001 -- keep polling alive regardless
                 consecutive_failures += 1
                 self._retries += 1
@@ -296,13 +300,30 @@ class YFinancePoller:
                 await asyncio.sleep(wait)
                 continue
 
-            await self._flush_provider_metric("provider_requests_failed", self._requests_failed - failed_before)
-            await self._flush_provider_metric("provider_rate_limited", self._rate_limited - rate_limited_before)
+            # S14 (Session-04 forensic s7): ONE upstream throttle made every symbol of a cycle fail and used to be
+            # counted as ~43 "provider failures". A cycle whose failure rate reaches the degraded threshold is now ONE
+            # upstream incident -- THROTTLE when rate-limit / malformed-response (schema) signatures are present,
+            # HARD otherwise -- and its per-symbol errors are counted separately (provider_symbol_errors_in_incidents).
+            # Isolated per-symbol failures in an otherwise healthy cycle remain provider_requests_failed.
+            failed_delta = self._requests_failed - failed_before
+            rate_limited_delta = self._rate_limited - rate_limited_before
+            cat_deltas = self._drain_category_deltas()
+            cycle_failure_rate = 1.0 - (len(snapshots) / len(symbols) if symbols else 1.0)
+            incident = len(symbols) >= 3 and cycle_failure_rate >= self.config.yfinance_degraded_cycle_failure_rate
+            if incident:
+                throttle = rate_limited_delta > 0 or cat_deltas.get(PROVIDER_ERR_RATE_LIMIT, 0) > 0                     or cat_deltas.get(PROVIDER_ERR_SCHEMA, 0) > 0
+                await self._flush_provider_metric("provider_upstream_incidents", 1)
+                await self._flush_provider_metric(
+                    "provider_throttle_incidents" if throttle else "provider_hard_incidents", 1)
+                await self._flush_provider_metric("provider_symbol_errors_in_incidents", failed_delta)
+            else:
+                await self._flush_provider_metric("provider_requests_failed", failed_delta)
+                await self._flush_provider_metric("provider_rate_limited", rate_limited_delta)
             # Task 87B FC_05: category-tagged provider-failure metrics so
             # the counted set matches the surfaced set (Task 87A found they
             # diverged -- the loud "possibly delisted" lines were uncounted
-            # while the counted ones were quiet warnings).
-            for _cat, _delta in self._drain_category_deltas().items():
+            # while the counted ones were quiet warnings). These stay PER-SYMBOL diagnostics.
+            for _cat, _delta in cat_deltas.items():
                 await self._flush_provider_metric(f"provider_err_{_cat.lower()}", _delta)
 
             # 2026-08-18 correctness fix (code-review findings #2/#4):

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from talonx_ingest.intelligence.comparison.engine import run_comparison_for_event
 from talonx_ingest.intelligence.comparison.retrieval import FilingArchiveCache
@@ -361,6 +361,25 @@ class EnrichmentEngine:
         return band, res.recompute_reason, None
 
     # ------------------------------------------------------------------
+    def _stale_at_enqueue(self, ev, route: str, now: datetime) -> str | None:
+        """The outbox's own freshness rule at enqueue time (basis = min(enqueue=now, event time) = event time):
+        stale iff age by the event's accepted_at_utc exceeds the route cutoff. Returns the reason, or None when the
+        card must be enqueued as before (enforcement off / delivery off / dry-run / no valid source time)."""
+        cfg = self.config
+        if cfg is None or not (getattr(cfg, "deliver_intelligence_cards", False)
+                               and not getattr(cfg, "dry_run_delivery", False)
+                               and getattr(cfg, "deliver_cards_enforce_age_cutoff", False)):
+            return None
+        evt = getattr(ev, "accepted_at_utc", None)
+        if not isinstance(evt, datetime) or evt.tzinfo is None or evt > now + timedelta(minutes=5):
+            return None                     # the outbox handles missing/invalid evidence (UNQUALIFIED) as before
+        from talonx_ingest.intelligence.delivery.config import CARD_MAX_AGE_DEFAULT_SECONDS, CARD_MAX_AGE_SECONDS
+        cutoff_s = CARD_MAX_AGE_SECONDS.get(route, CARD_MAX_AGE_DEFAULT_SECONDS)
+        age_s = (now - evt).total_seconds()
+        if age_s <= cutoff_s:
+            return None
+        return f"{age_s / 3600:.1f}h old by event_time > {cutoff_s / 3600:.0f}h {route} cutoff"
+
     def _enqueue_delivery(self, ev, what_changed, prior_row, now: datetime):
         sig = self.stores.significance.get_for_event(ev.event_id)
         card = build_alert_card(ev)
@@ -413,6 +432,17 @@ class EnrichmentEngine:
         # 3-5-line CONCISE shape -- DIGEST keeps the existing renderer
         # (an aggregated digest message is already compact per-row).
         tier = "CONCISE" if decision.disposition == "IMMEDIATE" else None
+        stale_reason = None if allow_update else self._stale_at_enqueue(ev, decision.disposition, now)
+        if stale_reason is not None:
+            # S14 (Session-04 forensic s8): a NEW card that the outbox would expire in the very same delivery cycle
+            # (event already past its route cutoff) is not written at all -- no enqueue->expire churn. Fresh-event
+            # semantics are untouched: this can only apply when age enforcement is active, the source time is valid,
+            # and the card is already provably stale by the SAME rule the outbox applies.
+            self.stores.processing.set_substate(
+                ev.event_id, delivery_state=ProcessingStateStore.DONE,
+                detail=f"96F SKIPPED_STALE_AT_ENQUEUE: {stale_reason}")
+            self.metrics.delivery_skipped_stale_at_enqueue += 1
+            return ProcessingStateStore.DONE, None
         try:
             result = enqueue_card(
                 card,

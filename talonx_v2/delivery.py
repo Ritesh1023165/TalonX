@@ -108,9 +108,13 @@ class OfficialTelegramTransport:
 
     Wraps ``talonx_dispatch.telegram_client.TelegramClient`` -- the ONE official
     sender the DispatchAgent already uses.  It:
-      * uses the existing ``TELEGRAM_BOT_TOKEN`` / ``TELEGRAM_CHAT_ID`` env
-        mechanism (no new config, no second bot poller);
-      * HOLDS (sends nothing) when not configured -- safe default;
+      * resolves the logical ``TRADE_EVENT`` destination (TalonX Signal) through
+        ``talonx_ops.notify.telegram_client_for`` -- the SAME resolution the
+        release gate validates (2026-09-25 fix: it used to build a bare
+        ``TelegramClient()`` from the legacy ``TELEGRAM_BOT_TOKEN``, which had
+        been revoked, so a real BUY/SELL would have failed with 401);
+      * HOLDS (sends nothing) when that destination is disabled/unconfigured --
+        it NEVER falls back to the legacy ``TELEGRAM_BOT_TOKEN``;
       * sends with ``parse_mode=None`` (the V2 card carries raw ``*``/``_``;
         Telegram would 400 the whole message otherwise -- 2026-08-18 incident);
       * maps a non-retryable client error (bad token / bot blocked) to a
@@ -125,21 +129,25 @@ class OfficialTelegramTransport:
 
     name = "official_telegram"
 
-    def __init__(self, *, client: object | None = None):
+    def __init__(self, *, client: object | None = None, destination: str = "TRADE_EVENT"):
         self._client = client
+        self.destination = destination
 
     def _resolve(self):
+        """The client for ``self.destination`` (None when that destination is disabled). Never the legacy
+        default-config ``TelegramClient()``."""
         if self._client is not None:
             return self._client
-        from talonx_dispatch.telegram_client import TelegramClient  # pragma: no cover
-        return TelegramClient()
+        from talonx_ops.notify import telegram_client_for
+        return telegram_client_for(self.destination)
 
     def send(self, payload_text: str, *, meta: dict[str, Any]) -> dict[str, Any]:
         import asyncio
         client = self._resolve()
-        if not getattr(client, "is_configured", False):
+        if client is None or not getattr(client, "is_configured", False):
             return {"held": True,
-                    "detail": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not configured -- HOLD"}
+                    "detail": f"{self.destination} destination not enabled/configured -- HOLD "
+                              "(no fallback to the legacy TELEGRAM_BOT_TOKEN)"}
         try:
             from talonx_dispatch.telegram_client import TelegramSendError
         except Exception:  # noqa: BLE001 -- narrow import guard for tests with a stub client

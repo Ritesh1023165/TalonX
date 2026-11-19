@@ -1,0 +1,27 @@
+{
+  "code_head": "3d55f851fa5a70e7f91f16f62e7be972a7cb9ec8",
+  "spec_fingerprint": "81ddf67e19cf108d2c6601fdb801020db474a113382ba314d8e1502cc13157e4",
+  "spec_commit": "4a3bec3125e181baea695dab3f2bebb1f9037395",
+  "utc": "2026-11-04T09:11:02.872356+00:00",
+  "panel_sha256": "f392ea89c468f3d2c03e23f15774784fa9479dab9fde66c7bf203a23092b457c",
+  "feature_sha256": "b49ae9d8f4d80cf0731e330d742e3ebad2b38e64a8056cae3861d6a1064b18d2",
+  "sessions": 1969,
+  "symbols": 7338,
+  "universe_name_days": 1950000,
+  "features_present": [
+    "F1",
+    "F10",
+    "F12",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9"
+  ],
+  "features_missing": [
+    "F11"
+  ]
+}

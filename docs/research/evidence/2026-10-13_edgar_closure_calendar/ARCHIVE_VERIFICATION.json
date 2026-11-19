@@ -1,0 +1,32 @@
+{
+ "verified_utc": "2026-10-13T22:22:10.995116+00:00",
+ "method": "fresh temporary clone at f78fb34 with core.autocrlf=true; files re-checked-out under the new .gitattributes",
+ "core_autocrlf": "true",
+ "results": [
+  {
+   "file": "calendar_2026-10-13T203120Z.html",
+   "recorded_sha256": "a50a12900c8f986acc411344b467485ec17cae94863b9e3f198077ed02130b39",
+   "fresh_checkout_sha256": "a50a12900c8f986acc411344b467485ec17cae94863b9e3f198077ed02130b39",
+   "fresh_checkout_bytes": 67436,
+   "cr_count": 0,
+   "match": true
+  },
+  {
+   "file": "announcements_2026-10-13T203123Z.html",
+   "recorded_sha256": "07da672dbabcc5a29116193e80bfc0eef7a12da306f867875a642153e66bd54a",
+   "fresh_checkout_sha256": "07da672dbabcc5a29116193e80bfc0eef7a12da306f867875a642153e66bd54a",
+   "fresh_checkout_bytes": 159419,
+   "cr_count": 0,
+   "match": true
+  },
+  {
+   "file": "accessing_edgar_data_2026-10-13T203125Z.html",
+   "recorded_sha256": "9a4d3cd9adde03aa7c0f071928f9420d17fa0e16bccb8f351f6c9ef2b57f15a0",
+   "fresh_checkout_sha256": "9a4d3cd9adde03aa7c0f071928f9420d17fa0e16bccb8f351f6c9ef2b57f15a0",
+   "fresh_checkout_bytes": 80349,
+   "cr_count": 0,
+   "match": true
+  }
+ ],
+ "all_match": true
+}

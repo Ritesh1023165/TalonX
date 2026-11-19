@@ -139,11 +139,12 @@
 
 <nav id="primary">
   <button data-sec="overview" class="active">Overview</button>
+  <button data-sec="opportunity_engine">Opportunity Engine</button>
   <button data-sec="premarket">Premarket</button>
   <button data-sec="original_quant">Original Quant</button>
   <button data-sec="v2_active_strategy">Active V2</button>
   <button data-sec="v2_broad_discovery">Broad Discovery</button>
-  <button data-sec="validation">Validation</button>
+  <button data-sec="validation">Validation (Experimental — retired)</button>
   <button data-sec="intelligence">Intelligence</button>
   <button data-sec="paper_eod">Paper / EOD</button>
 </nav>
@@ -230,7 +231,8 @@ function renderOverview(d){
        `<div>`+kv('campaign cash', num(v2.cash)+' / '+num(v2.starting_campaign_cash))+
          kv('open / capacity', (v2.open_positions==null?'—':v2.open_positions)+' / '+(v2.capacity||'—'))+
          kv('BUY / SELL (lifetime)', (v2.buys==null?'—':v2.buys)+' / '+(v2.sells==null?'—':v2.sells))+
-         kv('realized P&L', num(v2.realized_pnl_usd))+kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
+         kv('realized P&L', num(v2.realized_pnl_usd))+kv('P&L basis', esc(v2.realized_pnl_basis||'UNKNOWN'))+
+         kv('EXIT_UNRESOLVED', num(v2.exit_unresolved))+`</div>`+
        `<div>`+kv('pre-open intents PENDING', num(v2.pending_entry_intents))+
          kv('delivery SENT / HELD / RETRY', `${num(del.sent)} / ${num(del.held)} / ${num(del.retry)}`)+
          kv('delivery FAILED / AMBIGUOUS / EXPIRED', `${num(del.failed)} / ${num(del.ambiguous)} / ${num(del.by_state&&del.by_state.EXPIRED||0)}`)+
@@ -291,6 +293,8 @@ function renderPremarket(d){
          (pw.last_updated_age_seconds!=null?` (${ageStr(pw.last_updated_age_seconds)} ago)`:'')+
          ` · coverage ${num(cov.covered)}/${num(cov.active)}</div>`;
     if(pw.note) pwh+=`<div class="muted small">${esc(pw.note)}</div>`;
+    if(pw.producer_retired) pwh+=`<div class="banner internal small">Producer (Experimental lane) RETIRED — rows are historical.
+      Broad pre-market and all-phase discovery: <b>Opportunity Engine</b> tab.</div>`;
     const order=['GAP_UP','GAP_DOWN','ABNORMAL_VOLUME','BULLISH_WATCH','BEARISH_WATCH'];
     const any=order.some(k=>(fam[k]||[]).length);
     if(!any){ pwh+=`<div class="empty">no persisted movers for this session (or the field is NOT_AVAILABLE)</div>`; }
@@ -373,6 +377,30 @@ function renderValidation(d){
        {label:'+30m', get:r=>r.r_30m},{label:'+60m', get:r=>r.r_60m},{label:'EOD', get:r=>r.r_eod},{label:'+1D', get:r=>r.r_1d},
        {label:'status', get:r=>r.status},
      ], 15, r=>r.obs_id)+srcLine(fo.source)+`</div>`;
+  const fr=d.v2_forward_runs||{};
+  h+=`<div class="card card-wide"><h3>V2@1 forward tracker runs ${pill(fr.current_health||'UNREADABLE')}</h3>`+
+     `<div class="small muted">Recorded = what the run record says; Observed = derived conservatively (process identity + deadline). `+
+     `Operational metadata only — no outcomes. Next scheduled run: <b>${esc(fr.next_scheduled_run_utc||'UNKNOWN')}</b> · study end: ${esc(fr.study_end_date||'UNKNOWN')}`+
+     `${fr.error? ' · error: '+esc(fr.error):''}</div>`+
+     (()=>{ const c=fr.completeness||{}, n=c.counts||{};
+       return `<div class="small" style="margin:6px 0"><b>Study completeness</b> (${esc(c.period||'UNKNOWN')}; as of ${esc(c.as_of_utc||'—')}; `+
+         `${num(c.slots)} registered slots): success <b>${num(n.success)}</b> · incomplete/missing <b>${num(n.incomplete_or_missing)}</b> · `+
+         `unverified (legacy) <b>${num(n.unverified)}</b> · running/due <b>${num(n.running_or_due)}</b> · not yet due <b>${num(n.not_yet_due)}</b> · `+
+         `unreadable/unknown <b>${num(n.unreadable_or_unknown)}</b>. <span class="muted">Current health (above) is the latest run only.</span></div>`+
+         boundedTable(c.affected, [
+           {label:'day', get:r=>r.day},{label:'state', get:r=>r.state},{label:'provenance', get:r=>r.provenance},
+           {label:'reason', get:r=>r.reason},{label:'conflicts', get:r=>(r.conflicts||[]).join('; ')||'—'},
+         ], 40, r=>r.day); })()+
+     `<div class="small muted" style="margin-top:6px">Recent run records</div>`+
+     boundedTable(fr.runs, [
+       {label:'day', get:r=>r.day},{label:'run id', get:r=>r.run_id},
+       {label:'recorded', get:r=>r.recorded_state},{label:'observed', get:r=>r.observed_state},
+       {label:'why', get:r=>r.reason},{label:'scheduled', get:r=>r.scheduled_utc},{label:'started', get:r=>r.started_utc},
+       {label:'last stage', get:r=>r.last_stage? (r.last_stage.name+' '+r.last_stage.state):'—'},
+       {label:'last update', get:r=>r.last_update_utc},{label:'deadline', get:r=>r.deadline_utc},
+       {label:'process', get:r=>r.process? r.process.identity:'—'},{label:'artifact validated', get:r=>r.artifact_validated},
+       {label:'error', get:r=>r.error_class},{label:'persist. diag.', get:r=>(r.persistence_failure_diagnostics||[]).length},
+     ], 10, r=>r.day)+srcLine(fr.source)+`</div>`;
   h+=`<div class="card exp card-wide"><h3>Original vs Experimental (informational)</h3>`+
      `<div class="muted small">${esc(cmp.note||'')}</div><pre class="json">${esc(JSON.stringify({original:cmp.original,experimental:cmp.experimental},null,1))}</pre></div>`;
   h+=`</div>`;
@@ -566,7 +594,8 @@ function renderV2(d){
        kv('capacity', l.capacity)+kv('equity (cash+marked open)', num(veq.value)+' '+pill(veq.status))+`</div>`+
      `<div>`+kv('open positions', l.n_open)+kv('closed positions', l.closed_positions)+
        kv('BUY / SELL (lifetime)', (l.buys==null?'—':l.buys)+' / '+(l.sells==null?'—':l.sells))+
-       kv('realized P&L', num(l.realized_pnl_usd))+kv('EXIT_UNRESOLVED', l.exit_unresolved)+
+       kv('realized P&L', num(l.realized_pnl_usd))+kv('P&L basis', esc((l.accounting_basis||{}).label||'UNKNOWN'))+
+       kv('EXIT_UNRESOLVED', l.exit_unresolved)+
        kv('reconciliation', pill(vrc.status))+kv('costs', costLine(vco))+`</div></div>`+
      (vrc.status && vrc.status!=='UNAVAILABLE'? `<div class="src">reconciliation: expected_cash=${num(vrc.expected_cash)} actual_cash=${num(vrc.actual_cash)} diff=${num(vrc.diff)} — ${esc(vrc.basis||'')}</div>`:'')+
      boundedTable(l.open_positions||[], [
@@ -617,7 +646,8 @@ function renderV2(d){
   for(const [dest,n] of Object.entries(op.notifications||{})){
     h+=`<h4>${esc(dest)}</h4>`+kv('enabled / physically configured',String(n.enabled)+' / '+String(n.physical_destination_configured))+
       kv('credential source',esc(n.credential_source))+kv('configuration reason',esc(n.configuration_reason))+kv('shares chat with',esc(n.shares_chat_with.join(', ')||'none known'))+
-      kv('delivery counts',esc(JSON.stringify(n.counts)))+kv('last success',esc(n.last_success||'none'))+
+      kv('notification rows by state',esc(JSON.stringify(n.counts)))+
+      kv('counted sources',esc(n.counts_scope||'unknown'))+kv('last success',esc(n.last_success||'none'))+
       kv('last failure',esc(n.last_failure||'none'))+kv('real delivery validated',String(n.real_delivery_validated))+
       `<div class="muted small">${esc(n.configuration_scope)}</div>`;
   }
@@ -706,7 +736,7 @@ function renderV2Discovery(d){
   // D. paper trading (shared ledger, symbol-filtered)
   h+=`<div class="card card-wide"><h3>Paper trading — broad-discovery-only symbols ${pill(led.status)}</h3><div class="grid">`+
      `<div>`+kv('open positions', num(led.n_open))+kv('closed positions', num(led.n_closed))+
-       kv('realized P&L (broad-only)', num(led.realized_pnl_usd))+
+       kv('realized P&L (broad-only)', num(led.realized_pnl_usd))+kv('P&L basis', esc((led.accounting_basis||{}).label||'UNKNOWN'))+
        kv('open symbols', esc((led.open_symbols||[]).join(', ')||'none'))+`</div>`+
      `<div>`+kv('reserved cash (pending)', num(aq.reserved_cash_usd))+
        kv('reserved slots (pending)', num(aq.reserved_slots))+
@@ -785,8 +815,101 @@ function renderV2Discovery(d){
   return h;
 }
 
+/* Every Telegram lane counted from its own store; lanes that share a bot are never merged (2026-10-07). */
+function renderNotificationLanes(L){
+  if(!L||L.error||!L.lanes) return `<div class="card card-wide"><h3>Notification lanes</h3><div class="empty">${esc((L&&L.error)||'unavailable')}</div></div>`;
+  const per=L.period||{}, q=c=>c?(c.PENDING||0)+(c.RETRY||0)+(c.HELD||0):null, nh=x=>(x.notifications||{}).history, np=x=>(x.notifications||{}).period;
+  let h=`<div class="card card-wide"><h3>Notification lanes (all bots)</h3>`+
+    kv('period', esc(`${per.label||''} · ${String(per.start_utc||'').slice(0,19)}Z → ${String(per.end_utc||'').slice(0,19)}Z`))+
+    kv('timezone', esc(per.timezone||'UTC'))+`<div class="small muted">${esc(L.count_unit||'')}; ${esc(L.history_note||'')}.
+    SENT = confirmed by Telegram; AMBIGUOUS = outcome unknown (not counted as sent).</div>`+
+    boundedTable(L.lanes,[{label:'lane',get:x=>x.label},{label:'bot',get:x=>`${x.bot} (${x.destination})`},
+      {label:'mode',get:x=>x.mode||'active per producer'},
+      {label:'sent (all)',get:x=>(nh(x)||{}).SENT},{label:'sent (period)',get:x=>(np(x)||{}).SENT},
+      {label:'ambiguous',get:x=>(nh(x)||{}).AMBIGUOUS},{label:'queued now',get:x=>q(nh(x))},
+      {label:'expired (all)',get:x=>(nh(x)||{}).EXPIRED},{label:'failed (all)',get:x=>(nh(x)||{}).FAILED},
+      {label:'suppressed by pause',get:x=>(x.notifications||{}).suppressed_by_policy},
+      {label:'send attempts',get:x=>(x.notifications||{}).send_attempts_total},
+      {label:'last confirmed send',get:x=>String((x.notifications||{}).last_confirmed_send_utc||'').slice(0,19)},
+      {label:'source',get:x=>x.source}],12,x=>x.lane)+`</div>`;
+  const p=L.lanes.find(x=>x.lane==='PAPER_SIGNAL_PROMOTION');
+  if(p){
+    const rs=p.research_status||{}, pr=p.promotions||{}, cp=p.configured_pause||{};
+    const bt=(p.notifications||{}).by_event_type||{};
+    h+=`<div class="card card-wide"><h3>Opportunity research-review alerts ${pill(rs.status)}</h3>`+
+      kv('alert class', esc(p.alert_class||'RESEARCH_REVIEW (not a trade event)'))+
+      `<div class="banner internal">${esc(rs.statement||'')}</div>`+
+      kv('Signal-bot delivery mode', esc(p.mode))+
+      kv('pause configured', cp.paused?esc(`yes · effective ${cp.effective_utc||'?'} (${cp.effective_local||''}) · ${cp.policy_id||''}`):esc(`no · ${cp.delivery_mode||''}`))+
+      kv('promotions (all) by state', esc(JSON.stringify(pr.history||{})))+
+      kv('promotions (period) by state', esc(JSON.stringify(pr.period||{})))+
+      kv('delivery boundary', esc(cp.delivery_boundary_utc?`${cp.delivery_boundary_utc} (${cp.delivery_boundary_local||''})`:'none'))+
+      kv('promotions recorded while paused', num(pr.recorded_while_paused))+
+      kv('review alerts promoted (since boundary)', num(pr.review_alerts_promoted))+
+      kv('pre-restoration record-only', num(pr.pre_restoration_record_only))+
+      kv('review-alert rows by state', esc(JSON.stringify(bt.RESEARCH_OPPORTUNITY||{})))+
+      kv('legacy PAPER_OPPORTUNITY rows by state', esc(JSON.stringify(bt.PAPER_OPPORTUNITY||{})))+
+      kv('Signal-bot messages sent (all, confirmed)', num((nh(p)||{}).SENT))+
+      kv('research verdict', esc(rs.verdict))+kv('evidence', esc(rs.evidence))+kv('cost model', esc(rs.cost_model))+
+      kv('source / as of', esc(`${rs.source||''} · ${rs.as_of||''}`))+
+      (p.paper_markouts? `<h4>${esc(p.paper_markouts.label)}</h4><div class="small muted">${esc(p.paper_markouts.explanation)} ${esc(p.paper_markouts.not||'')}</div>`+
+        kv('alert delay (median, min)', esc(String((p.paper_markouts.delay_summary||{}).median_delay_min??'UNKNOWN')))+
+        kv('with / without delivery time', esc(`${(p.paper_markouts.delay_summary||{}).with_delivery_time??'?'} / ${(p.paper_markouts.delay_summary||{}).without_delivery_time??'?'}`))+
+        boundedTable(p.paper_markouts.recent||[],[{label:'symbol',get:x=>x.symbol},{label:'reference (data) UTC',get:x=>x.reference_data_utc},
+          {label:'alert delivered UTC',get:x=>x.alert_delivered_utc},{label:'delay min',get:x=>x.delay_min}],10,x=>x.symbol+x.reference_data_utc) : '')+`</div>`;
+  }
+  return h;
+}
+
+/* S14 Continuous Opportunity Engine -- research lane, read-only. */
+function renderOpportunity(d){
+  let h=`<h2 class="section-title">Opportunity Engine</h2>`;
+  if(!d||d.available===false||!d.system){
+    return h+`<div class="banner internal">Not running / no data. Start with <code>python -m talonx_opportunity up</code>.
+      ${esc((d&&d.error)||'')}</div>`;
+  }
+  const sys=d.system||{}, data=d.data||{}, disc=d.discovery||{}, ls=disc.last_scan||{}, n=d.notification||{},
+        rep=d.reporting||{}, cap=data.capability||{}, ing=data.ingestion||{};
+  h+=`<div class="banner internal">Research lane: continuous, phase-aware discovery. Candidate detection and
+      persistence are independent of Telegram capacity. No paper orders. Its PAPER_SIGNAL promotion lane DID deliver
+      to the Signal bot (TRADE_EVENT, non-V2) until the 2026-10-07 owner pause; see Notification lanes.</div><div class="grid">`;
+  const ver=sys.versions||{};
+  h+=`<div class="card"><h3>System ${pill(sys.overall)}</h3>`+kv('repo HEAD', esc(ver.repo_head||'UNKNOWN'))+
+     kv('dirty tracked files now', esc((ver.dirty_tracked_files_now||[]).join(', ')||'none'))+
+     kv('loaded commit (first component)', esc(sys.commit||'UNKNOWN'))+
+     kv('latest deployment', sys.latest_deployment?esc(`${String(sys.latest_deployment.at_utc).slice(0,19)} ${sys.latest_deployment.component} ${sys.latest_deployment.classification}`):null)+
+     kv('recent errors', num((sys.recent_errors||[]).length))+`</div>`;
+  h+=`<div class="card"><h3>Data</h3>`+kv('phase', esc(ing.phase))+kv('as-of (UTC)', esc(String(ing.as_of_utc||'').slice(0,19)))+
+     kv('incomplete symbols', num(ing.incomplete))+kv('capability', `${esc(cap.provider||'')}/${esc(cap.feed||'')} ${pill(cap.availability)} delay ${esc(cap.delay_minutes)}`)+
+     Object.entries(data.probes||{}).map(([p,v])=>kv('probe '+p, `${v.ok?'ok':'FAIL'} ${esc(String(v.at_utc).slice(11,19))}`)).join('')+`</div>`;
+  h+=`<div class="card"><h3>Discovery</h3>`+kv('last scan', `${esc(ls.phase)} ${pill(ls.state)} ${esc(String(ls.decision_utc||'').slice(11,19))}`)+
+     kv('universe / eligible', `${num(ls.universe)} / ${num(ls.eligible)}`)+kv('alert-worthy (last scan)', num(ls.alert_worthy))+
+     kv('candidates this window', num(disc.candidates_this_window))+kv('persisted (all)', num(disc.candidates_persisted_total))+
+     kv('active', num(disc.candidates_active))+`</div>`;
+  h+=`<div class="card"><h3>Horizons</h3>`+Object.entries(d.horizons||{}).map(([k,v])=>kv(k, `${pill(v.health)} ${esc(v.state||'')} records ${num(v.records)} · BUY/SELL ${num(v.buy_sell)}`)).join('')+`</div>`;
+  h+=`<div class="card"><h3>Notification (Lab)</h3>`+kv('policy', esc(n.policy?n.policy.policy_version:'—'))+
+     Object.entries((n.lab||{}).decisions||{}).map(([k,v])=>kv(k, num(v))).join('')+
+     Object.entries((n.lab||{}).delivery||{}).map(([k,v])=>kv('delivery '+k, num(v))).join('')+
+     `<div class="small muted">${esc(n.signal_bot_note||'')}</div></div>`;
+  h+=renderNotificationLanes(n.lanes);
+  h+=`<div class="card"><h3>Reporting</h3>`+kv('window', esc(rep.window_id))+kv('material boundaries', num(rep.material_changes))+
+     kv('ops-only restarts', num(rep.operations_only_restarts))+
+     (rep.warnings||[]).map(w=>`<div class="small" style="color:var(--warn)">${esc(w)}</div>`).join('')+`</div>`;
+  h+=`<div class="card card-wide"><h3>Components (independently restartable)</h3>`+
+     boundedTable(d.components, [{label:'logical', get:r=>r.logical},{label:'component', get:r=>r.component},
+       {label:'health', get:r=>r.health},{label:'hb age s', get:r=>r.heartbeat_age_s},{label:'restarts', get:r=>r.restarts},
+       {label:'source version', get:r=>r.version},
+       {label:'loaded commit', get:r=>((ver.components||{})[r.component]||{}).loaded_commit||'UNKNOWN'},
+       {label:'own sources', get:r=>((ver.components||{})[r.component]||{}).status||'UNKNOWN'},
+       {label:'commit vs HEAD', get:r=>((ver.components||{})[r.component]||{}).commit_vs_head||'UNKNOWN'},
+       {label:'dirty at load', get:r=>((ver.components||{})[r.component]||{}).dirty_at_load||'UNKNOWN'}], 12, r=>r.component)+`</div>`;
+  h+=`<div class="card"><h3>Paper (V2, read-only)</h3>`+kv('v2', esc(JSON.stringify((d.paper||{}).v2||{}).slice(0,160)))+
+     kv('research paper orders', num((d.paper||{}).research_lane_paper_orders))+`</div>`;
+  return h+`</div>`;
+}
+
 const SECTION_RENDER = {
-  overview: renderOverview, premarket: renderPremarket, original_quant: renderOriginalQuant,
+  overview: renderOverview, opportunity_engine: renderOpportunity, premarket: renderPremarket, original_quant: renderOriginalQuant,
   v2_active_strategy: renderV2, v2_broad_discovery: renderV2Discovery,
   validation: renderValidation, intelligence: renderIntelligence, paper_eod: renderPaperEod,
 };

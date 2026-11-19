@@ -137,10 +137,62 @@ FREEZE_SESSION03_HARDENING_FILES = (
     "talonx_ops/prospective/proc.py",
     "talonx_dispatch/telegram_listener.py",
 )
-# ISOLATED RESEARCH LANE -- the broad-universe pre-market research engine is a separate package run as its own process.
-# Nothing in the frozen release imports it (guarded by a test), it never trades, and it never writes a V2 ledger/outbox.
-FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/",)
+# ISOLATED RESEARCH LANES -- the broad-universe pre-market research engine (V1, frozen for replay/history) and the
+# Continuous Opportunity Engine are separate packages run as their own processes. Nothing in the frozen release imports
+# them (guarded by tests), they never trade, and they never write a V2 ledger/outbox.
+# 2026-09-30: + the read-only research tooling packages (DTU shadow collector, PAPER_SIGNAL profitability forensics /
+# forward-alpha framework): own processes / CLIs, read production stores mode=ro, never imported by the frozen release.
+FREEZE_RESEARCH_LANE_PREFIXES = ("talonx_premarket/", "talonx_opportunity/", "talonx_shadow/", "talonx_paperperf/")
+# POST-FREEZE CONTINUOUS-ENGINE INTEGRATION (S14-01..S14-06) -- an EXPLICIT, closed list: the read-only operator view of
+# the research lane, the retirement of the silently-broken Experimental lane from active startup, un-mixed /ping Quant
+# metrics, accurate yfinance incident accounting and the Intelligence stale-enqueue guard / digest visibility. No
+# strategy-fingerprint file, no provider/pricing/accounting/ledger file and no V2 admission input (guarded by a test).
+FREEZE_CONTINUOUS_ENGINE_FILES = (
+    "talonx_ops/opportunity_read.py",                         # read-only operator view of the research lane
+    "talonx_ops/dashboard_read.py",                           # Opportunity section; Experimental shown RETIRED
+    "talonx_ops/authoritative_read_model.py",                 # Experimental producer reported RETIRED
+    "dashboard_web.py",                                       # section whitelist += opportunity_engine
+    "dashboard_web_static/index.html",                        # Opportunity tab (read-only)
+    "talonx_signals/run.py",                                  # retired lane refuses a live start (--allow-retired)
+    "talonx_ingest/market_data/yfinance_poll.py",             # upstream incident accounting (legacy CONTROL feed)
+    "talonx_ingest/intelligence/service/enrichment.py",       # stale-at-enqueue guard (no enqueue->expire churn)
+    "talonx_ingest/intelligence/service/observability.py",    # counter for the guard
+    "scripts/start_talonx_supervised.ps1",                    # comment only: Experimental retired
+    ".env.example",                                           # comments only: research-lane + digest opt-ins
+    "README.md",                                              # documentation only
+)
 
+
+# POST-FREEZE V2 SIGNAL ROUTING FIX (2026-09-25, operator-authorized ROUTING_FIX) -- an EXPLICIT, closed list: the V2
+# actionable Telegram transport resolved a bare TelegramClient() from the legacy TELEGRAM_BOT_TOKEN (revoked -> 401)
+# instead of the TRADE_EVENT (TalonX Signal) destination. Delivery routing only: no strategy-fingerprint input, no
+# provider/pricing/accounting/ledger/admission change (the fingerprint is guarded by a test).
+FREEZE_SIGNAL_ROUTING_FIX_FILES = (
+    "talonx_v2/delivery.py",
+)
+# POST-FREEZE SENTINEL OPERATOR CONTROL PLANE (2026-09-25) -- an EXPLICIT, closed list: owner-only Sentinel commands
+# (/help /universe /exclude /scanned), a durable operator-intent store and fetch-universe gates that are exact
+# identities unless OPERATOR_UNIVERSE_MUTATION_MODE=ACTIVE (post-EOD authorisation). No strategy-fingerprint input,
+# no provider/pricing/accounting/ledger/admission change, never imports the research lane (guarded by tests).
+FREEZE_OPERATOR_CONTROL_FILES = (
+    "talonx_ops/operator_control/__init__.py",
+    "talonx_ops/operator_control/store.py",
+    "talonx_ops/operator_control/gates.py",
+    "talonx_ops/operator_control/commands.py",
+    "talonx_ops/operator_control/scanned.py",
+    "talonx_ops/operator_control/sentinel.py",
+    "talonx_ops/operator_control/universe_view.py",            # 2026-09-30: read-only /universe summary|excluded views
+)
+# POST-FREEZE P0 PACKAGE 2A (2026-09-26) -- an EXPLICIT, closed list of operations-observability files: a missed
+# previous-session EOD close is surfaced as OVERDUE_EOD_CLOSE instead of hiding behind a weekend NOT_DUE_YET (and still
+# needs --force to close), and the Telegram poller health check recognises the two expected, distinct command pollers
+# (Signal + Sentinel) while still flagging duplicates of either role and unknown clients. No strategy-fingerprint
+# input, no provider/pricing/accounting/ledger/admission change.
+FREEZE_P0_2A_OPS_FILES = (
+    "talonx_ops/prospective/checkpoint.py",
+    "talonx_ops/prospective/close.py",
+    "talonx_ops/prospective/telegram_owner.py",
+)
 
 def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None) -> tuple[bool, str]:
     if head.startswith(expected_sha):
@@ -159,11 +211,16 @@ def frozen_release_ok(head: str, expected_sha: str, *, repo: Path | None = None)
     extra = [f for f in diff if not (f.startswith(FREEZE_ALLOWED_PREFIXES) or f in FREEZE_ALLOWED_FILES
                                        or f in FREEZE_OPS_HARDENING_FILES or f in FREEZE_RELEASE_FIDELITY_FIX_FILES
                                        or f in FREEZE_SESSION03_HARDENING_FILES
+                                       or f in FREEZE_CONTINUOUS_ENGINE_FILES
+                                       or f in FREEZE_SIGNAL_ROUTING_FIX_FILES
+                                       or f in FREEZE_OPERATOR_CONTROL_FILES
+                                       or f in FREEZE_P0_2A_OPS_FILES
                                        or f.startswith(FREEZE_RESEARCH_LANE_PREFIXES))]
     if extra:
         return False, f"runtime files changed after the frozen release: {extra[:5]}"
     return True, (f"HEAD descends from the frozen release; only docs/tests/pin/declared ops-hardening, "
-                  f"release-fidelity-fix, Session-03-hardening and isolated research-lane files changed "
+                  f"release-fidelity-fix, Session-03-hardening, continuous-engine integration and isolated research-lane "
+                  f"files changed "
                   f"({len(diff)} files)")
 
 

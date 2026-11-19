@@ -1,0 +1,31 @@
+﻿{
+    "verified_utc":  "2026-10-09T15:57:44.9832904Z",
+    "task":  "\\TalonX\\PDM_V1_Collector",
+    "state":  "Ready",
+    "triggers":  [
+                     {
+                         "start_local":  "2026-10-20T00:15:00",
+                         "end_local":  "2026-11-18T12:00:00",
+                         "days_interval":  1,
+                         "enabled":  true
+                     },
+                     {
+                         "start_local":  "2026-10-20T06:30:00",
+                         "end_local":  "2026-11-17T12:00:00",
+                         "days_interval":  1,
+                         "enabled":  true
+                     }
+                 ],
+    "command":  "C:\\workspace\\TalonX\\.venv\\Scripts\\python.exe",
+    "arguments":  "-m talonx_paperperf.post_delivery_collector --config C:\\workspace\\TalonX\\docs\\research\\protocols\\POST_DELIVERY_ALERT_MARKOUT_V1_APPROVED_CONFIG.json --enable --budget-s 900",
+    "working_directory":  "C:\\workspace\\TalonX",
+    "multiple_instances":  "IgnoreNew",
+    "execution_time_limit":  "PT30M",
+    "disallow_on_batteries":  true,
+    "start_when_available":  true,
+    "logon_type":  "Interactive",
+    "next_run_local":  "2026-10-20T00:15:00",
+    "never_run":  true,
+    "collector_tasks_on_machine":  1,
+    "machine_timezone":  "GMT Standard Time"
+}
