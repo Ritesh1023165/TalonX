@@ -28,11 +28,11 @@ def test_summary_is_five_lines_with_the_same_values_and_every_warning_visible():
     head, details = txt.split(P.HTML_DETAILS_OPEN)
     lines = head.rstrip("\n").split("\n")
     assert lines == [
-        "🔎 <b>TWLO</b> · 🟢 ▲ UP +3.02% · UNVALIDATED",
+        "🔎 <b>TWLO</b> · 🟢 ▲ UP +3.02% · AWARENESS ONLY",
         "💵 $284.08 at 11:48 ET · 15-min delayed, not live",
         "📊 0.5× ATR · vol 14.0% of 20d avg · 1.27% above prior-day high",
-        "🧮 Score 65.9/100 · not a probability",
-        "⚠️ Paper results negative after costs · review only · no order",
+        "🧮 Rule score 65.9/100 · not a probability or recommendation",
+        "ℹ️ Awareness only · not a trade prompt · tested: no edge after costs",
     ]
     assert details.endswith("</blockquote>")
 
@@ -44,7 +44,7 @@ def test_details_are_exactly_the_v2_text_without_its_header():
     body = txt.split(P.HTML_DETAILS_OPEN, 1)[1].removesuffix("</blockquote>")
     assert html.unescape(body) == v2.split("\n", 1)[1]
     for kept in ("Previous close: $275.77", "Form 144 proposed-sale notice", "🔁 Earlier alert for TWLO delivered",
-                 "negative after costs", "not a buy instruction", "🔖 Reference OPPORTUNITY_ENGINE:2026-10-09:TWLO"):
+                 "negative after costs", "not a trade prompt", "🔖 Reference OPPORTUNITY_ENGINE:2026-10-09:TWLO"):
         assert kept in visible(txt)
 
 
@@ -65,8 +65,8 @@ def test_sub_display_move_renders_escaped_less_than():
 
 def test_missing_evidence_renders_unknown_and_never_raises():
     txt = P.render_review_expandable({"promotion_id": None}, NOW, "P", None)
-    assert txt.startswith("🔎 <b>UNKNOWN</b> · ❔ DIRECTION UNKNOWN · UNVALIDATED\n💵 UNKNOWN at UNKNOWN · delayed")
-    assert "📊 Reasons UNKNOWN" in txt and "🧮 Score UNKNOWN" in txt and P.HTML_DETAILS_OPEN in txt
+    assert txt.startswith("🔎 <b>UNKNOWN</b> · ❔ DIRECTION UNKNOWN · AWARENESS ONLY\n💵 UNKNOWN at UNKNOWN · delayed")
+    assert "📊 Reasons UNKNOWN" in txt and "🧮 Rule score UNKNOWN" in txt and P.HTML_DETAILS_OPEN in txt
     part = P.render_review_expandable(q(), NOW, "P", ctx(feats={"gap_pct": 2.0}))
     assert "📊 ATR multiple UNKNOWN · volume UNKNOWN · prior-day range UNKNOWN" in part
 
@@ -119,7 +119,7 @@ def test_live_path_without_tracing_still_sends_html_once(tmp_path, monkeypatch):
     payload, state, prov = ob.execute("SELECT payload_text, state, provenance_json FROM "
                                       "ops_notification_outbox").fetchone()
     assert state == "SENT" and c.sent == [(payload, "HTML")]
-    assert '"template_version": "RESEARCH_REVIEW_EXPANDABLE_V3"' in prov
+    assert f'"template_version": "{P.REVIEW_TEMPLATE_VERSION}"' in prov
 
 
 def test_presentation_fault_falls_back_to_plain_minimal_sent_without_html(tmp_path, monkeypatch):
@@ -134,7 +134,7 @@ def test_presentation_fault_falls_back_to_plain_minimal_sent_without_html(tmp_pa
     payload, state = sqlite3.connect(P.signal_outbox_path(tmp_path)).execute(
         "SELECT payload_text, state FROM ops_notification_outbox").fetchone()
     assert state == "SENT" and c.sent == [(payload, None)] and P.HTML_DETAILS_OPEN not in payload
-    assert "negative after costs" in payload and "not a buy instruction" in payload
+    assert "negative after costs" in payload and "not a trade prompt" in payload
 
 
 def test_promotion_decisions_do_not_depend_on_the_template(tmp_path, monkeypatch):
@@ -190,7 +190,7 @@ def test_bank_style_catalyst_fits_telegram_and_keeps_every_warning():
     sec = next(ln for ln in vis.split("\n") if "SEC context" in ln)
     assert "offering-related 424B2 ×212 (filed 2026-10-01 to 2026-10-21)" in sec and len(sec) < 300
     assert "other filing(s): Form FWP" in sec and P._TRUNCATED not in vis
-    for kept in ("negative after costs", "not a buy instruction", "🔖 Reference OPPORTUNITY_ENGINE:2026-10-09:TWLO"):
+    for kept in ("negative after costs", "not a trade prompt", "🔖 Reference OPPORTUNITY_ENGINE:2026-10-09:TWLO"):
         assert kept in vis
 
 

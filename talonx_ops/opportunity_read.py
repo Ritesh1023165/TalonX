@@ -216,7 +216,8 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
     if pf.exists():
         d = _j(pf.read_text(encoding="utf-8"), None)
         cfg = {k: d.get(k) for k in ("paused", "effective_utc", "effective_local", "decision", "policy_id",
-                                     "delivery_mode", "delivery_boundary_utc", "delivery_boundary_local")} \
+                                     "delivery_mode", "delivery_boundary_utc", "delivery_boundary_local",
+                                     "thinning")} \
             if isinstance(d, dict) else {"paused": True, "decision": "UNREADABLE_CONTROL_FILE_FAIL_SAFE"}
     cfg_paused = bool(cfg and cfg.get("paused") is True)
     if loaded and loaded.startswith("RESEARCH_REVIEW"):
@@ -236,7 +237,11 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
         mode = "PAUSE_CONFIGURED_NOT_YET_LOADED (component restart pending)"
     else:
         mode = {"ACTIVE": "ACTIVE (delivering to the Signal bot)", "OFF": "SHADOW (record-only)"}.get(loaded, loaded)
-    lane.update(mode=mode, loaded_signal_delivery=loaded, configured_pause=cfg)
+    lane.update(mode=mode, loaded_signal_delivery=loaded, configured_pause=cfg,
+                # 2026-11-20 owner decision: per-session delivery cap (configured in the control file vs loaded)
+                thinning={"configured": (cfg or {}).get("thinning"),
+                          "loaded": det.get("signal_thinning") or fps.get("signal_thinning")
+                          or "UNKNOWN (not reported by the running component)"})
     try:
         lane["paper_markouts"] = promotion_markout_view(r)
     except Exception as exc:  # noqa: BLE001 -- label visibility must never break the dashboard
@@ -265,7 +270,9 @@ def _promotion_lane(r: Path, comp: dict | None, since: str) -> dict:
             "review_alerts_promoted": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
                                                  "'RESEARCH_REVIEW_ALERT'").fetchone()[0],
             "pre_restoration_record_only": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
-                                                      "'PRE_RESTORATION_RECORD_ONLY'").fetchone()[0]}
+                                                      "'PRE_RESTORATION_RECORD_ONLY'").fetchone()[0],
+            "thinned_session_cap": pc.execute("SELECT COUNT(*) FROM promotions WHERE reason_code="
+                                              "'THINNED_SESSION_CAP'").fetchone()[0]}
         pc.close()
     return lane
 
@@ -315,7 +322,8 @@ def notification_lanes(root=None, *, now: datetime | None = None, repo: Path | N
     specs = [
         ("INTELLIGENCE_CARDS", "Intelligence cards (SEC filings)", "TRADE_EVENT", "Signal",
          home / "ingestion_ledger.db", "intelligence_delivery", "enqueued_at_utc", ""),
-        ("V2_ACTIONABLE", "V2 INSIDER_BUY_CLUSTER_V2 paper alerts", "TRADE_EVENT", "Signal",
+        ("V2_ACTIONABLE", "V2 INSIDER_BUY_CLUSTER_V2: PASSIVE record, no messages since 2026-11-20 "
+                          "(lane key kept for compatibility)", "TRADE_EVENT", "Signal",
          repo / "v2_release_rc1.db", "v2_alert_outbox", "created_at_utc", ""),
         ("OPERATIONS", "Operations / Sentinel health", "OPERATIONS", "Sentinel",
          repo / "v2_release_rc1_notifications.db", "ops_notification_outbox", "created_at_utc", ""),

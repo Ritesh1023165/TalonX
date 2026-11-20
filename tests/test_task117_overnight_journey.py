@@ -237,7 +237,7 @@ def test_p1_restart_does_not_duplicate_intent_or_buy(tmp_path):
 
 
 # --------------------------------------------------------------------------- P2
-def test_p2_qualified_decision_reaches_recording_transport(tmp_path):
+def test_p2_qualified_decision_reaches_recording_transport(tmp_path, v2_delivery_dormant_path):
     rt = RecordingTransport()
     svc = _svc(tmp_path, _bars(tmp_path), router=_StubRouter(), transport=rt, deliver=True)
     svc._records = lambda *, as_of: from_rows(_rows())

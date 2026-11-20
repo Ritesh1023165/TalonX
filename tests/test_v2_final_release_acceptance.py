@@ -130,7 +130,7 @@ def entered_rig(tmp, **kw) -> Rig:
 # =========================================================================== #
 # FLOW 1 -- normal trade, end to end
 # =========================================================================== #
-def test_flow1_normal_trade_intent_fill_hold_exit_settlement_total_return_and_operator_view(tmp_path):
+def test_flow1_normal_trade_intent_fill_hold_exit_settlement_total_return_and_operator_view(tmp_path, v2_delivery_dormant_path):
     ex = v2cal.add_sessions(ENTRY_MON, 4)                                  # dividend ex-date inside the hold
     div = make_dividend_event(SYM, ex, "0.40", payable_date=EXIT_10TD + timedelta(days=4))   # paid AFTER the exit
     r = Rig(tmp_path, events=[div])
@@ -216,7 +216,7 @@ def test_flow2_missing_entry_price_recovers_within_session_3_and_never_after(tmp
 # =========================================================================== #
 # FLOW 3 -- missing exit close -> +5 recovery -> EXIT_UNRESOLVED
 # =========================================================================== #
-def test_flow3_missing_exit_close_recovers_in_plus_5_then_exit_unresolved_with_block_and_sentinel_event(tmp_path):
+def test_flow3_missing_exit_close_recovers_in_plus_5_then_exit_unresolved_with_block_and_sentinel_event(tmp_path, v2_delivery_dormant_path):
     bars = history() + [sipbar(ENTRY_MON, 101.0, 102.0)]
     r = Rig(tmp_path, bars=bars)
     r.tick(ACT_FRI); r.tick(ENTRY_MON)
@@ -321,7 +321,7 @@ class _FailingTransport:
         return {"ok": False, "detail": "telegram 500"}
 
 
-def test_flow7_telegram_failure_does_not_touch_paper_execution_and_state_is_durably_retryable(tmp_path):
+def test_flow7_telegram_failure_does_not_touch_paper_execution_and_state_is_durably_retryable(tmp_path, v2_delivery_dormant_path):
     ft = _FailingTransport()
     r = Rig(tmp_path, transport=ft)
     r.tick(ACT_FRI); r.tick(ENTRY_MON)
@@ -594,7 +594,7 @@ def test_operator_launcher_exposes_sip_and_release_and_keeps_the_csv_default_for
 # =========================================================================== #
 # notification routing / Lab OFF / paper independence of Telegram / no secrets
 # =========================================================================== #
-def test_notification_routing_signal_for_trades_sentinel_for_operations_lab_off(tmp_path):
+def test_notification_routing_signal_for_trades_sentinel_for_operations_lab_off(tmp_path, v2_delivery_dormant_path):
     from talonx_ops.notify import RESEARCH, resolve_destination_config, telegram_client_for
     bars = history() + [sipbar(ENTRY_MON, 101.0, 102.0)]                     # no exit bar -> EXIT_UNRESOLVED (an operational event)
     r = Rig(tmp_path, bars=bars)

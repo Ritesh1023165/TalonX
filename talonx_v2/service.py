@@ -28,6 +28,7 @@ from talonx_v2.calendar import (add_sessions, is_session, next_session_on_or_aft
                                 next_session_strictly_after, recovery_deadline_session,
                                 session_close_utc)
 from talonx_v2.config import V2_VERSION, V2Config
+from talonx_v2.passive import V2_PASSIVE, suppress_outbox
 from talonx_v2.profile import active_profile
 from talonx_v2.schemas import V2Action
 from talonx_v2.store import V2Store
@@ -598,7 +599,14 @@ class V2Service:
         # For a PINNED as-of tick (replay / dry-run) the delivery clock is that
         # session ~close, so notification deadlines are evaluated on the modelled
         # timeline; a live tick (as_of is None) uses the real wall clock.
-        if self._deliver and self._router is not None:
+        # 2026-11-20 (owner): V2 is a PASSIVE descriptive record -- never deliver, whatever the flags; every unsent
+        # alert row is retired as EXPIRED (terminal) so nothing can be replayed later.
+        if V2_PASSIVE:
+            try:
+                self._last_delivery = suppress_outbox(self.store)
+            except Exception:  # noqa: BLE001 -- suppression failure must not stop the record; nothing is sent either way
+                logger.exception("V2 passive outbox suppression failed")
+        elif self._deliver and self._router is not None:
             try:
                 from datetime import time as _time
 
@@ -634,10 +642,11 @@ class V2Service:
                 from talonx_ops.notify import OPERATIONS
                 from talonx_ops.notify.producers import scan_v2_operational_events
                 from talonx_ops.notify.worker import drain as _drain_ops
-                scan_v2_operational_events(self.store, self._ops_notify_store)
+                if not V2_PASSIVE:                   # passive: V2 produces no OPERATIONS notification of its own
+                    scan_v2_operational_events(self.store, self._ops_notify_store)
                 from talonx_ops.notify.producers import enqueue_degraded_health
-                if source_degraded or (self._resolver is not None and any(
-                        not hasattr(v, "open") for v in self._resolver.last.values())):
+                if not V2_PASSIVE and (source_degraded or (self._resolver is not None and any(
+                        not hasattr(v, "open") for v in self._resolver.last.values()))):
                     enqueue_degraded_health(self._ops_notify_store, component="v2",
                                             condition="SOURCE_OR_PRICING_DEGRADED")
                 ops_now = (None if as_of is None else
@@ -1546,7 +1555,8 @@ class V2Service:
                 for i in self.store.pending_entry_intents()],
             "alert_outbox": self._outbox_summary(),
             "last_delivery": self._last_delivery or None,
-            "delivery_enabled": self._deliver,
+            "delivery_enabled": self._deliver and not V2_PASSIVE,
+            "v2_passive": V2_PASSIVE,
             "open_positions": len(opens),
             "open_symbols": [o["symbol"] for o in opens],
             "exit_unresolved": [{"symbol": u["symbol"], "episode_id": u["episode_id"]}

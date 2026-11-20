@@ -37,6 +37,12 @@ enter the Signal outbox; anything older is recorded PROMOTED_SHADOW / PRE_RESTOR
 labelled "TALONX — RESEARCH OPPORTUNITY / UNVALIDATED — not a buy instruction" with the policy's negative research
 verdict, event_type RESEARCH_OPPORTUNITY. ``paused: false`` without a valid boundary stays PAUSED (fail safe). Alert
 delivery is independent of any paper-trading admission (it never consults VR, V2 or a paper ledger).
+
+THINNING + AWARENESS-ONLY WORDING (owner decisions 2026-11-20). The control file's ``"thinning": {"mode":
+"SESSION_CAP", "max_per_session": 10}`` sends only the first N released review alerts per trading window; the rest are
+recorded PROMOTED_SHADOW / THINNED_SESSION_CAP and never sent. A delivery filter only: decisions, ordering, rate limit,
+expiry and the policy fingerprint are unchanged. The review template is RESEARCH_REVIEW_AWARENESS_V4 (no trade-prompt
+wording). See docs/research/NOTIFICATION_POLICY.md §0.
 """
 from __future__ import annotations
 
@@ -60,6 +66,8 @@ SHADOW, PAPER_SIGNAL = "SHADOW", "PAPER_SIGNAL"
 PAUSE_REASON = "SIGNAL_DELIVERY_PAUSED"            # promotions recorded while Signal delivery is paused
 PRE_RESTORATION = "PRE_RESTORATION_RECORD_ONLY"     # queued before the review-delivery boundary: never sent
 REVIEW_REASON = "RESEARCH_REVIEW_ALERT"             # delivered as a research-review alert (not a trade event)
+THINNED_SESSION_CAP = "THINNED_SESSION_CAP"         # 2026-11-20: past the per-session delivery cap: record-only, never sent
+DEFAULT_SESSION_CAP = 10                            # owner decision 2026-11-20; also the fail-safe for a malformed block
 REVIEW_EVENT_TYPE = "RESEARCH_OPPORTUNITY"
 SIGNAL_EVENT_TYPES = ("PAPER_OPPORTUNITY", REVIEW_EVENT_TYPE)
 SUPPRESS_PREFIX = "SUPPRESSED_POLICY_PAUSE"        # outbox rows retired by the pause (policy, never a transport error)
@@ -162,6 +170,27 @@ def signal_delivery_control(root=None) -> dict | None:
         return None
 
 
+def signal_thinning(ctl: dict | None) -> dict | None:
+    """The review-alert delivery thinning (owner decision 2026-11-20) from the delivery control file's ``thinning``
+    block: ``{"mode": "SESSION_CAP", "max_per_session": N}`` = only the first N released promotions of a trading window
+    are sent. Absent block -> None (no cap; the explicit rollback). Fail safe for a REDUCTION: any malformed block ->
+    the default cap, flagged ``malformed`` (never more alerts because of a typo)."""
+    if not isinstance(ctl, dict) or "thinning" not in ctl:
+        return None
+    t = ctl["thinning"]
+    n = t.get("max_per_session") if isinstance(t, dict) else None
+    if (isinstance(t, dict) and t.get("mode") == "SESSION_CAP" and isinstance(n, int) and not isinstance(n, bool)
+            and n >= 0):
+        return {"mode": "SESSION_CAP", "max_per_session": n, "malformed": False}
+    return {"mode": "SESSION_CAP", "max_per_session": DEFAULT_SESSION_CAP, "malformed": True}
+
+
+def thinning_fp(t: dict | None) -> str:
+    if not t:
+        return "NONE"
+    return f"SESSION_CAP:{t['max_per_session']}" + (":MALFORMED_DEFAULT" if t.get("malformed") else "")
+
+
 def trace_path(root=None) -> Path:
     return root_dir(root) / "promotion_delivery_trace.db"
 
@@ -226,7 +255,9 @@ REVIEW_TEMPLATE_VERSION_V2 = "RESEARCH_REVIEW_COMPACT_V2"   # V1 2026-10-09 16:5
 #                                                             (icons, bullets, direction from the RECORDED change)
 # 2026-10-17 (owner-approved, PRESENTATION ONLY): V3 = a short visible summary + the unchanged V2 wording inside a
 # Telegram expandable quote (HTML). Same evidence, same values; only layout and parse mode differ. Rollback = V2.
-REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_EXPANDABLE_V3"
+REVIEW_TEMPLATE_VERSION_V3 = "RESEARCH_REVIEW_EXPANDABLE_V3"
+# 2026-11-20 (owner, PRESENTATION ONLY): V4 = same layout, AWARENESS-ONLY wording (no trade-prompt language).
+REVIEW_TEMPLATE_VERSION = "RESEARCH_REVIEW_AWARENESS_V4"
 _ET = ZoneInfo("America/New_York")
 _FORM_WORDS = {"144": "Form 144 proposed-sale notice", "3": "Form 3 initial ownership report",
                "4": "Form 4 insider transaction report", "5": "Form 5 annual insider report"}
@@ -358,7 +389,7 @@ def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None 
     ref = _num(p.get("reference_price"))
     score = _num(p.get("score"))
     lines = [
-        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        "🔎 MARKET MOVE — AWARENESS ONLY",
         f"{p.get('symbol') or 'UNKNOWN'} · {_direction(f.get('gap_pct'))}",
         f"Previous close: {_ref(pc) if pc else 'UNKNOWN'}",
         "",
@@ -373,14 +404,14 @@ def render_review_compact(p: dict, now: datetime, policy: str, ctx: dict | None 
         "",
         "📄 " + _sec_context(ev.get("catalyst") if ev else None),
         "",
-        f"⏱️ Scope: Today’s session, closing {_et(ctx.get('close_utc'))}. No entry, exit or holding rule.",
+        f"⏱️ Observed in today’s session (closes {_et(ctx.get('close_utc'))}).",
         f"🧮 Rule score: {score:.1f}/100; not a probability." if score is not None else "🧮 Rule score: UNKNOWN.",
     ]
     if ctx.get("prior_delivery_date"):
         lines.append(f"🔁 Earlier alert for {p.get('symbol')} delivered {ctx['prior_delivery_date']}")
     lines += ["",
               "⚠️ This policy’s evaluated paper results were negative after costs.",
-              "For review only · not a buy instruction · no order placed",
+              "Awareness only · not a trade prompt · no order placed",
               "",
               f"🏷️ Policy {policy}",
               f"🌐 Universe {ctx.get('universe') or 'UNKNOWN'}",
@@ -428,12 +459,13 @@ def render_review_expandable(p: dict, now: datetime, policy: str, ctx: dict | No
     e = lambda s: html.escape(str(s), quote=False)  # noqa: E731
     ref, score, delay = _num(p.get("reference_price")), _num(p.get("score")), prov.get("delay_minutes")
     summary = [
-        f"🔎 <b>{e(p.get('symbol') or 'UNKNOWN')}</b> · {e(_direction(f.get('gap_pct')))} · UNVALIDATED",
+        f"🔎 <b>{e(p.get('symbol') or 'UNKNOWN')}</b> · {e(_direction(f.get('gap_pct')))} · AWARENESS ONLY",
         f"💵 {e(_ref(ref) if ref else 'UNKNOWN')} at {e(_et(p.get('data_as_of_utc')))} · "
         f"{e(f'{delay}-min delayed' if delay else 'delayed')}, not live",
         f"📊 {e(_short_why(f)) if f else 'Reasons UNKNOWN'}",
-        f"🧮 Score {score:.1f}/100 · not a probability" if score is not None else "🧮 Score UNKNOWN",
-        "⚠️ Paper results negative after costs · review only · no order",
+        f"🧮 Rule score {score:.1f}/100 · not a probability or recommendation" if score is not None
+        else "🧮 Rule score UNKNOWN",
+        "ℹ️ Awareness only · not a trade prompt · tested: no edge after costs",
     ]
     details = render_review_compact(p, now, policy, ctx).split("\n", 1)[-1].strip("\n")
     details = _fit_details(html.unescape(re.sub(r"<[^>]*>", "", "\n".join(summary))), details)
@@ -497,14 +529,14 @@ def render_review_minimal(p: dict, policy: str) -> str:
     sym = p.get("symbol") if isinstance(p, dict) else None
     ref = p.get("promotion_id") if isinstance(p, dict) else None
     return "\n".join([
-        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        "🔎 MARKET MOVE — AWARENESS ONLY",
         f"{sym or 'UNKNOWN'} · ❔ DIRECTION UNKNOWN",
         "",
         "💵 Historical price: UNKNOWN · delayed feed · not a live quote",
         "🧮 Rule score: UNKNOWN; not a probability.",
         "",
         "⚠️ This policy’s evaluated paper results were negative after costs.",
-        "For review only · not a buy instruction · no order placed",
+        "Awareness only · not a trade prompt · no order placed",
         "",
         f"🏷️ Policy {policy}",
         f"🔖 Reference {ref or 'UNKNOWN'}"])
@@ -531,6 +563,8 @@ class Promoter:
         self.pause = signal_delivery_pause(root) if mode == PAPER_SIGNAL else None
         ctl = signal_delivery_control(root) if mode == PAPER_SIGNAL and not self.pause else None
         self.delivery_boundary = delivery_boundary(ctl)   # None: legacy PAPER_SIGNAL (no control file at all)
+        # review-alert delivery thinning applies only to research-review delivery (never changes a decision)
+        self.thinning = signal_thinning(ctl) if self.delivery_boundary is not None else None
         if self.pause:                               # durable owner pause overrides a PAPER_SIGNAL environment
             mode = SHADOW
         self.root, self.policy, self.mode = root, policy, mode
@@ -700,6 +734,7 @@ class Promoter:
                          ("RESEARCH_REVIEW" if self.delivery_boundary else "ACTIVE") if self.mode == PAPER_SIGNAL
                          else "OFF"),
                      "delivery_boundary_utc": iso(self.delivery_boundary) if self.delivery_boundary else None,
+                     "signal_thinning": thinning_fp(self.thinning),
                      "pause": dict(self.pause) if self.pause else None,
                      "suppressed_pending_at_start": self.suppressed_at_start}
         return 30.0
@@ -707,7 +742,7 @@ class Promoter:
     def _release(self, s: OpportunityStore, now: datetime) -> dict:
         """Expire, re-validate and release queued promotions: score-desc, <= rate_max per rolling window."""
         p = self.policy
-        out = {"expired": 0, "rejected_while_queued": 0, "promoted": 0, "held_by_rate": 0}
+        out = {"expired": 0, "rejected_while_queued": 0, "promoted": 0, "held_by_rate": 0, "thinned": 0}
         for r in self.con.execute("SELECT promotion_id, queued_utc FROM promotions WHERE state='QUEUED'").fetchall():
             if (now - _ts(r[1])).total_seconds() > p.queue_expiry_s:
                 with self.con:
@@ -748,6 +783,10 @@ class Promoter:
             if (self.mode == PAPER_SIGNAL and self.outbox is not None and review
                     and _ts(q["queued_utc"]) < self.delivery_boundary):
                 reason = PRE_RESTORATION                  # queued before restoration: record-only, never sent
+            elif (self.mode == PAPER_SIGNAL and self.outbox is not None and review and self.thinning is not None
+                  and self._sent_in_window(q["window_id"]) >= self.thinning["max_per_session"]):
+                reason = THINNED_SESSION_CAP              # past the session's delivery cap: record-only, never sent
+                out["thinned"] += 1
             elif self.mode == PAPER_SIGNAL and self.outbox is not None:
                 from talonx_ops.notify import TRADE_EVENT
                 sig = q["promotion_id"]
@@ -770,6 +809,12 @@ class Promoter:
             used += 1
             out["promoted"] += 1
         return out
+
+    def _sent_in_window(self, window_id) -> int:
+        """Promotions already DELIVERED (PROMOTED_SIGNAL) in this trading window -- durable, so the cap survives a
+        restart; thinned and shadow rows do not count."""
+        return self.con.execute("SELECT COUNT(*) FROM promotions WHERE window_id=? AND state='PROMOTED_SIGNAL'",
+                                (window_id,)).fetchone()[0]
 
     def _review_context(self, s: OpportunityStore, q: dict) -> dict:
         """Render-time evidence for the compact review template (read-only; each part independently UNKNOWN on error)."""
@@ -941,5 +986,6 @@ def main(argv=None) -> int:
     run_component("promotion", tick=pr.tick, root=root, detail=pr.detail,
                   config_fps={"PROMOTION_POLICY": PROMOTION_V1.fingerprint(), "mode": mode, "promotion_src": src,
                               "signal_delivery": "PAUSED" if pr.pause else (
-                                  "RESEARCH_REVIEW@" + iso(pr.delivery_boundary) if pr.delivery_boundary else "ACTIVE")})
+                                  "RESEARCH_REVIEW@" + iso(pr.delivery_boundary) if pr.delivery_boundary else "ACTIVE"),
+                              "signal_thinning": thinning_fp(pr.thinning)})
     return 0

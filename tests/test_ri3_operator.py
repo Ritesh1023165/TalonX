@@ -330,7 +330,7 @@ fs.writeFileSync(process.argv[2],result);
         (Path(os.environ['TALONX_RI3_EVIDENCE_DIR'])/'operator_fixture.html').write_text(
             '<!doctype html><meta charset="utf-8"><title>RI3 isolated fixture</title><style>'+style+'</style>'+rendered,encoding='utf-8')
 
-def test_live_tick_degraded_health_is_bounded(tmp_path,monkeypatch):
+def test_live_tick_degraded_health_is_bounded(tmp_path,monkeypatch, v2_delivery_dormant_path):
     from test_ri1_campaign_identity import _svc
     from talonx_v2.service import V2SourceError
     import talonx_ops.notify.worker as worker

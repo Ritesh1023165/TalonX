@@ -290,13 +290,12 @@ def test_14_runtime_delivery_component_actually_drains_outbox(tmp_path, monkeypa
     isolation."""
     from talonx_v2.service import V2Service
 
-    store = V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE, campaign_id="WIRE_TEST")
-    pos_id = store.insert_open_position(
-        episode_id="epW", symbol="AAA", issuer_cik="x", entry_session=date(2026, 9, 8),
-        target_exit_session=date(2026, 9, 22), entry_price=100.0, shares=10, position_cost=1000.0)
-    store.mark_exit_unresolved(pos_id, detail="test")
-
+    V2Store(str(tmp_path / "v2.db"), starting_cash=BALANCE, campaign_id="WIRE_TEST")
+    # 2026-11-20: V2 is passive and produces no OPERATIONS event of its own (tests/test_v2_passive.py); the tick still
+    # drives the SHARED OPERATIONS drain, proven here with another component's queued notification.
     ops = NotifyStore(str(tmp_path / "notify.db"))
+    from talonx_ops.notify.producers import enqueue_degraded_health
+    enqueue_degraded_health(ops, component="intelligence", condition="POLL_ERRORS")
     cfg = V2Config(db_path=str(tmp_path / "v2.db"), starting_cash_usd=BALANCE, campaign_id="WIRE_TEST")
     svc = V2Service(config=cfg, bar_dirs=[tmp_path / "bars"], ops_notify_store=ops)
 

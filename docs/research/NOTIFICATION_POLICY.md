@@ -1,4 +1,80 @@
-# TalonX Informational Notification Delivery Policy (Task 138, revised Task 140)
+# TalonX Informational Notification Delivery Policy (Task 138, revised Task 140; owner decisions 2026-11-20)
+
+## 0. Owner decisions 2026-11-20 (supersede anything below that conflicts)
+
+**Context.** On 2026-11-19 the programme decision was approved: stop the edge search under the current constraints.
+- V2 forward: `V2_NO_EDGE_CONFIRMED`.
+- PDM: `PDM_NOT_COST_SURVIVING`.
+- TalonX continues as a descriptive Risk & Event Intelligence product (`docs/research/closeout/2026-11-20_alpha_programme_closeout.md`).
+
+Every message TalonX sends is **awareness only**. None is worded or presented as a trade prompt, buy/sell
+language, entry timing or target.
+
+### 0.1 Signal-bot review alerts: thinned to a per-session cap
+
+| Item | Rule |
+|---|---|
+| Producer | `talonx_opportunity/promotion.py`, `RESEARCH_OPPORTUNITY` to the TRADE_EVENT (Signal) bot |
+| Cap | Only the **first 10 released alerts per trading window** are sent |
+| Past the cap | Recorded `PROMOTED_SHADOW` / reason `THINNED_SESSION_CAP`: never enqueued, sent or replayed |
+| Configuration | `results/opportunity/control/promotion_signal_delivery.json`, block `"thinning": {"mode": "SESSION_CAP", "max_per_session": 10}`. Read at component start; a change needs `python -m talonx_opportunity restart promotion` |
+| Fail-safe | A malformed block falls back to the default cap of 10. A typo can never produce more alerts |
+| Rollback | Remove the block (no cap) and restart promotion |
+| Unchanged | Delivery filter only. `OPPORTUNITY_PROMOTION_V1` (fingerprint `4926c12e5eace04e`), its eligibility, score ordering, rate limit (3 per 5 min), 30-min queue expiry and one-promotion-per-candidate rule; paper outcomes are still recorded for every released promotion |
+| Expected volume | About 60 → 10 per session (replay over the 24 sessions 2026-10-19 … 11-19, 1,448 alerts → 240) |
+| What the cap drops | Alerts released after the first 10 of the session, typically after the first 25–85 minutes of the regular session. A later, higher-scored alert can be dropped: the cap keeps release order, not the best scores of the day |
+| Cockpit | `:8787`, Notification lanes → `PAPER_SIGNAL_PROMOTION` shows the configured vs loaded cap and the `thinned_session_cap` count |
+
+### 0.2 Review-alert wording: template `RESEARCH_REVIEW_AWARENESS_V4`
+
+Same layout as V3 (five visible lines, details in an expandable quote) and the same values.
+
+| | Before | After |
+|---|---|---|
+| First line | `… · UNVALIDATED` | `… · AWARENESS ONLY` |
+| Score line | `Score N/100 · not a probability` | `Rule score N/100 · not a probability or recommendation` |
+| Warning line | `Paper results negative after costs · review only · no order` | `Awareness only · not a trade prompt · tested: no edge after costs` |
+| Scope line | `Scope: Today’s session, closing 16:00 ET. No entry, exit or holding rule.` | `Observed in today’s session (closes 16:00 ET).` |
+| Footer | `For review only · not a buy instruction · no order placed` | `Awareness only · not a trade prompt · no order placed` |
+| Fallback header | `RESEARCH OPPORTUNITY — UNVALIDATED` | `MARKET MOVE — AWARENESS ONLY` |
+
+- **Enforcement:** `tests/test_review_alert_awareness_wording.py` fails on buy/sell, entry/exit, target, stop,
+  opportunity, setup, actionable or signal wording in any review-alert render.
+- **Exemption:** the two provenance lines that carry fingerprinted identifiers (`OPPORTUNITY_PROMOTION_V1`,
+  `OPPORTUNITY_ENGINE:…`), which cannot be renamed.
+
+### 0.3 V2 companion (`INSIDER_BUY_CLUSTER_V2@1`): passive record, sends nothing
+
+- **What it sends:** no BUY/SELL alert to the Signal bot and **no V2-produced OPERATIONS notification**
+  (`DEGRADED_HEALTH` from component `v2`, `EXIT_UNRESOLVED`, `ACCOUNT_BLOCK`). This holds **whatever flags it is
+  started with**: the release start still passes `--deliver --transport telegram`.
+- **Where it's enforced:** `talonx_v2/passive.py` (`V2_PASSIVE = True`), applied in `talonx_v2/service.py`.
+- **Unsent rows:** every unsent V2 alert row is retired `EXPIRED` with `SUPPRESSED_V2_PASSIVE: …` (terminal; it can
+  never be replayed). SENT rows are untouched.
+- **What keeps running:** the companion as a descriptive record (Form 4 polling, cluster episodes, paper ledger,
+  dashboard), and the **shared OPERATIONS drain** (owner choice "silence V2 only"), so other components' operations
+  messages (Intelligence health, start-up notices) still arrive.
+- **Fingerprint:** the frozen V2 strategy fingerprint `e2acf6454789217e` is unchanged (passive lives outside
+  `V2Config`).
+- **Messages already sent before this change**, recorded for the owner:
+  - 2026-11-14 01:17Z "PLANNED BUY ABCL";
+  - 2026-11-17 01:16Z "BUY FILLED ABCL".
+
+  These were paper notices from a strategy with no demonstrated edge. The ABCL paper position is still managed
+  silently to its planned 2026-12-01 exit, and no SELL message will be sent.
+- **Forward tracker:** the V2 forward-study daily loop ended on 2026-10-31 as registered. There is no daily forward
+  record to keep, and the closed study is not rerun.
+- **Enforcement:** `tests/test_v2_passive.py`, including a negative control showing the same setup would send when
+  passive is off.
+
+### 0.4 Out of scope of these decisions (unchanged, listed for completeness)
+
+- **Opportunity Lab bot** (`talonx_opportunity/notifier.py`, about 200 messages per day): uses
+  "NEW SETUP / BULLISH / BEARISH" wording. Not covered by the 2026-11-20 decisions; open for a separate owner decision.
+- **Intelligence cards** (this document §1–§9): unchanged. A ≥2-insider open-market buy cluster still routes
+  `IMMEDIATE` (§3.3) as a descriptive filing card, not as a V2 signal.
+
+---
 
 Status: active configurable delivery policy, not an economically-validated
 trading threshold. Governs which already-enriched, already-scored
@@ -136,7 +212,7 @@ unavailable for a periodic filing), the event still retains that
 limitation in the digest text rather than being silently dropped or
 force-elevated.
 
-## 5. V2 paper entry/exit — untouched, separate route
+## 5. V2 paper entry/exit — separate route (SUPERSEDED 2026-11-20: V2 is passive and sends nothing, see §0.3)
 
 V2's own actionable entry/exit Telegram notifications are generated and
 delivered entirely through `talonx_v2`'s own `alert_outbox` /

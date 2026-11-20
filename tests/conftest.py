@@ -178,3 +178,11 @@ def _isolate_ops_notification_store(tmp_path_factory, monkeypatch):
         orig_init(self, path, *a, **k)
 
     monkeypatch.setattr(outbox.NotifyStore, "__init__", guarded)
+
+
+@pytest.fixture
+def v2_delivery_dormant_path(monkeypatch):
+    """V2 is a PASSIVE record in production (owner decision 2026-11-20; enforced by talonx_v2/passive.py and covered by
+    tests/test_v2_passive.py). A test that requests this fixture exercises the retained-but-disabled V2 delivery and
+    V2-operations machinery, so it switches passive off for that test only."""
+    monkeypatch.setattr("talonx_v2.service.V2_PASSIVE", False)

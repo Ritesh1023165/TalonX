@@ -42,7 +42,7 @@ NOW = datetime(2026, 10, 9, 16, 5, 36, 733277, tzinfo=UTC)
 def test_typical_alert_renders_the_approved_structure_exactly():
     txt = P.render_review_compact(q(), NOW, "OPPORTUNITY_PROMOTION_V1", ctx())
     assert txt.split("\n") == [
-        "🔎 RESEARCH OPPORTUNITY — UNVALIDATED",
+        "🔎 MARKET MOVE — AWARENESS ONLY",
         "TWLO · 🟢 ▲ UP +3.02%",
         "Previous close: $275.77",
         "",
@@ -59,11 +59,11 @@ def test_typical_alert_renders_the_approved_structure_exactly():
         "",
         "📄 SEC context: No matching SEC/insider record found in the checked sources. News not checked.",
         "",
-        "⏱️ Scope: Today’s session, closing 16:00 ET. No entry, exit or holding rule.",
+        "⏱️ Observed in today’s session (closes 16:00 ET).",
         "🧮 Rule score: 65.9/100; not a probability.",
         "",
         "⚠️ This policy’s evaluated paper results were negative after costs.",
-        "For review only · not a buy instruction · no order placed",
+        "Awareness only · not a trade prompt · no order placed",
         "",
         "🏷️ Policy OPPORTUNITY_PROMOTION_V1",
         "🌐 Universe DTU_V3_TOP600",
@@ -77,7 +77,7 @@ def test_no_forecast_catalyst_or_trading_language_and_no_acknowledgement_time():
     for banned in ("bullish", "premarket", "pre-market", "target", "stop", "expected", "urgent", "buy now",
                    "probability of", "confidence", "manipulat", "ack", "delivered at", "received"):
         assert banned not in low, banned
-    assert "not a buy instruction" in txt and "not a probability" in txt and "not a live quote" in txt
+    assert "not a trade prompt" in txt and "not a probability" in txt and "not a live quote" in txt
 
 
 def test_missing_evidence_renders_unknown_and_never_raises():
@@ -90,9 +90,9 @@ def test_missing_evidence_renders_unknown_and_never_raises():
         assert "💵 Historical price: UNKNOWN at UNKNOWN\n• Delayed feed · not a live quote" in txt
         assert "🕒 Data UNKNOWN age old when written\n• Detected UNKNOWN · written 12:05 ET" in txt
         assert "📄 SEC context: UNKNOWN (no catalyst record). News not checked." in txt
-        assert "closing UNKNOWN" in txt and "🧮 Rule score: UNKNOWN." in txt and "🌐 Universe UNKNOWN" in txt
+        assert "closes UNKNOWN" in txt and "🧮 Rule score: UNKNOWN." in txt and "🌐 Universe UNKNOWN" in txt
         assert "🔁" not in txt and "Earlier alert" not in txt
-        assert "For review only · not a buy instruction · no order placed" in txt
+        assert "Awareness only · not a trade prompt · no order placed" in txt
         assert "⚠️ This policy’s evaluated paper results were negative after costs." in txt
 
 
@@ -149,7 +149,7 @@ def test_session_close_comes_from_the_exchange_calendar_across_dst_and_half_days
     close = trading_window(date.fromisoformat(window)).close_utc
     txt = P.render_review_compact(q(window_id=window, data_as_of_utc=asof, event_utc=asof), now, "P",
                                   ctx(close=close))
-    assert f"⏱️ Scope: Today’s session, closing {close_et} ET. No entry, exit or holding rule." in txt
+    assert f"⏱️ Observed in today’s session (closes {close_et} ET)." in txt
     assert f"at {asof_et} ET" in txt and "Data 16 min old when written" in txt
 
 
@@ -233,9 +233,9 @@ def test_live_path_renders_compact_template_records_version_and_tracing_still_co
     ev, payload, state, prov = ob.execute("SELECT event_id, payload_text, state, provenance_json FROM "
                                           "ops_notification_outbox").fetchone()
     assert state == "SENT" and c.sent == [(payload, "HTML")]                  # one send, same text (V3: HTML)
-    assert payload.startswith("🔎 <b>AAA</b> · 🟢 ▲ UP +5.00% · UNVALIDATED\n")                    # V3 summary
+    assert payload.startswith("🔎 <b>AAA</b> · 🟢 ▲ UP +5.00% · AWARENESS ONLY\n")                 # V4 summary
     assert "<blockquote expandable>AAA · 🟢 ▲ UP +5.00%\nPrevious close: $9.52" in payload      # V2 body = details
-    assert "Form 144 proposed-sale notice" in payload and "closing 16:00 ET" in payload
+    assert "Form 144 proposed-sale notice" in payload and "closes 16:00 ET" in payload
     assert "🌐 Universe DTU_V3_TOP600\n🔖 Reference OPPORTUNITY_ENGINE:2026-09-24:AAA:GAP_UP" in payload
     assert json.loads(prov)["template_version"] == P.REVIEW_TEMPLATE_VERSION
     look = Tr.make_trace_lookup(P.signal_outbox_path(tmp_path), P.trace_path(tmp_path))(ev)
@@ -311,7 +311,7 @@ def test_direction_is_the_recorded_change_vs_prior_close_with_consistent_roundin
 def test_flex_example_layout():
     f = {**FEATS, "gap_pct": 3.0857, "prev_close": 114.74}
     txt = P.render_review_compact(q(symbol="FLEX"), NOW, "P", ctx(feats=f))
-    assert txt.startswith("🔎 RESEARCH OPPORTUNITY — UNVALIDATED\nFLEX · 🟢 ▲ UP +3.09%\nPrevious close: $114.74\n")
+    assert txt.startswith("🔎 MARKET MOVE — AWARENESS ONLY\nFLEX · 🟢 ▲ UP +3.09%\nPrevious close: $114.74\n")
 
 
 @pytest.mark.parametrize("gap,head", [(-3.0857, "🔴 ▼ DOWN −3.09%"), (0.0, "⚪ ▬ UNCHANGED 0.00%")])
@@ -326,8 +326,8 @@ def test_recorded_direction_overrides_a_conflicting_setup_label(gap, head):
 
 def test_every_section_icon_in_order_and_optional_repeat():
     txt = P.render_review_compact(q(), NOW, "P", ctx(prior="2026-10-01"))
-    order = ["📊 Why flagged", "💵 Historical price", "🕒 Data", "📄 SEC context", "⏱️ Scope", "🧮 Rule score",
-             "🔁 Earlier alert", "⚠️ This policy", "For review only", "🏷️ Policy", "🌐 Universe", "🔖 Reference"]
+    order = ["📊 Why flagged", "💵 Historical price", "🕒 Data", "📄 SEC context", "⏱️ Observed", "🧮 Rule score",
+             "🔁 Earlier alert", "⚠️ This policy", "Awareness only", "🏷️ Policy", "🌐 Universe", "🔖 Reference"]
     pos = [txt.index(x) for x in order]
     assert pos == sorted(pos)
     assert "🔁" not in P.render_review_compact(q(), NOW, "P", ctx())
@@ -336,8 +336,8 @@ def test_every_section_icon_in_order_and_optional_repeat():
 def test_minimal_fallback_keeps_every_essential_warning():
     for p in ({"symbol": "AAA", "promotion_id": "R"}, {}, None):
         txt = P.render_review_minimal(p, "OPPORTUNITY_PROMOTION_V1")
-        for must in ("RESEARCH OPPORTUNITY — UNVALIDATED", "not a live quote", "not a probability",
-                     "negative after costs", "For review only · not a buy instruction · no order placed",
+        for must in ("MARKET MOVE — AWARENESS ONLY", "not a live quote", "not a probability",
+                     "negative after costs", "Awareness only · not a trade prompt · no order placed",
                      "❔ DIRECTION UNKNOWN"):
             assert must in txt
         assert len(txt) < 4096
@@ -350,4 +350,4 @@ def test_double_fault_uses_minimal_fallback_and_still_sends_once(tmp_path, monke
     rich_seed(tmp_path, "AAA", tt(15))
     pr.tick()
     assert len(c.sent) == 1 and c.sent[0][1] is None
-    assert c.sent[0][0].startswith("🔎 RESEARCH OPPORTUNITY — UNVALIDATED\nAAA · ❔ DIRECTION UNKNOWN")
+    assert c.sent[0][0].startswith("🔎 MARKET MOVE — AWARENESS ONLY\nAAA · ❔ DIRECTION UNKNOWN")

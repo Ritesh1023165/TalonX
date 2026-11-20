@@ -85,7 +85,7 @@ def _v2fp() -> str:
         "research.scripts.task112_v2_release_fingerprint").v2_release_fingerprint()["fingerprint"]
 
 
-def test_p6_full_isolated_product_journey(tmp_path, monkeypatch):
+def test_p6_full_isolated_product_journey(tmp_path, monkeypatch, v2_delivery_dormant_path):
     home = tmp_path / "home"
     home.mkdir()
     store, accessions = _isolated_insider_store(tmp_path)
@@ -196,7 +196,7 @@ def test_p6_full_isolated_product_journey(tmp_path, monkeypatch):
     Path(tmp_path / "journey_correlation.json").write_text(json.dumps(corr, indent=2, default=str))
 
 
-def test_p6_interrupted_delivery_survives_restart(tmp_path, monkeypatch):
+def test_p6_interrupted_delivery_survives_restart(tmp_path, monkeypatch, v2_delivery_dormant_path):
     home = tmp_path / "home"; home.mkdir()
     store, _ = _isolated_insider_store(tmp_path)
     bd = _bars(tmp_path)
